@@ -1,0 +1,14 @@
+node_modules/
+dist/
+public/sdk/
+public/downloads/
+public/demo-react/
+examples/react/app.js
+.local/
+.vercel/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+supabase/.temp/
+supabase/.branches/
