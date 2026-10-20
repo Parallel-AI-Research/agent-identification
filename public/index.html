@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A small, website-owned visitor identification widget. Try it, then add it to your website."
+    />
+    <title>Agent Identification · Parallel Research</title>
+    <link rel="stylesheet" href="/demo.css" />
+    <script defer src="/sdk/v0.1.0/agent-id.js"></script>
+    <script defer src="/demo.js"></script>
+  </head>
+  <body>
+    <header><a href="/">Parallel Research</a><span>Agent Identification · v0.1.0</span></header>
+    <main>
+      <div class="eyebrow">A website-owned integration</div>
+      <h1>Let visitors<br />say how they’re visiting.</h1>
+      <p class="intro">
+        A small widget for people and AI assistants. Add it with a script tag or import it into your
+        app.
+      </p>
+      <div class="links">
+        <a href="https://github.com/Parallel-AI-Research/agent-identification"
+          >Source &amp; documentation ↗</a
+        ><a href="/demo-react/">Try the React example →</a>
+      </div>
+      <div class="layout">
+        <section class="card" aria-labelledby="try-title">
+          <div class="eyebrow">01 / Try it</div>
+          <h2 id="try-title">A choice before continuing.</h2>
+          <p id="mode-description">
+            Choose any option, then try the form. Your response is recorded for this demo session.
+          </p>
+          <div id="visitor-choice"></div>
+          <form id="demo-form">
+            <label
+              >Announcement headline<input name="headline" placeholder="What’s new?" required
+            /></label>
+            <button type="submit">Preview announcement</button>
+          </form>
+          <output id="preview-result" aria-live="polite"></output>
+          <div class="controls">
+            <button id="reset" class="secondary" type="button">Start a new session</button
+            ><a href="/?mode=optional">Try optional mode</a><a href="/">Required mode</a>
+          </div>
+          <p class="small">
+            Only the choice is sent. The headline stays in this browser. “Person” and “Prefer not to
+            say” also let you continue.
+          </p>
+        </section>
+        <section class="card" aria-labelledby="install-title">
+          <div class="eyebrow">02 / Add it</div>
+          <h2 id="install-title">One script. Your website.</h2>
+          <p>
+            This snippet is configured for <strong>useparallel.com</strong> and
+            <strong>www.useparallel.com</strong>.
+          </p>
+          <pre><code id="install-code">Loading installation snippet…</code></pre>
+          <button id="copy" class="secondary" type="button">Copy snippet</button>
+          <output id="copy-result" aria-live="polite"></output>
+          <p class="small">
+            For another website, register its exact origins with your collector operator and use its
+            own public site ID.
+          </p>
+          <div class="divider">
+            <h3>Prefer a package?</h3>
+            <pre><code id="package-code"></code></pre>
+            <p>
+              Includes JavaScript, React and Node server exports. Install directly from the
+              versioned tarball.
+            </p>
+          </div>
+        </section>
+      </div>
+      <aside class="note">
+        <strong>A declaration is a statement, not verified identity.</strong> This visible prompt
+        does not detect every agent or identify agents invisibly. For protected actions, add the
+        server verification helper to your existing authentication and permission checks.
+      </aside>
+    </main>
+    <footer>
+      <span>Parallel Research · Open source</span
+      ><a
+        href="https://github.com/Parallel-AI-Research/agent-identification/blob/main/docs/operations.md"
+        >Collector operations</a
+      >
+    </footer>
+  </body>
+</html>
