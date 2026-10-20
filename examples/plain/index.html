@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fieldwork — Script installation</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script
+      id="identification-script"
+      defer
+      src="http://127.0.0.1:4310/sdk/v0.1.0/agent-id.js"
+      data-site="demo-site"
+      data-api="http://127.0.0.1:4310"
+      data-target="#visitor-choice"
+      data-mode="required"
+      data-gate="#publish-form"
+    ></script>
+    <script defer src="/plain/demo.js"></script>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <div class="brand"><span>f</span>fieldwork</div>
+        <div class="tag">Team workspace · Script example</div>
+      </nav>
+    </header>
+    <main>
+      <div class="eyebrow">Workspace / Announcements</div>
+      <h1>A little progress, shared.</h1>
+      <p class="intro">
+        Keep your team in the loop. This local example shows how a website can collect a visitor’s
+        self-reported classification.
+      </p>
+      <div id="visitor-choice"></div>
+      <div class="layout">
+        <section class="card">
+          <h2>Publish an update</h2>
+          <p>Give the team a short update about what you’re working on.</p>
+          <form id="publish-form">
+            <label>Headline<input name="headline" placeholder="What’s new?" required /></label>
+            <label
+              >Update<textarea name="update" placeholder="A few words for your team…"></textarea>
+            </label>
+            <button type="submit">Publish update</button>
+          </form>
+          <output id="publish-result" aria-live="polite"></output>
+        </section>
+        <aside class="card">
+          <h2>One script. Your website.</h2>
+          <p>
+            The widget and API run on a separate origin. There are no third-party cookies, fonts,
+            analytics, or account credentials.
+          </p>
+          <p class="small">
+            This is a local demo. Publishing only updates this page; it sends no content to a
+            server. A choice is self-reported and does not prove identity or authorize an action.
+          </p>
+          <div class="divider">
+            <a href="/plain/?mode=optional">Try optional mode</a> ·
+            <a href="/plain/">Required mode</a>
+            <div class="controls">
+              <button class="secondary" id="reset" type="button">Reset declaration</button>
+              <button class="secondary" id="remove" type="button">Remove widget</button>
+              <button class="secondary" id="mount" type="button">Mount widget</button>
+            </div>
+            <output id="lifecycle-result" aria-live="polite"></output>
+          </div>
+        </aside>
+      </div>
+      <footer>Fieldwork demo · <a href="/react/">Open React package example</a></footer>
+    </main>
+  </body>
+</html>
