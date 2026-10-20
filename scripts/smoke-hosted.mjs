@@ -21,6 +21,7 @@ if (
 }
 const baseUrl = target.origin;
 const secret = process.env.AGENT_ID_SITE_SECRET;
+const trialSecret = process.env.AGENT_ID_TRIAL_SECRET;
 const origin = "https://useparallel.com";
 const outputDirectory = resolve(".local");
 await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
@@ -152,12 +153,22 @@ try {
 
   const browserEnv = { ...process.env };
   delete browserEnv.AGENT_ID_SITE_SECRET;
+  delete browserEnv.AGENT_ID_TRIAL_SECRET;
   browser = await chromium.launch({ env: browserEnv });
 
   currentStep = "public-demo-record-and-reset";
   const landing = await newPage();
   await landing.goto(baseUrl);
   await landing.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
+  check(
+    (await landing.locator("#install-code").textContent()).includes("data-site") &&
+      (await landing.locator("#package-code").textContent()).includes("npm install"),
+    "Landing installation instructions are missing.",
+  );
+  check(
+    (await landing.locator('a[href="/trial/"]').count()) > 0,
+    "Landing does not link to the clean trial.",
+  );
   check(await gated(landing, "#demo-form"), "Public demo must initially gate its form.");
   await landing.screenshot({ path: screenshotPath, fullPage: true });
   await chmod(screenshotPath, 0o600);
@@ -181,6 +192,113 @@ try {
   );
   check(await gated(landing, "#demo-form"), "Reset must gate the form again.");
   report.checks.push("public-demo-recorded", "public-demo-reset-revoked");
+
+  currentStep = "clean-required-trial";
+  const trial = await newPage();
+  await trial.goto(`${baseUrl}/trial/`);
+  await trial.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
+  check(await gated(trial, "#announcement-form"), "Required trial must gate its form.");
+  const trialText = await trial.locator("body").evaluate((body) => {
+    const clone = body.cloneNode(true);
+    clone.querySelector("#visitor-choice")?.remove();
+    clone.querySelectorAll("script, style").forEach((element) => element.remove());
+    return clone.textContent ?? "";
+  });
+  check(
+    !/\b(?:install|npm|SDK|research|experiment|trial|collector|optional mode|required mode|new session|reset declaration)\b/i.test(
+      trialText,
+    ) && (await trial.locator("pre, code").count()) === 0,
+    "Trial includes installation or experiment instructions.",
+  );
+  const trialDeclaration = await declare(trial, "agent-trials", baseUrl);
+  check(!(await gated(trial, "#announcement-form")), "Accepted trial choice did not unlock.");
+  await trial.locator('[name="headline"]').fill("Hosted trial smoke check");
+  await trial.locator('[name="body"]').fill("This announcement remains a local preview.");
+  await trial.getByRole("button", { name: "Preview announcement", exact: true }).click();
+  await trial.getByRole("heading", { name: "Announcement preview", exact: true }).waitFor();
+  check(
+    (await trial.locator("#announcement-preview").textContent()).includes(
+      "Hosted trial smoke check",
+    ),
+    "Trial did not preview the entered headline.",
+  );
+  const reloaded = trial.waitForResponse(
+    (response) =>
+      response.url() === `${baseUrl}/v1/sessions` &&
+      response.request().method() === "POST" &&
+      response.status() === 201,
+  );
+  await trial.reload();
+  const reloadedSession = await (await reloaded).json();
+  await trial.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
+  check(
+    reloadedSession.siteId === "agent-trials" &&
+      reloadedSession.sessionId !== trialDeclaration.sessionId &&
+      reloadedSession.choice === null &&
+      (await gated(trial, "#announcement-form")),
+    "Trial reload inherited a recorded identification session.",
+  );
+  report.checks.push("clean-required-trial-recorded-and-previewed", "trial-reload-starts-fresh");
+
+  currentStep = "clean-optional-trial";
+  let optionalDeclarations = 0;
+  trial.on("request", (incoming) => {
+    if (incoming.url() === `${baseUrl}/v1/declarations` && incoming.method() === "POST") {
+      optionalDeclarations += 1;
+    }
+  });
+  const optionalCreated = trial.waitForResponse(
+    (response) =>
+      response.url() === `${baseUrl}/v1/sessions` &&
+      response.request().method() === "POST" &&
+      response.status() === 201,
+  );
+  await trial.goto(`${baseUrl}/trial/?mode=optional`);
+  const optionalSession = await (await optionalCreated).json();
+  await trial.getByRole("button", { name: "Person", exact: true }).waitFor();
+  check(!(await gated(trial, "#announcement-form")), "Optional trial blocked its form.");
+  await trial.locator('[name="headline"]').fill("No identification was submitted");
+  await trial
+    .locator('[name="body"]')
+    .fill("An unanswered optional choice leaves the task usable.");
+  await trial.getByRole("button", { name: "Preview announcement", exact: true }).click();
+  await trial.getByRole("heading", { name: "Announcement preview", exact: true }).waitFor();
+  check(optionalDeclarations === 0, "Optional trial automatically submitted a declaration.");
+  const optionalStatusResponse = await request("/v1/sessions/current", {
+    headers: sessionHeaders(optionalSession),
+  });
+  check(optionalStatusResponse.ok, "Optional trial session could not be checked.");
+  const optionalStatus = await optionalStatusResponse.json();
+  check(
+    optionalStatus.siteId === "agent-trials" && optionalStatus.choice === null,
+    "Optional trial unexpectedly recorded identification.",
+  );
+  report.checks.push("optional-trial-task-without-identification");
+
+  if (trialSecret) {
+    currentStep = "private-trial-event-export";
+    const exported = await request("/v1/events?siteId=agent-trials&limit=1000", {
+      headers: { Authorization: `Bearer ${trialSecret}` },
+    });
+    check(exported.ok, "Private trial event export failed.");
+    const data = await exported.json();
+    check(Array.isArray(data.events), "Trial event export is malformed.");
+    const event = data.events.find((candidate) => candidate.id === trialDeclaration.eventId);
+    check(
+      event?.siteId === "agent-trials" &&
+        event.origin === baseUrl &&
+        event.choice === "ai_assistant" &&
+        event.sessionId === trialDeclaration.sessionId,
+      "Trial browser declaration is missing from private event export.",
+    );
+    check(
+      !data.events.some((candidate) => candidate.sessionId === optionalSession.sessionId),
+      "Optional unanswered trial unexpectedly has a declaration event.",
+    );
+    report.checks.push("private-trial-export-matches-required-and-optional-evidence");
+  } else {
+    report.trialSecretChecks = "skipped: AGENT_ID_TRIAL_SECRET was not supplied";
+  }
 
   currentStep = "react-demo";
   const react = await newPage();
