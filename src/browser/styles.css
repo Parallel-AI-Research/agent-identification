@@ -1,0 +1,94 @@
+:host {
+  display: block;
+  color-scheme: light dark;
+  font-family: var(--agent-id-font, ui-sans-serif, system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--agent-id-text, #17202a);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.agent-identification {
+  padding: 20px;
+  border: 1px solid var(--agent-id-border, #d7dce1);
+  border-radius: var(--agent-id-radius, 12px);
+  background: var(--agent-id-background, #fff);
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+p {
+  margin: 0 0 16px;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--agent-id-button-border, #64748b);
+  border-radius: 6px;
+  background: var(--agent-id-button-background, #fff);
+  color: var(--agent-id-text, #17202a);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--agent-id-hover, #f1f5f9);
+}
+
+button:focus-visible {
+  outline: 3px solid var(--agent-id-focus, #2563eb);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+button[hidden] {
+  display: none;
+}
+
+.status {
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.status + button {
+  margin-top: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    color: var(--agent-id-text, #f1f5f9);
+  }
+
+  .agent-identification {
+    background: var(--agent-id-background, #17202a);
+    border-color: var(--agent-id-border, #64748b);
+  }
+
+  button {
+    background: var(--agent-id-button-background, #17202a);
+    color: var(--agent-id-text, #f1f5f9);
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--agent-id-hover, #273445);
+  }
+}
