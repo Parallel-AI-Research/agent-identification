@@ -56,6 +56,7 @@ declare one.
 ### macOS Firefox test runner limitation
 
 On 20 October 2026, Chromium and WebKit passed all 17 local integration cases.
+[Linux CI passed all 51 cases across Chromium, Firefox, and WebKit](https://github.com/Parallel-AI-Research/agent-identification/actions/runs/39404164376).
 The bundled Firefox 157 / Playwright 1.64.1 failed before loading a page with
 `Could not find profile folder`, including when using a fresh temporary profile
 under `/private/tmp`. This matches
@@ -65,7 +66,7 @@ directory despite having a temporary test profile. The upstream fix is slated
 for Playwright 1.65.
 
 Do not change personal browser profiles or grant broad disk permissions for
-these tests. The repository keeps Firefox enabled for the Linux CI run.
+these tests. Firefox remains enabled and verified in Linux CI.
 Chromium and WebKit can be checked locally with:
 
 ```sh

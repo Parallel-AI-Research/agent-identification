@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": "24.x"
   },
   "files": [
     "dist",
@@ -47,6 +47,7 @@
     "format:check": "prettier . --check",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
+    "smoke:hosted": "node scripts/smoke-hosted.mjs",
     "test:package": "node scripts/test-package.mjs",
     "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm test && npm run test:package",
     "dev:collector": "node --import tsx scripts/dev-server.ts",

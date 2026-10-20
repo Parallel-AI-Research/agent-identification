@@ -8,6 +8,13 @@ This is **visible, self-reported classification**. It does not detect every agen
 prove identity, or grant permissions. An agent can skip an optional prompt or
 choose a different answer. Required mode asks every visitor to choose.
 
+**Live demo and copyable Parallel snippet:**
+[parallel-agent-identification.vercel.app](https://parallel-agent-identification.vercel.app).
+Parallel's public site ID is `parallel`, allowed on `https://useparallel.com` and
+`https://www.useparallel.com`. Use
+`https://parallel-agent-identification.vercel.app` wherever the examples below
+say `https://YOUR-COLLECTOR`.
+
 ## Add it to a website
 
 Ask your collector operator for its URL and a public site ID registered for your
@@ -87,13 +94,10 @@ const widget = init({
   },
 });
 await widget.ready;
-// Explicitly revoke and start over when appropriate, for example on logout:
-await widget.reset();
-// On navigation/unmount, remove listeners/DOM and restore the original UI state:
-widget.destroy();
 ```
 
-`reset()` revokes the previous collector session. `destroy()` only unmounts; it
+Call `await widget.reset()` to revoke the previous collector session and start
+over. Call `widget.destroy()` on unmount/navigation; it
 does not revoke a session. The default storage is per-tab `sessionStorage`, scoped
 to site, origin, collector and binding context. If storage is blocked it uses
 memory. Choose `storage: "memory"` when persistence across reloads is unwanted.
@@ -181,6 +185,8 @@ Versioned asset hashes are at `/sdk/v0.1.0/integrity.json`.
 
 ## Development and operating the collector
 
+Use Node.js 24 (`nvm use` reads the included `.nvmrc`).
+
 ```sh
 npm ci
 npm run build
@@ -198,6 +204,12 @@ npm run check
 npx playwright install chromium firefox webkit
 npm run test:e2e
 ```
+
+After deployment, run `npm run smoke:hosted -- https://YOUR-COLLECTOR`.
+With `AGENT_ID_SITE_SECRET` set to Parallel's private server secret, it also checks
+event export, bound-session verification and revocation. The cross-origin page is
+an intercepted browser fixture; this does not install anything on Parallel's
+website. Sanitized results stay in ignored `.local/`.
 
 See [operating the collector](docs/operations.md), [API contract](docs/protocol.md)
 and [integration examples](examples/README.md). Production requires PostgreSQL
