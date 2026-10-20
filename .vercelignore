@@ -1,0 +1,14 @@
+.git
+.local
+.env*
+node_modules
+dist
+coverage
+test-results
+playwright-report
+supabase/.temp
+supabase/.branches
+examples/react/app.js
+public/sdk
+public/downloads
+public/demo-react
