@@ -179,6 +179,9 @@ code {
   line-height: 1.8;
   font-size: 13px;
 }
+.trial-links {
+  margin-top: 24px;
+}
 footer {
   color: #69796d;
 }

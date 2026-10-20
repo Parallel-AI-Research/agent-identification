@@ -1,0 +1,37 @@
+header,
+main {
+  max-width: 780px;
+}
+main {
+  padding-top: 44px;
+}
+h1 {
+  font-size: clamp(36px, 6vw, 56px);
+}
+.card {
+  margin-top: 28px;
+}
+#compose-title {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+textarea {
+  width: 100%;
+  resize: vertical;
+  background: white;
+  color: inherit;
+  font: inherit;
+  border: 1px solid #b9c8bb;
+  border-radius: 7px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+textarea:focus-visible {
+  outline: 3px solid #bc9b35;
+  outline-offset: 3px;
+}
+#preview-headline,
+#preview-body {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

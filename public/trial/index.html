@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Announcements · Fieldwork</title>
+    <link rel="stylesheet" href="/demo.css" />
+    <link rel="stylesheet" href="/trial/trial.css" />
+    <script defer src="/sdk/v0.1.0/agent-id.js"></script>
+    <script defer src="/trial/trial.js"></script>
+  </head>
+  <body>
+    <header><strong>Fieldwork</strong><span>Team workspace</span></header>
+    <main>
+      <div class="eyebrow">Workspace / Announcements</div>
+      <h1>Keep your team<br />in the loop.</h1>
+      <p class="intro">Prepare an update and preview it before sharing.</p>
+      <section class="card" aria-labelledby="compose-title">
+        <h2 id="compose-title">New announcement</h2>
+        <div id="visitor-choice"></div>
+        <p id="page-status" role="alert" hidden></p>
+        <form id="announcement-form" hidden>
+          <label>
+            Headline
+            <input name="headline" placeholder="What’s new?" maxlength="200" required />
+          </label>
+          <label>
+            Update
+            <textarea
+              name="body"
+              placeholder="A few words for your team…"
+              maxlength="2000"
+              rows="4"
+            ></textarea>
+          </label>
+          <button type="submit">Preview announcement</button>
+        </form>
+        <noscript><p>Enable JavaScript to compose your announcement.</p></noscript>
+      </section>
+      <section
+        id="announcement-preview"
+        class="card"
+        aria-labelledby="preview-title"
+        aria-live="polite"
+        hidden
+      >
+        <h2 id="preview-title">Announcement preview</h2>
+        <h3 id="preview-headline"></h3>
+        <p id="preview-body"></p>
+      </section>
+    </main>
+  </body>
+</html>

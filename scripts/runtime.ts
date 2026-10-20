@@ -15,6 +15,16 @@ export function createRuntime(options: { demo?: boolean; vercel?: boolean } = {}
           origins: ["http://127.0.0.1:4311", "http://127.0.0.1:4312"],
           secret: DEMO_SECRET,
         },
+        {
+          id: "public-demo",
+          origins: ["http://127.0.0.1:4310"],
+          secret: DEMO_SECRET,
+        },
+        {
+          id: "agent-trials",
+          origins: ["http://127.0.0.1:4310"],
+          secret: DEMO_SECRET,
+        },
       ]
     : JSON.parse(process.env.AGENT_ID_SITES ?? "null");
   if (!Array.isArray(sites) || sites.length === 0) throw Error("Configure AGENT_ID_SITES");

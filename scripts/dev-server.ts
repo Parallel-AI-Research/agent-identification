@@ -12,11 +12,22 @@ const server = createServer(async (req, res) => {
       req.method === "GET" &&
       (url.pathname.startsWith("/sdk/") ||
         url.pathname.startsWith("/downloads/") ||
+        url.pathname.startsWith("/trial/") ||
+        url.pathname.startsWith("/demo-react/") ||
+        ["/demo.js", "/demo.css", "/trial", "/demo-react"].includes(url.pathname) ||
         url.pathname === "/")
     ) {
+      if (["/trial", "/demo-react"].includes(url.pathname)) {
+        res.writeHead(308, { Location: `${url.pathname}/${url.search}` });
+        res.end();
+        return;
+      }
       const file = resolve(
         root,
-        "." + (url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname)),
+        "." +
+          decodeURIComponent(
+            url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname,
+          ),
       );
       if (!file.startsWith(root + sep)) {
         res.writeHead(404);
@@ -36,6 +47,9 @@ const server = createServer(async (req, res) => {
           "Content-Type": types[extname(file)] || "application/octet-stream",
           "Access-Control-Allow-Origin": "*",
           "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "no-store",
+          "Content-Security-Policy":
+            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
         });
         res.end(body);
         return;
