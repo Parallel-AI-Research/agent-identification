@@ -10,7 +10,8 @@
 
 - [x] Built database-backed sites, the owner API, rotation and DNS verification.
 - [x] Built the customer dashboard.
-- [x] Applied all migrations to the dedicated Supabase project.
+- [x] Applied the first three customer migrations to the dedicated Supabase project.
+- [x] Moved site credentials and origins from products to environments.
 
 ## Verification Evidence
 
@@ -32,6 +33,7 @@
 ## Blockers / Risks
 
 - The hosted collector still runs the old code and database.
+- The environments migration is not applied to the dedicated Supabase project yet.
 - Supabase production auth settings and custom SMTP are not configured.
 
 ## Next Session Startup
