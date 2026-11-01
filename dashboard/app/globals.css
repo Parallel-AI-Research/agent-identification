@@ -1,4 +1,21 @@
 @import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* The public site uses the same palette as the dashboard. */
+@theme {
+  --color-fd-background: #f8f9fc;
+  --color-fd-foreground: #212a3e;
+  --color-fd-muted-foreground: #5f6879;
+  --color-fd-card: #fff;
+  --color-fd-popover: #fff;
+  --color-fd-border: #e6e9ef;
+  --color-fd-primary: #5658cd;
+  --color-fd-primary-foreground: #fff;
+  --color-fd-accent: #eef0ff;
+  --color-fd-accent-foreground: #494cc2;
+  --color-fd-ring: #6666d7;
+}
 
 @theme inline {
   --color-background: #f8f9fc;

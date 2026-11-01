@@ -12,7 +12,11 @@ export function AgentSetup({ values, origins }: { values: InstallValues; origins
           Paste these instructions into Claude Code, Cursor, Codex or any coding agent that can edit
           your project. They include your public site ID and no secrets.
         </p>
-        <CopyBlock value={agentPrompt(values, origins)} label="Copy instructions" wrap />
+        <CopyBlock
+          value={agentPrompt(values, origins, `${process.env.SITE_URL}/llms.txt`)}
+          label="Copy instructions"
+          wrap
+        />
       </div>
     </details>
   );

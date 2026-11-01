@@ -35,7 +35,9 @@ test("origins can be separated by new lines, commas or spaces, without duplicate
 });
 
 test("agent instructions are specific to the product and carry no secret", () => {
-  const prompt = agentPrompt(values, ["https://a.example", "https://b.example"]);
+  const docsUrl = "https://dashboard.example/llms.txt";
+  const prompt = agentPrompt(values, ["https://a.example", "https://b.example"], docsUrl);
+  assert(prompt.includes(docsUrl));
   assert(prompt.includes(values.siteId));
   assert(prompt.includes(values.collectorUrl));
   assert(prompt.includes("https://a.example, https://b.example"));

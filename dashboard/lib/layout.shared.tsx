@@ -1,0 +1,14 @@
+import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
+import { appName } from "./shared";
+
+export function baseOptions(): BaseLayoutProps {
+  return {
+    nav: { title: appName },
+    themeSwitch: { enabled: false },
+    links: [
+      { text: "Docs", url: "/docs", active: "nested-url" },
+      { text: "Changelog", url: "/changelog", active: "nested-url" },
+      { text: "Dashboard", url: "/dashboard" },
+    ],
+  };
+}

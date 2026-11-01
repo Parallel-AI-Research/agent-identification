@@ -11,10 +11,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <>
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4">
-          <Link className="shrink-0 text-sm font-semibold text-primary" href="/products">
+          <Link className="shrink-0 text-sm font-semibold text-primary" href="/dashboard">
             Agent analytics
           </Link>
           <div className="flex min-w-0 items-center gap-3">
+            <Link className="text-sm text-muted-foreground hover:text-foreground" href="/docs">
+              Docs
+            </Link>
             <span className="truncate text-sm text-muted-foreground">
               {String(data?.claims.email ?? "")}
             </span>

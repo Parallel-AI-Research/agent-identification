@@ -1,0 +1,75 @@
+---
+title: Install
+description: Add the widget with a script tag, JavaScript or React.
+---
+
+Your product page in the dashboard has these snippets with your own site ID filled in. The site ID is public, so it's safe to commit.
+
+## Script tag
+
+This works on any website:
+
+```html
+<div id="visitor-choice"></div>
+<script
+  defer
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.1.0/agent-id.js"
+  data-site="YOUR-SITE-ID"
+  data-target="#visitor-choice"
+  data-mode="optional"
+></script>
+```
+
+Without `data-target`, the widget adds itself to the end of the page.
+
+## JavaScript
+
+```sh
+npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.1.0.tgz
+```
+
+```js
+import { init } from "@parallel-research/agent-identification";
+
+const widget = init({
+  container: "#visitor-choice",
+  siteId: "YOUR-SITE-ID",
+  apiUrl: "https://parallel-agent-identification.vercel.app",
+  mode: "optional",
+});
+await widget.ready;
+```
+
+## React and Next.js
+
+React is an optional peer dependency. In Next.js, render this from a client component:
+
+```tsx
+"use client";
+import { AgentIdentification } from "@parallel-research/agent-identification/react";
+
+export function VisitorChoice() {
+  return (
+    <AgentIdentification
+      siteId="YOUR-SITE-ID"
+      apiUrl="https://parallel-agent-identification.vercel.app"
+      mode="optional"
+    />
+  );
+}
+```
+
+## Optional and required modes
+
+| Mode       | What the visitor sees                                               |
+| ---------- | ------------------------------------------------------------------- |
+| `optional` | The prompt, which they can ignore.                                  |
+| `required` | The prompt, which must be answered before using a section you gate. |
+
+To gate a section, add `data-mode="required"` and `data-gate="#your-section"`. Any of the three answers unlocks it, and it only unlocks once the collector has accepted the answer.
+
+A gate in the browser can be bypassed, so it doesn't protect anything by itself. Use [server verification](/docs/server-verification) for protected actions.
+
+## Content Security Policy
+
+If your site uses one, allow the collector in `script-src`, `style-src` and `connect-src`. The widget needs no inline scripts or styles.

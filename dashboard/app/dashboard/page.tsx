@@ -10,7 +10,7 @@ export default async function ProductsPage() {
         <h1 className="text-xl font-semibold">Your products</h1>
         <Link
           className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground"
-          href="/products/new"
+          href="/dashboard/products/new"
         >
           Add product
         </Link>
@@ -19,7 +19,7 @@ export default async function ProductsPage() {
         <ul className="space-y-3">
           {products.map((product) => (
             <li key={product.id}>
-              <Link href={`/products/${product.id}`} className="block">
+              <Link href={`/dashboard/products/${product.id}`} className="block">
                 <Card className="transition hover:border-primary/40">
                   <p className="font-medium">{product.name}</p>
                   <p className="mt-1 truncate text-sm text-muted-foreground">

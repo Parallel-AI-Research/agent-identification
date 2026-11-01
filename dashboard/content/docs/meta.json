@@ -1,0 +1,14 @@
+{
+  "title": "Docs",
+  "pages": [
+    "---Get started---",
+    "index",
+    "quickstart",
+    "---Install---",
+    "install",
+    "coding-agents",
+    "---Guides---",
+    "server-verification",
+    "limits"
+  ]
+}

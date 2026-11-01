@@ -36,7 +36,7 @@ async function signUp(page: Page, email: string): Promise<void> {
 }
 async function confirm(page: Page, email: string): Promise<void> {
   await page.goto(await emailLink(page, email, /http[^\s"<>]+type=signup[^\s"<>]*/));
-  await expect(page).toHaveURL(/\/products$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
 }
 async function signIn(page: Page, email: string, password = PASSWORD): Promise<void> {
   await page.goto("/sign-in");
@@ -45,7 +45,7 @@ async function signIn(page: Page, email: string, password = PASSWORD): Promise<v
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 async function addProduct(page: Page, name: string, origins: string[]): Promise<string> {
-  await page.goto("/products/new");
+  await page.goto("/dashboard/products/new");
   await page.getByLabel("Product name").fill(name);
   await page.getByLabel("Website origins").fill(origins.join("\n"));
   await page.getByRole("button", { name: "Create product" }).click();
@@ -63,7 +63,7 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await confirm(page, email);
   await expect(page.getByText("No products yet")).toBeVisible();
 
-  await page.goto("/products/new");
+  await page.goto("/dashboard/products/new");
   await page.getByLabel("Product name").fill("Wildcard");
   await page.getByLabel("Website origins").fill("https://*.example.com");
   await page.getByRole("button", { name: "Create product" }).click();
@@ -72,7 +72,7 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   const secret = await addProduct(page, "Storefront", [SITE, "https://www.onboarding.example"]);
   expect(secret).toMatch(/^[A-Za-z0-9_-]{43}$/);
   await page.getByRole("link", { name: "Continue to install" }).click();
-  await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/dashboard\/products\/[0-9a-f-]{36}$/);
   expect(page.url()).not.toContain(secret);
   await expect(page.locator("body")).not.toContainText(secret);
 
@@ -101,7 +101,7 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
     await new Promise((resolve) => website.close(resolve));
   }
 
-  await page.goto("/products");
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: /Storefront/ }).click();
 
   await expect(page.getByText("Unverified", { exact: true })).toBeVisible();
@@ -124,7 +124,7 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
-  await page.goto("/products");
+  await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
@@ -134,7 +134,7 @@ test("a second customer cannot reach the first customer's product", async ({ pag
   await confirm(page, first);
   await addProduct(page, "Private product", ["https://first.example"]);
   await page.getByRole("link", { name: "Continue to install" }).click();
-  await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/dashboard\/products\/[0-9a-f-]{36}$/);
   const url = page.url();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -164,7 +164,7 @@ test("an email link opened in another browser explains what happened", async ({
   await expect(other.getByText("Your email is confirmed")).toBeVisible();
   await expect(other.locator("p[role=alert]")).toHaveCount(0);
   await signIn(other, email);
-  await expect(other).toHaveURL(/\/products$/);
+  await expect(other).toHaveURL(/\/dashboard$/);
   await elsewhere.close();
 
   await page.goto("/forgot-password");
@@ -228,12 +228,12 @@ test("password reset works and doesn't reveal who has an account", async ({ page
   const replacement = "a-brand-new-password";
   await page.getByLabel("New password").fill(replacement);
   await page.getByRole("button", { name: "Save password" }).click();
-  await expect(page).toHaveURL(/\/products$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 
   await signIn(page, email);
   await expect(page.locator("p[role=alert]")).toContainText("incorrect");
   await signIn(page, email, replacement);
-  await expect(page).toHaveURL(/\/products$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
 });
