@@ -51,6 +51,19 @@ cached briefly to keep public traffic away from the database. No wildcard origin
 The public site ID and `Origin` checks are not proof that a request is legitimate:
 non-browser clients can copy both. All declarations remain self-reported.
 
+## Dashboard
+
+The customer dashboard is a separate Vercel project with its root directory set to
+`dashboard/`. It holds no database credentials; the collector's owner API enforces
+ownership.
+
+1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `COLLECTOR_URL` and `SITE_URL` as listed in `dashboard/.env.example`.
+2. In the Supabase project, set the site URL to the dashboard's URL and allow
+   `SITE_URL/auth/confirm` as a redirect, with and without `?next=/reset-password`.
+3. Configure custom SMTP before external testing. Supabase's built-in email sender
+   is heavily rate limited.
+
 ## Logs and retention
 
 The collector's stored event is the recording evidence. Export the newest events

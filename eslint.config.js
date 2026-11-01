@@ -5,6 +5,7 @@ export default ts.config(
   {
     ignores: [
       "dist/**",
+      "dashboard/**",
       "node_modules/**",
       ".local/**",
       ".vercel/**",

@@ -1,4 +1,7 @@
 node_modules/
+.next/
+dashboard/next-env.d.ts
+dashboard/tsconfig.tsbuildinfo
 dist/
 public/sdk/
 public/downloads/
