@@ -30,9 +30,19 @@ const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z][a-z0-9-]+$/;
 const TXT_PREFIX = "_agent-identification";
 const TXT_VALUE = "agent-identification-verification";
 
-function resolver(): (name: string) => Promise<string[][]> {
-  const dns = new Resolver({ timeout: 5000, tries: 2 });
-  return (name) => dns.resolveTxt(name);
+/**
+ * Asks public resolvers, so the answer doesn't depend on a host's DNS setup and can't
+ * come from internal records. Bounded, so a slow lookup can't hold a request open.
+ */
+export async function publicTxtLookup(name: string): Promise<string[][]> {
+  const dns = new Resolver({ timeout: 3000, tries: 1 });
+  dns.setServers(["1.1.1.1", "8.8.8.8"]);
+  const deadline = setTimeout(() => dns.cancel(), 6000);
+  try {
+    return await dns.resolveTxt(name);
+  } finally {
+    clearTimeout(deadline);
+  }
 }
 function view(product: ProductRecord, now: number) {
   const overlap = (product.previousSecretExpiresAt ?? 0) > now;
@@ -210,7 +220,7 @@ export async function handleOwnerRequest(
     const expected = domainView(claim!).record;
     let values: string[] = [];
     try {
-      values = (await (owners.resolveTxt ?? resolver())(expected.name)).map((part) =>
+      values = (await (owners.resolveTxt ?? publicTxtLookup)(expected.name)).map((part) =>
         part.join(""),
       );
     } catch {
