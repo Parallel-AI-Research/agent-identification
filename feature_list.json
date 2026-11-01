@@ -12,21 +12,28 @@
         "The harness validator scores all five subsystems.",
         "Harness files stay out of the published package and the deployed site."
       ],
+      "decisions": [],
       "openDecisions": [],
-      "evidence": "2026-11-01: ./init.sh --full exited 0 with 60/60 tests and 48/48 Chromium and WebKit browser tests. A misformatted file made ./init.sh exit 1. validate-harness scored 100/100, a structural score only. npm pack --dry-run listed 15 files, none of them harness files, and Vercel serves only public/. Firefox and hosted smoke checks were not run."
+      "evidence": "2026-11-01: ./init.sh --full exited 0 with 60/60 tests and 48/48 Chromium and WebKit browser tests. A misformatted file made ./init.sh exit 1. validate-harness scored 100/100, a structural score only. npm pack --dry-run listed 15 files, none of them harness files, and Vercel serves only public/. CI passed 60/60 tests and 72/72 browser tests, including Firefox. Firefox was not run locally, and hosted smoke checks were not run."
     },
     {
       "id": "feat-002",
       "name": "Customer and product ownership",
       "description": "Replace operator-only site provisioning with persisted customer and product ownership, enforced on every product, settings and telemetry query.",
       "dependencies": ["feat-001"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "Two independent customers can create products and receive different configuration.",
         "Neither customer can read or modify the other's products or telemetry, at the API as well as the UI.",
-        "Demo and ticket-app installations keep working through the migration."
+        "Demo and ticket-app installations keep working through the migration.",
+        "Sites and their origins load from the database, replacing the AGENT_ID_SITES environment variable.",
+        "Site secrets are encrypted at rest, because the collector must read them to sign."
       ],
-      "openDecisions": ["Customer auth mechanism", "Dashboard framework and location"],
+      "decisions": [
+        "Customer auth uses Supabase Auth in a dedicated project, separate from the research app's accounts. The collector schema moves to that project.",
+        "The dashboard is a Next.js app in dashboard/ in this repository, deployed as a second Vercel project."
+      ],
+      "openDecisions": [],
       "evidence": ""
     },
     {
@@ -34,16 +41,21 @@
       "name": "Signup, add product and install instructions",
       "description": "Self-service flow: sign up, add a product with its exact permitted origins, then copy script or package instructions for the chosen integration.",
       "dependencies": ["feat-002"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "Owners can sign up, sign in, recover their account and sign out without operator help.",
         "Each product gets a generated public installation identifier; any server credential is separate and labelled server-only.",
         "Invalid or unapproved origins fail clearly.",
         "Secrets never appear in the browser bundle or public snippet.",
-        "The chosen domain-control check is implemented and tested; an origin allowlist alone is not treated as proof of ownership.",
-        "No pre-populated customer account, site ID, key or domain allowlist ships with onboarding."
+        "The DNS TXT check is implemented and tested, unverified domains are labelled, and a domain cannot have two verified owners.",
+        "No pre-populated customer account, site ID, key or domain allowlist ships with onboarding.",
+        "Secret rotation works without an outage, and revoke-now ends the old secret immediately."
       ],
-      "openDecisions": ["Domain ownership verification method", "Credential rotation flow"],
+      "decisions": [
+        "Domain control uses a DNS TXT record and does not block events. A domain shows as unverified until the check passes, and each domain has one verified owner.",
+        "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
+      ],
+      "openDecisions": [],
       "evidence": ""
     },
     {
@@ -57,6 +69,7 @@
         "Copying a snippet never shows a product as connected.",
         "A failing installation shows an error the owner can act on."
       ],
+      "decisions": [],
       "openDecisions": [],
       "evidence": ""
     },
@@ -65,7 +78,7 @@
       "name": "Activity event contract",
       "description": "Extend the declaration model with repeatable activity events, so a declaration is one event type rather than the whole session timeline.",
       "dependencies": ["feat-004"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "The contract covers product, session, event ID and timestamp, with duplicate handling.",
         "Independent signals keep their sources, and conflicting signals stay inspectable.",
@@ -73,13 +86,16 @@
         "The account reference is an opaque ID supplied by the host server and labelled as the account used, not as proof of delegation.",
         "Action events distinguish attempted, rejected and application-confirmed outcomes, without arbitrary page or form contents.",
         "src/protocol.ts and docs/protocol.md change together.",
-        "The change ships as a new versioned release and published v0.1.0 assets stay unchanged."
+        "The change ships as a new versioned release and published v0.1.0 assets stay unchanged.",
+        "README and docs no longer state that page URLs are not collected."
       ],
-      "openDecisions": [
-        "Exact approved event fields",
-        "Page and resource redaction rules",
-        "Retention for the customer product"
+      "decisions": [
+        "Browser events carry the route path with query strings removed and ID-like segments masked. Hosts can supply their own route pattern, because masking only catches segments that look like IDs.",
+        "Server events carry a host-named action, opaque resource and account references, and an outcome.",
+        "Page titles, page text, form contents and raw IP addresses are never collected.",
+        "Customer activity data is kept for 30 days."
       ],
+      "openDecisions": [],
       "evidence": ""
     },
     {
@@ -87,16 +103,21 @@
       "name": "Browser and server activity collection",
       "description": "Collect access and activity evidence independently of whether a visitor answers the widget, through a browser integration and a server or edge integration.",
       "dependencies": ["feat-005"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "Visits and relevant actions are recorded for both answered and unanswered prompts.",
         "Retries are idempotent.",
         "Browser-supplied principal claims cannot become server-confirmed attribution.",
         "Errors never appear as successful recording.",
         "Logout, new-account and new-session boundaries work.",
-        "Behaviour is verified with the ticket app as an integration fixture, without coupling the repositories."
+        "Behaviour is verified with the ticket app as an integration fixture, without coupling the repositories.",
+        "A non-Node backend can report actions with a plain HTTP request."
       ],
-      "openDecisions": ["First server or edge adapter and any paid infrastructure dependency"],
+      "decisions": [
+        "The first server integration is a plain HTTP events endpoint, so any backend can report actions without our package.",
+        "A Node helper sits on top of that endpoint. No paid dependency is required."
+      ],
+      "openDecisions": [],
       "evidence": ""
     },
     {
@@ -111,7 +132,11 @@
         "Retries, asset requests and client/server duplicates do not inflate counts, and a session with both a verified provider and a self-declaration is not double-counted.",
         "Customer isolation holds at the API as well as the UI.",
         "Empty, loading, disconnected and error states are covered.",
-        "Unclassified sessions stay unknown and are never labelled human."
+        "Unclassified sessions stay unknown and are never labelled human.",
+        "Every signal stays visible, and conflicting signals are shown rather than resolved."
+      ],
+      "decisions": [
+        "Sessions show Verified signer, Declared AI, Declared person, Suspected automation or Unknown, with no numeric score."
       ],
       "openDecisions": [],
       "evidence": ""
@@ -121,18 +146,21 @@
       "name": "Detection adapters",
       "description": "Add supported signals one at a time and test what each contributes, covering provider signature verification and heuristic automation signals used as evidence.",
       "dependencies": ["feat-006"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "Signatures are validated with their scope, and a header that merely names a provider is not trusted.",
         "Spoofed, expired, replayed and tampered signatures are tested wherever signature verification exists.",
         "Ordinary automation is not labelled an AI agent.",
         "A self-declaration is never promoted to verified identity, and a Person answer does not erase contradictory evidence.",
-        "No numerical confidence score ships without a defensible meaning and validation."
+        "No numerical confidence score ships without a defensible meaning and validation.",
+        "No provider is shown as supported until a real signed request from it has been verified."
       ],
-      "openDecisions": [
-        "Which provider signatures to support first",
-        "What evidence justifies a classification"
+      "decisions": [
+        "The first verified signal is Web Bot Auth, checked on our servers against an allowlist of key directories.",
+        "A valid signature adds a verified signer label and never blocks a visitor.",
+        "Labels follow the evidence in feat-007; a signature identifies the signer only, not who it acts for."
       ],
+      "openDecisions": [],
       "evidence": ""
     },
     {
@@ -146,10 +174,15 @@
         "Tests cover API-only access, JavaScript-disabled clients, denied actions and abandoned visits.",
         "Missed agents, false positives, attribution errors, task outcome and coverage are reported separately.",
         "The real model, browser, control method and any assistance are recorded.",
-        "Small successful batches are reported as exploratory, not as proof of universal reliability."
+        "Small successful batches are reported as exploratory, not as proof of universal reliability.",
+        "All three hard rules hold across the test matrix."
+      ],
+      "decisions": [
+        "Three hard rules apply now: no customer sees another's data, no self-report is shown as verified, and no unknown session is labelled human.",
+        "Detection targets are set after a small baseline run and frozen before the measured pilot."
       ],
       "openDecisions": [
-        "Pilot success thresholds for detection accuracy, coverage and acceptable false positives"
+        "Numeric detection, coverage and false-positive targets, set from the baseline run"
       ],
       "evidence": ""
     },
@@ -166,6 +199,7 @@
         "Retention is defined, and deletion and cleanup are tested.",
         "Release claims stay limited to a documented pilot, not enterprise procurement, compliance, universal detection or verified delegation."
       ],
+      "decisions": [],
       "openDecisions": [],
       "evidence": ""
     }
