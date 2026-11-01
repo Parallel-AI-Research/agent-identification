@@ -83,7 +83,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] Moved sites: each secret and origin matched the previous live collector, and stored secrets are encrypted.
 - [x] A forged token was rejected with 401, which shows the collector reaches Supabase's signing keys.
 - [x] Published SDK files match the frozen `0.1.0` release.
-- [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 6/6 dashboard journey tests.
+- [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 8/8 dashboard journey tests.
 - [ ] Not run: a real signup on the hosted dashboard, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session

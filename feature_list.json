@@ -61,7 +61,7 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 6/6 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. Not done: no real account has completed the hosted journey, and no real domain has been verified end to end. Custom email is still needed before external testers."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 8/8 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. Not done: no real account has completed the hosted journey, and no real domain has been verified end to end. Custom email is still needed before external testers."
     },
     {
       "id": "feat-004",

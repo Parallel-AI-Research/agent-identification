@@ -142,6 +142,38 @@ test("a second customer cannot reach the first customer's product", async ({ pag
   await expect(page.locator("body")).not.toContainText("Private product");
 });
 
+test("an email link opened in another browser explains what happened", async ({
+  browser,
+  page,
+}, info) => {
+  const email = address(info, "elsewhere");
+  await signUp(page, email);
+  const baseURL = info.project.use.baseURL;
+  const elsewhere = await browser.newContext({ baseURL });
+  const other = await elsewhere.newPage();
+
+  // The email really is confirmed, so the person is told that and can sign in.
+  await other.goto(await emailLink(page, email, /http[^\s"<>]+type=signup[^\s"<>]*/));
+  await expect(other).toHaveURL(/\/sign-in\?notice=confirmed$/);
+  await expect(other.getByText("Your email is confirmed")).toBeVisible();
+  await expect(other.locator("p[role=alert]")).toHaveCount(0);
+  await signIn(other, email);
+  await expect(other).toHaveURL(/\/products$/);
+  await elsewhere.close();
+
+  await page.goto("/forgot-password");
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByText("If that email has an account")).toBeVisible();
+
+  // A reset can't continue elsewhere, and the person is told how to finish it.
+  const third = await (await browser.newContext({ baseURL })).newPage();
+  await third.goto(await emailLink(page, email, /http[^\s"<>]+type=recovery[^\s"<>]*/));
+  await expect(third).toHaveURL(/\/forgot-password\?error=browser$/);
+  await expect(third.locator("p[role=alert]")).toContainText("browser that requested");
+  await third.context().close();
+});
+
 test("password reset works and doesn't reveal who has an account", async ({ page }, info) => {
   const email = address(info, "reset");
   await signUp(page, email);
