@@ -1,4 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/** Tabs sit on the left, with the toggle and then Dashboard on the far right. */
+async function expectNavbarOrder(page: Page): Promise<void> {
+  const navbar = page.locator("header").first();
+  const title = await navbar.getByRole("link", { name: "Agent analytics" }).boundingBox();
+  const docs = await navbar.getByRole("link", { name: "Docs", exact: true }).boundingBox();
+  const changelog = await navbar.getByRole("link", { name: "Changelog" }).boundingBox();
+  const search = await navbar
+    .getByRole("button", { name: /search/i })
+    .first()
+    .boundingBox();
+  const toggle = await navbar.getByRole("button", { name: "Toggle Theme" }).boundingBox();
+  const dashboard = await navbar.getByRole("link", { name: "Dashboard" }).boundingBox();
+  const order = [title, docs, changelog, search, toggle, dashboard].map((box) => box!.x);
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+}
 
 const DOCS = [
   ["/docs", "Introduction"],
@@ -23,11 +39,49 @@ test("every docs page loads without signing in, with navigation", async ({ page 
   for (const [route, title] of DOCS) {
     await page.goto(route!);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title!);
+    const navbar = page.locator("header").first();
+    await expect(navbar.getByRole("link", { name: "Changelog" })).toBeVisible();
+    await expect(navbar.getByRole("link", { name: "Dashboard" })).toBeVisible();
   }
+  await expectNavbarOrder(page);
+  await page.goto("/");
+  await expectNavbarOrder(page);
   await page.goto("/docs");
   await page.getByRole("link", { name: "Quickstart" }).first().click();
   await expect(page).toHaveURL(/\/docs\/quickstart$/);
   await expect(page.getByRole("link", { name: "Check it works" }).first()).toBeVisible();
+});
+
+test("the light and dark toggle applies across the site and is remembered", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/docs/quickstart");
+  const html = page.locator("html");
+  await expect(html).not.toHaveClass(/dark/);
+  await page.getByRole("button", { name: "Toggle Theme" }).first().click();
+  await expect(html).toHaveClass(/dark/);
+
+  await page.goto("/");
+  await expect(html).toHaveClass(/dark/);
+  await page.goto("/sign-in");
+  await expect(html).toHaveClass(/dark/);
+  const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(background).toBe("rgb(15, 17, 23)");
+});
+
+test("phones can reach the dashboard from the home page and the docs", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 760 });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Toggle Menu" }).click();
+  await expect(page.getByRole("link", { name: "Dashboard", exact: true })).toBeVisible();
+
+  await page.goto("/docs/quickstart");
+  await page.getByRole("button", { name: "Open Sidebar" }).click();
+  await page
+    .locator("#nd-sidebar-mobile")
+    .getByRole("link", { name: "Dashboard", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/sign-in$/);
 });
 
 test("docs search finds pages", async ({ page }) => {

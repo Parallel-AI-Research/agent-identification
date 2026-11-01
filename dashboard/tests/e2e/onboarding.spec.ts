@@ -44,6 +44,10 @@ async function signIn(page: Page, email: string, password = PASSWORD): Promise<v
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
+async function signOut(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+}
 async function addProduct(page: Page, name: string, origins: string[]): Promise<string> {
   await page.goto("/dashboard/products/new");
   await page.getByLabel("Product name").fill(name);
@@ -62,6 +66,13 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
 
   await confirm(page, email);
   await expect(page.getByText("No products yet")).toBeVisible();
+  const navbar = page.locator("header").first();
+  await expect(navbar.getByRole("link", { name: "Docs" })).toBeVisible();
+  await expect(navbar.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
+  await navbar.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByText(email)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(navbar.getByRole("button", { name: "Toggle Theme" })).toBeVisible();
 
   await page.goto("/dashboard/products/new");
   await page.getByLabel("Product name").fill("Wildcard");
@@ -122,7 +133,7 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await page.getByRole("button", { name: "Revoke old secret now" }).click();
   await expect(page.getByText("The old secret has been revoked")).toBeVisible();
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/sign-in$/);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -136,7 +147,7 @@ test("a second customer cannot reach the first customer's product", async ({ pag
   await page.getByRole("link", { name: "Continue to install" }).click();
   await expect(page).toHaveURL(/\/dashboard\/products\/[0-9a-f-]{36}$/);
   const url = page.url();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/sign-in$/);
 
   const second = address(info, "second");
@@ -210,7 +221,7 @@ test("password reset works and doesn't reveal who has an account", async ({ page
   const email = address(info, "reset");
   await signUp(page, email);
   await confirm(page, email);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/sign-in$/);
 
   await page.goto("/forgot-password");
@@ -229,7 +240,7 @@ test("password reset works and doesn't reveal who has an account", async ({ page
   await page.getByLabel("New password").fill(replacement);
   await page.getByRole("button", { name: "Save password" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/sign-in$/);
 
   await signIn(page, email);
