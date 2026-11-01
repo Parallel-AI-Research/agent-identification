@@ -5,9 +5,9 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** None. `feat-002` is next and can start.
+**Active Feature:** `feat-002` and `feat-003`. Both are built and pass locally, and neither is deployed.
 
-The package is at version `0.1.0`: a declaration widget, session binding, server verification helpers and a PostgreSQL collector. No analytics MVP feature is implemented yet.
+The package is still `0.1.0`, and `src/` is unchanged. Sites now load from the database, customers own products through an owner API, and `dashboard/` covers signup, install instructions, origins, DNS verification and secret rotation.
 
 ## Status
 
@@ -15,21 +15,31 @@ The package is at version `0.1.0`: a declaration widget, session binding, server
 
 - [x] Agent harness added and verified (`feat-001`).
 - [x] Open product decisions resolved with the owner, except numeric pilot targets. See `decisions` in `feature_list.json`.
-- [x] Dedicated Supabase project created for the customer product. It is empty, and the collector has not moved yet.
+- [x] Dedicated Supabase project created, with all migrations applied. It holds no customer data.
+- [x] `feat-002` and `feat-003` built and passing locally.
 
 ### What's In Progress
 
-- Nothing.
+- [ ] Moving the hosted collector to the dedicated project, which needs the owner's approval because it changes a live service.
+- [ ] Deploying the dashboard.
 
 ### What's Next
 
-1. Start `feat-002`: move sites into the database, add customer and product ownership, and move the collector schema to the new project.
-2. Continue in `feature_list.json` order.
+1. Review and merge the branch.
+2. Give the collector role a login on the dedicated project and generate the encryption key.
+3. Import the existing operator sites with `npm run sites:import`.
+4. Update the collector's hosted settings, deploy it, and run the hosted smoke checks.
+5. Deploy the dashboard, configure Supabase redirects and email, then run the journey with a real account.
+6. Mark both features done, then start `feat-004`.
 
 ## Blockers / Risks
 
+- [ ] **Collector migration**: moving must keep the demo, trial and ticket-app installs working. Sessions and events in the old database do not move; visitor sessions last at most 30 minutes and events are kept for 7 days.
+- [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
+- [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited, so external testers need custom SMTP.
+- [ ] **Dashboard e2e tests are local only**: CI runs its typecheck, lint, unit tests and build, but not the Playwright journey.
+- [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **`feat-009` targets**: numeric targets need a small baseline run first, so that feature stays blocked until then.
-- [ ] **Collector migration**: moving the schema must keep the demo, trial and ticket-app installs working.
 - [ ] **Web Bot Auth coverage**: signing is voluntary and agents driving a local browser probably will not sign, so many sessions will stay unknown. This needs testing with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
@@ -59,16 +69,19 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 
 ## Files Modified This Session
 
-- `feature_list.json` - recorded decisions, added acceptance items and unblocked features.
-- `progress.md`, `session-handoff.md` - updated session state.
+- `collector/` - database-backed sites, owner API, token verification, rotation and DNS checks.
+- `dashboard/` - new customer dashboard.
+- `supabase/` - two migrations and local stack configuration.
+- `scripts/`, `init.sh`, CI and docs - site import, dashboard checks and deployment steps.
 
 ## Evidence of Completion
 
-- [x] Harness: `./init.sh --full` exited 0 with 60/60 tests and 48/48 Chromium and WebKit browser tests.
-- [x] CI: 60/60 tests and 72/72 browser tests, including Firefox.
+- [x] `./init.sh --full`: 86/86 tests, 3/3 dashboard unit tests, 48/48 SDK browser tests and 6/6 dashboard browser tests.
+- [x] Real database: migrations applied, with forced row-level security on all tables.
+- [x] Real DNS: lookups through public resolvers return in about half a second, and a missing record in under 200ms.
 - [x] Harness validator: 100/100. This is a structural score, not a measure of agent effectiveness.
-- [ ] Not run: hosted smoke checks, and any trial of an agent actually using this harness.
+- [ ] Not run: hosted smoke checks, any hosted signup, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session
 
-`feat-002` needs the new Supabase project's connection details from private configuration. Never copy them into this repository. Run `./init.sh` before and after any change; it takes seconds when dependencies are current.
+Production steps need the owner's approval. The Supabase CLI link in this repository points at the research project, so always pass `--db-url` for the customer project. Connection details stay in private configuration and are never copied into this repository.

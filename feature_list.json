@@ -21,7 +21,7 @@
       "name": "Customer and product ownership",
       "description": "Replace operator-only site provisioning with persisted customer and product ownership, enforced on every product, settings and telemetry query.",
       "dependencies": ["feat-001"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Two independent customers can create products and receive different configuration.",
         "Neither customer can read or modify the other's products or telemetry, at the API as well as the UI.",
@@ -34,14 +34,14 @@
         "The dashboard is a Next.js app in dashboard/ in this repository, deployed as a second Vercel project."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-01, local only: 86/86 tests pass on memory and Postgres stores, covering isolation at the API, encrypted secrets, Supabase token rejection and an imported operator site completing online verification. Migrations are applied to the dedicated Supabase project, with forced row-level security and no anon or authenticated schema access. Not done: the hosted collector has not moved, so existing installs have not been verified through the real migration."
     },
     {
       "id": "feat-003",
       "name": "Signup, add product and install instructions",
       "description": "Self-service flow: sign up, add a product with its exact permitted origins, then copy script or package instructions for the chosen integration.",
       "dependencies": ["feat-002"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Owners can sign up, sign in, recover their account and sign out without operator help.",
         "Each product gets a generated public installation identifier; any server credential is separate and labelled server-only.",
@@ -56,7 +56,7 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-01, local only: 6/6 Playwright tests pass in Chromium and WebKit against a local Supabase stack, covering sign-up with email confirmation, sign-in, password reset, sign-out, invalid origins, a generated snippet recording a declaration from a real separate origin, customer isolation in the UI, rotation and revoke-now. API tests cover the 24-hour overlap and one verified owner per domain. Real DNS lookups were checked, but no real domain has been verified end to end. Not done: the dashboard is not deployed, and hosted Supabase email and redirects are not configured."
     },
     {
       "id": "feat-004",
