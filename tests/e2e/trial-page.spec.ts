@@ -43,12 +43,34 @@ async function isGated(page: Page) {
   return page.locator("#announcement-form").evaluate((element) => (element as HTMLElement).inert);
 }
 
-test("landing retains installation instructions and links to the clean trial", async ({ page }) => {
+test("landing copies an unconfigured installation template while keeping its demo separate", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: async (text: string) => sessionStorage.setItem("copied-install-snippet", text),
+      },
+    });
+  });
   const session = await load(page, "/");
   expect(session.siteId).toBe("public-demo");
-  await expect(page.locator("#install-code")).toContainText("data-site");
+  const snippet = await page.locator("#install-code").textContent();
+  const installation = await page.locator("#install-code").evaluate((element) => {
+    const script = new DOMParser()
+      .parseFromString(element.textContent ?? "", "text/html")
+      .querySelector("script")!;
+    return { siteId: script.dataset.site, src: script.src };
+  });
+  expect(installation).toEqual({
+    siteId: "YOUR-SITE-ID",
+    src: `${api}/sdk/v0.1.0/agent-id.js`,
+  });
+  await expect(page.locator("body")).not.toContainText("useparallel.com");
   await expect(page.locator("#package-code")).toContainText("npm install");
-  await expect(page.getByRole("button", { name: "Copy snippet", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Copy snippet", exact: true }).click();
+  await expect(page.locator("#copy-result")).toHaveText("Copied.");
+  expect(await page.evaluate(() => sessionStorage.getItem("copied-install-snippet"))).toBe(snippet);
   const links = await page
     .locator("a[href]")
     .evaluateAll((elements) => elements.map((element) => (element as HTMLAnchorElement).href));

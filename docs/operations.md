@@ -17,10 +17,10 @@ app. A separate schema and restricted role let it use an existing database.
 
    ```sh
    mkdir -p .local
-   npm run site:create -- --id parallel \
-     --origin https://useparallel.com \
-     --origin https://www.useparallel.com \
-     --out .local/parallel-site.json
+   npm run site:create -- --id your-site-id \
+     --origin https://your-website.example \
+     --origin https://www.your-website.example \
+     --out .local/your-site.json
    ```
 
 5. Set `AGENT_ID_SITES` to a JSON **array** of site objects. Keep the file and
@@ -49,7 +49,7 @@ from your server or terminal:
 
 ```sh
 # Set AGENT_ID_SITE_SECRET through your secret manager/environment.
-npm run events -- --api https://YOUR-COLLECTOR --site parallel --limit 100
+npm run events -- --api https://YOUR-COLLECTOR --site YOUR-SITE-ID --limit 100
 ```
 
 The server-only event endpoint rejects browser `Origin` requests and requires

@@ -15,7 +15,7 @@ if (
   !values.out
 )
   throw Error(
-    "Usage: npm run site:create -- --id parallel --origin https://example.com --out .local/site.json",
+    "Usage: npm run site:create -- --id your-site-id --origin https://example.com --out .local/site.json",
   );
 for (const raw of values.origin) {
   const u = new URL(raw);

@@ -8,10 +8,9 @@ This is **visible, self-reported classification**. It does not detect every agen
 prove identity, or grant permissions. An agent can skip an optional prompt or
 choose a different answer. Required mode asks every visitor to choose.
 
-**Live demo and copyable Parallel snippet:**
+**Live demo and installation template:**
 [parallel-agent-identification.vercel.app](https://parallel-agent-identification.vercel.app).
-Parallel's public site ID is `parallel`, allowed on `https://useparallel.com` and
-`https://www.useparallel.com`. Use
+Use
 `https://parallel-agent-identification.vercel.app` wherever the examples below
 say `https://YOUR-COLLECTOR`.
 

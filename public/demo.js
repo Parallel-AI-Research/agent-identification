@@ -30,7 +30,7 @@ document.querySelector("#reset").addEventListener("click", async (event) => {
 const snippet = `<div id="visitor-choice"></div>
 <script defer
   src="${location.origin}/sdk/v0.1.0/agent-id.js"
-  data-site="parallel"
+  data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="optional"
 ></script>`;
