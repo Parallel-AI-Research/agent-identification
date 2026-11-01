@@ -62,14 +62,14 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, both fixed and deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. The copy fallback was confirmed on the live site in a browser that denies clipboard access. Not done: the agent setup panel is not deployed, the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, both fixed and deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. The copy fallback was confirmed on the live site in a browser that denies clipboard access. The agent setup panel is deployed and was confirmed on a real product page. Not done: the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
     },
     {
       "id": "feat-011",
       "name": "Public site, docs and changelog",
       "description": "Give the product a public home: a landing page, documentation with a sidebar, search and on-page contents, and a changelog for releases and new features. The signed-in dashboard moves under /dashboard.",
       "dependencies": ["feat-002"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "/ is a public landing page that explains what the product does and what it can't do.",
         "/docs has a sidebar, search and on-page contents, and needs no sign-in.",
@@ -86,7 +86,7 @@
         "The site can launch on its vercel.app address, and a custom domain can follow."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-01, local only: 24/24 Playwright tests pass in Chromium and WebKit, covering the signed-out home page, every docs page, search, the changelog, plain-text docs for agents, cacheable public pages, sign-in only for /dashboard, and redirects from old product links. Not done: the public site is not deployed."
     },
     {
       "id": "feat-004",
