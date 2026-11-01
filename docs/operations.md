@@ -59,11 +59,21 @@ The customer dashboard is a separate Vercel project with its root directory set 
 ownership.
 
 1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   `COLLECTOR_URL` and `SITE_URL` as listed in `dashboard/.env.example`.
+   `COLLECTOR_URL` and `SITE_URL` as listed in `dashboard/.env.example`. Deploy with
+   `vercel deploy --prod` from `dashboard/`.
 2. In the Supabase project, set the site URL to the dashboard's URL and allow
    `SITE_URL/auth/confirm` as a redirect, with and without `?next=/reset-password`.
 3. Configure custom SMTP before external testing. Supabase's built-in email sender
    is heavily rate limited.
+
+`vercel link` can connect the project to the Git repository. A push to `main` then
+deploys the repository root, which breaks the dashboard, so run `vercel git disconnect`
+afterwards unless the project's root directory is set to `dashboard`.
+
+`supabase config push` applies its changes without asking when it isn't run in a
+terminal, even if piped answers say no. It also reads `supabase/config.toml` from the
+current folder, and this repository's copy holds local-only values. Never run it from
+here against a hosted project.
 
 ## Logs and retention
 

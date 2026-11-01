@@ -6,13 +6,16 @@ import { Field, Notice } from "@/components/ui";
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
   return (
     <>
       <h1 className="mb-5 text-xl font-semibold">Sign in</h1>
       <div className="space-y-4">
+        {notice === "confirmed" ? (
+          <Notice tone="success">Your email is confirmed. Sign in to continue.</Notice>
+        ) : null}
         {error === "link" ? (
           <Notice tone="error">
             That link has expired or was already used. Request a new one.

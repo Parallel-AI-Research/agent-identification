@@ -1,4 +1,4 @@
-import type { EmailOtpType } from "@supabase/supabase-js";
+import { isAuthPKCECodeVerifierMissingError, type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -14,7 +14,15 @@ export async function GET(request: NextRequest) {
   const supabase = await supabaseServer();
   let confirmed = false;
   if (code) {
-    confirmed = !(await supabase.auth.exchangeCodeForSession(code)).error;
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    confirmed = !error;
+    // The link opened in a different browser from the one that requested it. Supabase
+    // has already verified it, so only the sign-in step is missing here.
+    if (isAuthPKCECodeVerifierMissingError(error)) {
+      const target =
+        next === "/reset-password" ? "/forgot-password?error=browser" : "/sign-in?notice=confirmed";
+      return NextResponse.redirect(new URL(target, process.env.SITE_URL));
+    }
   } else if (tokenHash && type) {
     confirmed = !(await supabase.auth.verifyOtp({ token_hash: tokenHash, type })).error;
   }
