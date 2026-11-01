@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { after, before, beforeEach, describe, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import postgres from "postgres";
 import { createCollector } from "../collector/index.js";
-import { PostgresStore } from "../collector/postgres-store.js";
+import { PostgresStore, postgresExecutor } from "../collector/postgres-store.js";
 import { MemoryStore, type CollectorStore } from "../collector/store.js";
 import {
   ProductDirectory,
@@ -21,21 +23,53 @@ const owners = { alice: randomUUID(), bob: randomUUID() };
 const time = Date.parse("2026-11-01T10:00:00Z");
 const origin = "https://alice.example";
 
-let database: PGlite;
-before(async () => {
-  database = new PGlite();
-  for (const file of [
-    "20261020093721_create_agent_identification_collector.sql",
-    "20261101120000_add_customer_products.sql",
-    "20261101130000_add_domain_claims.sql",
-    "20261101140000_add_environments.sql",
-  ]) {
-    await database.exec(
+const MIGRATIONS = [
+  "20261020093721_create_agent_identification_collector.sql",
+  "20261101120000_add_customer_products.sql",
+  "20261101130000_add_domain_claims.sql",
+  "20261101140000_add_environments.sql",
+];
+const RESET = `reset role;
+  truncate agent_identification.products cascade;
+  truncate agent_identification.domain_claims;
+  truncate agent_identification.sessions cascade;
+  truncate agent_identification.rate_buckets;
+  set role agent_id_app`;
+
+async function migrated(): Promise<PGlite> {
+  const instance = new PGlite();
+  for (const file of MIGRATIONS) {
+    await instance.exec(
       await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8"),
     );
   }
+  return instance;
+}
+
+let database: PGlite;
+let wireDatabase: PGlite;
+let wireServer: PGLiteSocketServer;
+let wire: postgres.Sql;
+before(async () => {
+  database = await migrated();
+  // The driver production uses treats parameters differently from PGlite's own client.
+  wireDatabase = await migrated();
+  wireServer = new PGLiteSocketServer({ db: wireDatabase, host: "127.0.0.1", port: 55432 });
+  await wireServer.start();
+  wire = postgres({
+    host: "127.0.0.1",
+    port: 55432,
+    user: "postgres",
+    database: "postgres",
+    max: 1,
+    prepare: false,
+    ssl: false,
+  });
 });
 after(async () => {
+  await wire?.end({ timeout: 2 });
+  await wireServer?.stop();
+  await wireDatabase?.close();
   await database?.close();
 });
 
@@ -60,19 +94,19 @@ const stores: [string, () => Promise<CollectorStore & ProductStore>][] = [
   [
     "postgres",
     async () => {
-      await database.exec(
-        `reset role;
-         truncate agent_identification.products cascade;
-         truncate agent_identification.domain_claims;
-         truncate agent_identification.sessions cascade;
-         truncate agent_identification.rate_buckets;
-         set role agent_id_app`,
-      );
+      await database.exec(RESET);
       // Runs as the restricted role, so a missing grant or policy fails here, not in production.
       return new PostgresStore(
         async (sql, parameters) =>
           (await database.query<Record<string, unknown>>(sql, parameters)).rows,
       );
+    },
+  ],
+  [
+    "postgres driver",
+    async () => {
+      await wire.unsafe(RESET);
+      return new PostgresStore(postgresExecutor(wire));
     },
   ],
 ];
