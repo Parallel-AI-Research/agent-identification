@@ -174,6 +174,32 @@ test("an email link opened in another browser explains what happened", async ({
   await third.context().close();
 });
 
+test("copying a secret always says what happened", async ({ page }, info) => {
+  const email = address(info, "copy");
+  await signUp(page, email);
+  await confirm(page, email);
+  const secret = await addProduct(page, "Clipboard", ["https://clipboard.example"]);
+  const button = page.getByRole("button", { name: "Copy secret" });
+
+  // The clipboard is denied, as in embedded browsers, but the older command still works.
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      value: () => Promise.reject(new DOMException("Denied", "NotAllowedError")),
+    });
+    document.execCommand = () => true;
+  });
+  await button.click();
+  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+
+  // With both blocked, the person is told, and the secret is ready to copy by hand.
+  await page.evaluate(() => {
+    document.execCommand = () => false;
+  });
+  await button.click();
+  await expect(page.getByText("This browser blocked copying")).toBeVisible();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(secret);
+});
+
 test("password reset works and doesn't reveal who has an account", async ({ page }, info) => {
   const email = address(info, "reset");
   await signUp(page, email);
