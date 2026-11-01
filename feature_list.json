@@ -39,7 +39,7 @@
         "Each environment has a fixed type of production, beta, staging or dev, and a product has at most one of each, so production can be the default view."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01, local only: 95/95 tests pass on memory and Postgres stores, with the Postgres owner API suite running as the restricted database role. They cover isolation between customers and between environments, encrypted secrets, Supabase token rejection, a migration test that keeps site IDs and secrets, and an imported operator site completing online verification. The environments migration has not been applied to the dedicated Supabase project. Not done: the hosted collector has not moved, so existing installs have not been verified through the real migration."
+      "evidence": "2026-11-01, hosted: the live collector now loads sites from the dedicated Supabase project. Hosted smoke checks passed (12 checks, 10/10 sessions revoked) using the existing ticket-app site, including bound verification with its unchanged secret. Each imported site's secret and origins were confirmed to match the previous live collector, and published SDK files match the frozen release. Locally, 108/108 tests pass, with the owner API suite also running through the real Postgres driver as the restricted role, covering isolation between customers and between environments. Not done: no real customer account has created a product on the hosted service."
     },
     {
       "id": "feat-003",
@@ -61,7 +61,7 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01, local only: 6/6 Playwright tests pass in Chromium and WebKit against a local Supabase stack, covering sign-up with email confirmation, sign-in, password reset, sign-out, invalid origins, a generated snippet recording a declaration from a real separate origin, customer isolation in the UI, rotation and revoke-now. API tests cover the 24-hour overlap and one verified owner per domain. Real DNS lookups were checked, but no real domain has been verified end to end. Not done: the dashboard is not deployed, and hosted Supabase email and redirects are not configured."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 6/6 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. Not done: no real account has completed the hosted journey, and no real domain has been verified end to end. Custom email is still needed before external testers."
     },
     {
       "id": "feat-004",

@@ -2,29 +2,27 @@
 
 ## Current Objective
 
-- Goal: Build the analytics MVP in `feature_list.json` order.
-- Current status: `feat-002` and `feat-003` pass locally. Nothing is deployed.
-- Branch / commit: `feat/customer-ownership`, based on `dc3e780`.
+- Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
+- Current status: The hosted collector and dashboard are live. No real account has used them yet.
+- Branch / commit: `docs/production-move`, based on `f9397a7`.
 
 ## Completed This Session
 
-- [x] Built database-backed sites, the owner API, rotation and DNS verification.
-- [x] Built the customer dashboard.
-- [x] Applied the first three customer migrations to the dedicated Supabase project.
-- [x] Moved site credentials and origins from products to environments.
+- [x] Moved the hosted collector to the dedicated Supabase project, keeping existing site IDs and secrets.
+- [x] Deployed the dashboard and set Supabase redirects.
+- [x] Fixed a production-only JSON parameter bug and added real-driver tests.
 
 ## Verification Evidence
 
-| Check             | Command                            | Result  | Notes                      |
-| ----------------- | ---------------------------------- | ------- | -------------------------- |
-| Collector         | `npm test`                         | Pass    | 86/86                      |
-| SDK browsers      | `npm run test:e2e`                 | Pass    | 48/48, Chromium and WebKit |
-| Dashboard journey | `npm run test:e2e` in `dashboard/` | Pass    | 6/6, local Supabase        |
-| Harness structure | `validate-harness.mjs`             | 100/100 | Structural score only      |
+| Check             | Command                | Result  | Notes                             |
+| ----------------- | ---------------------- | ------- | --------------------------------- |
+| Hosted collector  | `npm run smoke:hosted` | Pass    | 12 checks, 10/10 sessions revoked |
+| Collector         | `npm test`             | Pass    | 108/108                           |
+| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only             |
 
 ## Files Changed
 
-- `collector/`, `dashboard/`, `supabase/`, `scripts/`, `docs/`, `init.sh`, CI, `AGENTS.md` and state files.
+- `feature_list.json`, `progress.md`, `session-handoff.md`, `docs/operations.md`
 
 ## Decisions Made
 
@@ -32,9 +30,8 @@
 
 ## Blockers / Risks
 
-- The hosted collector still runs the old code and database.
-- The environments migration is not applied to the dedicated Supabase project yet.
-- Supabase production auth settings and custom SMTP are not configured.
+- The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
+- No real account has completed the hosted journey.
 
 ## Next Session Startup
 
@@ -45,4 +42,4 @@
 
 ## Recommended Next Step
 
-- After review and merge, get the owner's approval to move the hosted collector, following the steps in `progress.md`.
+- Ask how the owner's first hosted signup went. If it worked, mark `feat-002` and `feat-003` done and start `feat-004`.
