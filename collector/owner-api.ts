@@ -3,11 +3,15 @@ import { Resolver } from "node:dns/promises";
 import { hashToken, isAllowedOrigin, isUuid } from "../src/server/tokens.js";
 import { body, eventLimit, HttpError } from "./http.js";
 import {
+  ENVIRONMENT_TYPES,
   newSiteId,
   newSiteSecret,
   type DomainClaim,
+  type EnvironmentRecord,
+  type EnvironmentType,
   type ProductRecord,
   type ProductStore,
+  type ProductWithEnvironments,
   type SecretCipher,
   type SiteDirectory,
 } from "./products.js";
@@ -22,9 +26,15 @@ export interface OwnerApiOptions {
   resolveTxt?: (name: string) => Promise<string[][]>;
 }
 const ROUTE =
-  /^\/v1\/owner\/products(?:\/([^/]+)(?:\/(events|secret|secret\/previous|domains|domains\/verify))?)?$/;
+  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
 const MAX_ORIGINS = 20;
 const MAX_PRODUCTS = 25;
+const DEFAULT_NAMES: Record<EnvironmentType, string> = {
+  production: "Production",
+  beta: "Beta",
+  staging: "Staging",
+  dev: "Dev",
+};
 const OVERLAP_MS = 24 * 60 * 60 * 1000;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z][a-z0-9-]+$/;
 const TXT_PREFIX = "_agent-identification";
@@ -44,18 +54,56 @@ export async function publicTxtLookup(name: string): Promise<string[][]> {
     clearTimeout(deadline);
   }
 }
-function view(product: ProductRecord, now: number) {
-  const overlap = (product.previousSecretExpiresAt ?? 0) > now;
+function environmentView(environment: EnvironmentRecord, now: number) {
+  const overlap = (environment.previousSecretExpiresAt ?? 0) > now;
+  return {
+    id: environment.id,
+    productId: environment.productId,
+    type: environment.type,
+    name: environment.name,
+    siteId: environment.siteId,
+    origins: environment.origins,
+    previousSecretExpiresAt: overlap
+      ? new Date(environment.previousSecretExpiresAt!).toISOString()
+      : null,
+    createdAt: new Date(environment.createdAt).toISOString(),
+    updatedAt: new Date(environment.updatedAt).toISOString(),
+  };
+}
+function productView(product: ProductWithEnvironments, now: number) {
   return {
     id: product.id,
     name: product.name,
-    siteId: product.siteId,
-    origins: product.origins,
-    previousSecretExpiresAt: overlap
-      ? new Date(product.previousSecretExpiresAt!).toISOString()
-      : null,
+    environments: product.environments.map((item) => environmentView(item, now)),
     createdAt: new Date(product.createdAt).toISOString(),
     updatedAt: new Date(product.updatedAt).toISOString(),
+  };
+}
+function newEnvironment(
+  cipher: SecretCipher,
+  productId: string,
+  type: EnvironmentType,
+  name: string,
+  origins: string[],
+  now: number,
+): { environment: EnvironmentRecord; serverSecret: string } {
+  const siteId = newSiteId();
+  const serverSecret = newSiteSecret();
+  return {
+    serverSecret,
+    environment: {
+      id: randomUUID(),
+      productId,
+      type,
+      name,
+      siteId,
+      origins: [...origins].sort(),
+      secretCiphertext: cipher.seal(serverSecret, siteId),
+      previousSecretCiphertext: null,
+      previousSecretExpiresAt: null,
+      createdAt: now,
+      updatedAt: now,
+    },
   };
 }
 function productName(value: unknown): string {
@@ -126,8 +174,13 @@ export async function handleOwnerRequest(
   }
   const ownerId = await owners.authenticate(request);
   if (!ownerId) throw new HttpError(401, "Invalid or expired sign-in");
-  const [, productId, section] = route;
-  if (productId !== undefined && !isUuid(productId)) throw new HttpError(404, "Not found");
+  const [, productId, environmentsPath, environmentId, section] = route;
+  if (
+    (productId !== undefined && !isUuid(productId)) ||
+    (environmentId !== undefined && !isUuid(environmentId))
+  ) {
+    throw new HttpError(404, "Not found");
+  }
   if (request.method !== "GET") {
     const key = hashToken(JSON.stringify(["agent-identification-owner", ownerId]));
     if (!(await store.consumeRate(key, 60, 60000, now))) {
@@ -138,7 +191,7 @@ export async function handleOwnerRequest(
   if (productId === undefined) {
     if (request.method === "GET") {
       const products = await owners.products.listProducts(ownerId);
-      return respond({ products: products.map((product) => view(product, now)) });
+      return respond({ products: products.map((product) => productView(product, now)) });
     }
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
     const data = await body(request, ["name", "origins"]);
@@ -147,60 +200,115 @@ export async function handleOwnerRequest(
     if ((await owners.products.countProducts(ownerId)) >= MAX_PRODUCTS) {
       throw new HttpError(409, `An account can have up to ${MAX_PRODUCTS} products`);
     }
-    const siteId = newSiteId();
-    const serverSecret = newSiteSecret();
     const product: ProductRecord = {
       id: randomUUID(),
       ownerId,
       name,
-      siteId,
-      origins: [...origins].sort(),
-      secretCiphertext: owners.cipher.seal(serverSecret, siteId),
-      previousSecretCiphertext: null,
-      previousSecretExpiresAt: null,
       createdAt: now,
       updatedAt: now,
     };
-    await owners.products.createProduct(product);
-    directory.invalidate(siteId, origins);
+    const { environment, serverSecret } = newEnvironment(
+      owners.cipher,
+      product.id,
+      "production",
+      DEFAULT_NAMES.production,
+      origins,
+      now,
+    );
+    await owners.products.createProduct(product, environment);
+    directory.invalidate(environment.siteId, origins);
     // The secret is returned here once and cannot be read back.
-    return respond({ product: view(product, now), serverSecret }, 201);
+    return respond(
+      { product: productView({ ...product, environments: [environment] }, now), serverSecret },
+      201,
+    );
   }
 
   const product = await owners.products.getProduct(ownerId, productId);
   // Another owner's product is reported as missing, so IDs cannot be probed.
   if (!product) throw new HttpError(404, "Not found");
 
+  if (!environmentsPath) {
+    if (request.method === "GET") return respond({ product: productView(product, now) });
+    if (request.method !== "PATCH") throw new HttpError(405, "Method not allowed");
+    const data = await body(request, ["name"]);
+    const renamed = await owners.products.renameProduct(
+      ownerId,
+      productId,
+      productName(data.name),
+      now,
+    );
+    if (!renamed) throw new HttpError(404, "Not found");
+    return respond({ product: productView(renamed, now) });
+  }
+
+  if (environmentId === undefined) {
+    if (request.method === "GET") {
+      return respond({
+        environments: product.environments.map((item) => environmentView(item, now)),
+      });
+    }
+    if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
+    const data = await body(request, ["type", "name", "origins"]);
+    const type = data.type as EnvironmentType;
+    if (!ENVIRONMENT_TYPES.includes(type)) {
+      throw new HttpError(400, `Type must be one of ${ENVIRONMENT_TYPES.join(", ")}`);
+    }
+    const name = data.name === undefined ? DEFAULT_NAMES[type] : productName(data.name);
+    const origins = productOrigins(data.origins);
+    const { environment, serverSecret } = newEnvironment(
+      owners.cipher,
+      productId,
+      type,
+      name,
+      origins,
+      now,
+    );
+    if (!(await owners.products.createEnvironment(ownerId, environment))) {
+      throw new HttpError(409, `This product already has a ${type} environment`);
+    }
+    directory.invalidate(environment.siteId, origins);
+    return respond({ environment: environmentView(environment, now), serverSecret }, 201);
+  }
+
+  const environment = product.environments.find((item) => item.id === environmentId);
+  if (!environment) throw new HttpError(404, "Not found");
+
   if (section === "events") {
     if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
-    return respond({ events: await store.listEvents(product.siteId, eventLimit(url)) });
+    return respond({ events: await store.listEvents(environment.siteId, eventLimit(url)) });
   }
   if (section === "secret") {
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
-    if ((product.previousSecretExpiresAt ?? 0) > now) {
+    if ((environment.previousSecretExpiresAt ?? 0) > now) {
       throw new HttpError(409, "Revoke the old secret before rotating again");
     }
     const serverSecret = newSiteSecret();
-    const rotated = await owners.products.rotateSecret(ownerId, productId, {
-      expectedCiphertext: product.secretCiphertext,
-      secretCiphertext: owners.cipher.seal(serverSecret, product.siteId),
+    const rotated = await owners.products.rotateSecret(ownerId, productId, environmentId, {
+      expectedCiphertext: environment.secretCiphertext,
+      secretCiphertext: owners.cipher.seal(serverSecret, environment.siteId),
       previousSecretExpiresAt: now + OVERLAP_MS,
       now,
     });
     if (!rotated) throw new HttpError(409, "Revoke the old secret before rotating again");
-    directory.invalidate(product.siteId);
-    return respond({ product: view(rotated, now), serverSecret });
+    directory.invalidate(environment.siteId);
+    return respond({ environment: environmentView(rotated, now), serverSecret });
   }
   if (section === "secret/previous") {
     if (request.method !== "DELETE") throw new HttpError(405, "Method not allowed");
-    const revoked = await owners.products.revokePreviousSecret(ownerId, productId, now);
+    const revoked = await owners.products.revokePreviousSecret(
+      ownerId,
+      productId,
+      environmentId,
+      now,
+    );
     if (!revoked) throw new HttpError(404, "Not found");
-    directory.invalidate(product.siteId);
-    return respond({ product: view(revoked, now) });
+    directory.invalidate(environment.siteId);
+    return respond({ environment: environmentView(revoked, now) });
   }
   if (section === "domains") {
     if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
-    const { domains, other } = verifiableHosts(product.origins);
+    const { domains, other } = verifiableHosts(environment.origins);
     const claims = await owners.products.claimDomains(ownerId, claimsFor(domains), now);
     return respond({
       domains: [
@@ -212,9 +320,9 @@ export async function handleOwnerRequest(
   if (section === "domains/verify") {
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
     const data = await body(request, ["domain"]);
-    const { domains } = verifiableHosts(product.origins);
+    const { domains } = verifiableHosts(environment.origins);
     if (typeof data.domain !== "string" || !domains.includes(data.domain)) {
-      throw new HttpError(400, "That domain is not one of this product's origins");
+      throw new HttpError(400, "That domain is not one of this environment's origins");
     }
     const [claim] = await owners.products.claimDomains(ownerId, claimsFor([data.domain]), now);
     const expected = domainView(claim!).record;
@@ -238,18 +346,19 @@ export async function handleOwnerRequest(
     return respond({ domain: domainView({ ...claim!, verifiedAt: now }) });
   }
 
-  if (request.method === "GET") return respond({ product: view(product, now) });
+  if (request.method === "GET") return respond({ environment: environmentView(environment, now) });
   if (request.method !== "PATCH") throw new HttpError(405, "Method not allowed");
+  // The type is deliberately not editable, so it is rejected as an unexpected field.
   const data = await body(request, ["name", "origins"]);
   if (data.name === undefined && data.origins === undefined) {
     throw new HttpError(400, "Provide a name or origins to change");
   }
-  const updated = await owners.products.updateProduct(ownerId, productId, {
+  const updated = await owners.products.updateEnvironment(ownerId, productId, environmentId, {
     ...(data.name !== undefined ? { name: productName(data.name) } : {}),
     ...(data.origins !== undefined ? { origins: productOrigins(data.origins) } : {}),
     now,
   });
   if (!updated) throw new HttpError(404, "Not found");
-  directory.invalidate(product.siteId, [...product.origins, ...updated.origins]);
-  return respond({ product: view(updated, now) });
+  directory.invalidate(environment.siteId, [...environment.origins, ...updated.origins]);
+  return respond({ environment: environmentView(updated, now) });
 }

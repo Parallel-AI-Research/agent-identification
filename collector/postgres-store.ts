@@ -8,9 +8,12 @@ import type {
 import type { Choice } from "../src/protocol.js";
 import type {
   DomainClaim,
-  ProductChanges,
+  EnvironmentChanges,
+  EnvironmentRecord,
+  EnvironmentType,
   ProductRecord,
   ProductStore,
+  ProductWithEnvironments,
   SecretRotation,
 } from "./products.js";
 
@@ -45,11 +48,21 @@ function session(row: Record<string, unknown>): StoredSession {
 }
 
 function product(row: Record<string, unknown>): ProductRecord {
+  return {
+    id: String(row.id),
+    ownerId: row.owner_id === null ? null : String(row.owner_id),
+    name: String(row.name),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+function environment(row: Record<string, unknown>): EnvironmentRecord {
   // Drivers differ on whether a jsonb column arrives parsed.
   const origins = typeof row.origins === "string" ? JSON.parse(row.origins) : row.origins;
   return {
     id: String(row.id),
-    ownerId: row.owner_id === null ? null : String(row.owner_id),
+    productId: String(row.product_id),
+    type: row.type as EnvironmentType,
     name: String(row.name),
     siteId: String(row.site_id),
     origins: origins as string[],
@@ -61,10 +74,13 @@ function product(row: Record<string, unknown>): ProductRecord {
     updatedAt: Number(row.updated_at),
   };
 }
-const PRODUCT_COLUMNS = `p.*, coalesce((
+const ENVIRONMENT_COLUMNS = `e.*, coalesce((
   select jsonb_agg(o.origin order by o.origin)
-  from agent_identification.product_origins o where o.product_id = p.id
+  from agent_identification.environment_origins o where o.environment_id = e.id
 ), '[]'::jsonb) as origins`;
+const OWNED_ENVIRONMENTS = `agent_identification.environments e
+  join agent_identification.products p on p.id = e.product_id`;
+const ENVIRONMENT_ORDER = `array_position(array['production','beta','staging','dev'], e.type)`;
 
 export class PostgresStore implements CollectorStore, ProductStore {
   readonly kind = "postgres" as const;
@@ -76,34 +92,42 @@ export class PostgresStore implements CollectorStore, ProductStore {
     await this.execute(
       `select 1 from agent_identification.sessions,
        agent_identification.events, agent_identification.rate_buckets,
-       agent_identification.products, agent_identification.product_origins,
-       agent_identification.domain_claims limit 0`,
+       agent_identification.products, agent_identification.environments,
+       agent_identification.environment_origins, agent_identification.domain_claims limit 0`,
       [],
     );
   }
 
-  async createProduct(p: ProductRecord): Promise<void> {
-    // One statement, so a product can never exist without its origins.
+  async createProduct(p: ProductRecord, e: EnvironmentRecord): Promise<void> {
+    // One statement, so a product can never exist without a production environment.
     await this.execute(
       `with created as (
-         insert into agent_identification.products
-         (id, owner_id, name, site_id, secret_ciphertext, previous_secret_ciphertext,
+         insert into agent_identification.products (id, owner_id, name, created_at, updated_at)
+         values ($1,$2,$3,$4,$5) returning id
+       ), environment as (
+         insert into agent_identification.environments
+         (id, product_id, type, name, site_id, secret_ciphertext, previous_secret_ciphertext,
           previous_secret_expires_at, created_at, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id
+         select $6, created.id, $7, $8, $9, $10, $11, $12, $4, $5 from created
+         returning id
        )
-       insert into agent_identification.product_origins (product_id, origin)
-       select created.id, value from created, jsonb_array_elements_text($10::jsonb) as value`,
+       insert into agent_identification.environment_origins (environment_id, origin)
+       select environment.id, value
+       from environment, jsonb_array_elements_text($13::jsonb) as value`,
       [
         p.id,
         p.ownerId,
         p.name,
-        p.siteId,
-        p.secretCiphertext,
-        p.previousSecretCiphertext,
-        p.previousSecretExpiresAt,
         p.createdAt,
         p.updatedAt,
-        JSON.stringify(p.origins),
+        e.id,
+        e.type,
+        e.name,
+        e.siteId,
+        e.secretCiphertext,
+        e.previousSecretCiphertext,
+        e.previousSecretExpiresAt,
+        JSON.stringify(e.origins),
       ],
     );
   }
@@ -114,59 +138,137 @@ export class PostgresStore implements CollectorStore, ProductStore {
     );
     return Number(rows[0]?.total);
   }
-  async listProducts(ownerId: string): Promise<ProductRecord[]> {
-    const rows = await this.execute(
-      `select ${PRODUCT_COLUMNS} from agent_identification.products p
-       where p.owner_id=$1 order by p.created_at desc, p.id desc`,
+  async listProducts(ownerId: string): Promise<ProductWithEnvironments[]> {
+    const products = await this.execute(
+      `select * from agent_identification.products
+       where owner_id=$1 order by created_at desc, id desc`,
       [ownerId],
     );
-    return rows.map(product);
+    const environments = await this.execute(
+      `select ${ENVIRONMENT_COLUMNS} from ${OWNED_ENVIRONMENTS}
+       where p.owner_id=$1 order by ${ENVIRONMENT_ORDER}`,
+      [ownerId],
+    );
+    const rows = environments.map(environment);
+    return products.map((row) => ({
+      ...product(row),
+      environments: rows.filter((item) => item.productId === String(row.id)),
+    }));
   }
-  async getProduct(ownerId: string, id: string): Promise<ProductRecord | null> {
-    const rows = await this.execute(
-      `select ${PRODUCT_COLUMNS} from agent_identification.products p
-       where p.owner_id=$1 and p.id=$2`,
+  async getProduct(ownerId: string, id: string): Promise<ProductWithEnvironments | null> {
+    const products = await this.execute(
+      "select * from agent_identification.products where owner_id=$1 and id=$2",
       [ownerId, id],
     );
-    return rows[0] ? product(rows[0]) : null;
+    if (!products[0]) return null;
+    const environments = await this.execute(
+      `select ${ENVIRONMENT_COLUMNS} from ${OWNED_ENVIRONMENTS}
+       where p.owner_id=$1 and e.product_id=$2 order by ${ENVIRONMENT_ORDER}`,
+      [ownerId, id],
+    );
+    return { ...product(products[0]), environments: environments.map(environment) };
   }
-  async updateProduct(
+  async renameProduct(
     ownerId: string,
     id: string,
-    changes: ProductChanges,
-  ): Promise<ProductRecord | null> {
-    const origins = changes.origins === undefined ? null : JSON.stringify(changes.origins);
+    name: string,
+    now: number,
+  ): Promise<ProductWithEnvironments | null> {
     const rows = await this.execute(
-      `with target as (
-         update agent_identification.products
-         set name=coalesce($3,name), updated_at=$4
-         where owner_id=$1 and id=$2 returning id
-       ), removed as (
-         delete from agent_identification.product_origins
-         where $5::jsonb is not null and product_id in (select id from target)
-           and origin not in (select jsonb_array_elements_text($5::jsonb))
-       ), added as (
-         insert into agent_identification.product_origins (product_id, origin)
-         select target.id, value from target, jsonb_array_elements_text($5::jsonb) as value
-         on conflict do nothing
-       )
-       select id from target`,
-      [ownerId, id, changes.name ?? null, changes.now, origins],
+      `update agent_identification.products set name=$3, updated_at=$4
+       where owner_id=$1 and id=$2 returning id`,
+      [ownerId, id, name, now],
     );
     return rows[0] ? this.getProduct(ownerId, id) : null;
   }
-  async rotateSecret(
-    ownerId: string,
-    id: string,
-    rotation: SecretRotation,
-  ): Promise<ProductRecord | null> {
+  async createEnvironment(ownerId: string, e: EnvironmentRecord): Promise<boolean> {
     const rows = await this.execute(
-      `update agent_identification.products
-       set previous_secret_ciphertext=secret_ciphertext, previous_secret_expires_at=$3,
-           secret_ciphertext=$4, updated_at=$5
-       where owner_id=$1 and id=$2 and secret_ciphertext=$6 returning id`,
+      `with allowed as (
+         select id from agent_identification.products where owner_id=$1 and id=$2
+       ), created as (
+         insert into agent_identification.environments
+         (id, product_id, type, name, site_id, secret_ciphertext, created_at, updated_at)
+         select $3, allowed.id, $4, $5, $6, $7, $8, $9 from allowed
+         on conflict (product_id, type) do nothing
+         returning id
+       ), origins as (
+         insert into agent_identification.environment_origins (environment_id, origin)
+         select created.id, value
+         from created, jsonb_array_elements_text($10::jsonb) as value
+       )
+       select id from created`,
       [
         ownerId,
+        e.productId,
+        e.id,
+        e.type,
+        e.name,
+        e.siteId,
+        e.secretCiphertext,
+        e.createdAt,
+        e.updatedAt,
+        JSON.stringify(e.origins),
+      ],
+    );
+    return rows.length > 0;
+  }
+  private async readEnvironment(
+    ownerId: string,
+    productId: string,
+    id: string,
+  ): Promise<EnvironmentRecord | null> {
+    const rows = await this.execute(
+      `select ${ENVIRONMENT_COLUMNS} from ${OWNED_ENVIRONMENTS}
+       where p.owner_id=$1 and e.product_id=$2 and e.id=$3`,
+      [ownerId, productId, id],
+    );
+    return rows[0] ? environment(rows[0]) : null;
+  }
+  async updateEnvironment(
+    ownerId: string,
+    productId: string,
+    id: string,
+    changes: EnvironmentChanges,
+  ): Promise<EnvironmentRecord | null> {
+    const origins = changes.origins === undefined ? null : JSON.stringify(changes.origins);
+    const rows = await this.execute(
+      `with target as (
+         update agent_identification.environments e
+         set name=coalesce($4,e.name), updated_at=$5
+         from agent_identification.products p
+         where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+         returning e.id
+       ), removed as (
+         delete from agent_identification.environment_origins
+         where $6::jsonb is not null and environment_id in (select id from target)
+           and origin not in (select jsonb_array_elements_text($6::jsonb))
+       ), added as (
+         insert into agent_identification.environment_origins (environment_id, origin)
+         select target.id, value from target, jsonb_array_elements_text($6::jsonb) as value
+         on conflict do nothing
+       )
+       select id from target`,
+      [ownerId, productId, id, changes.name ?? null, changes.now, origins],
+    );
+    return rows[0] ? this.readEnvironment(ownerId, productId, id) : null;
+  }
+  async rotateSecret(
+    ownerId: string,
+    productId: string,
+    id: string,
+    rotation: SecretRotation,
+  ): Promise<EnvironmentRecord | null> {
+    const rows = await this.execute(
+      `update agent_identification.environments e
+       set previous_secret_ciphertext=e.secret_ciphertext, previous_secret_expires_at=$4,
+           secret_ciphertext=$5, updated_at=$6
+       from agent_identification.products p
+       where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+         and e.secret_ciphertext=$7
+       returning e.id`,
+      [
+        ownerId,
+        productId,
         id,
         rotation.previousSecretExpiresAt,
         rotation.secretCiphertext,
@@ -174,20 +276,23 @@ export class PostgresStore implements CollectorStore, ProductStore {
         rotation.expectedCiphertext,
       ],
     );
-    return rows[0] ? this.getProduct(ownerId, id) : null;
+    return rows[0] ? this.readEnvironment(ownerId, productId, id) : null;
   }
   async revokePreviousSecret(
     ownerId: string,
+    productId: string,
     id: string,
     now: number,
-  ): Promise<ProductRecord | null> {
+  ): Promise<EnvironmentRecord | null> {
     const rows = await this.execute(
-      `update agent_identification.products
-       set previous_secret_ciphertext=null, previous_secret_expires_at=null, updated_at=$3
-       where owner_id=$1 and id=$2 returning id`,
-      [ownerId, id, now],
+      `update agent_identification.environments e
+       set previous_secret_ciphertext=null, previous_secret_expires_at=null, updated_at=$4
+       from agent_identification.products p
+       where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+       returning e.id`,
+      [ownerId, productId, id, now],
     );
-    return rows[0] ? this.getProduct(ownerId, id) : null;
+    return rows[0] ? this.readEnvironment(ownerId, productId, id) : null;
   }
   async claimDomains(
     ownerId: string,
@@ -229,16 +334,16 @@ export class PostgresStore implements CollectorStore, ProductStore {
       throw error;
     }
   }
-  async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
+  async getEnvironmentBySiteId(siteId: string): Promise<EnvironmentRecord | null> {
     const rows = await this.execute(
-      `select ${PRODUCT_COLUMNS} from agent_identification.products p where p.site_id=$1`,
+      `select ${ENVIRONMENT_COLUMNS} from agent_identification.environments e where e.site_id=$1`,
       [siteId],
     );
-    return rows[0] ? product(rows[0]) : null;
+    return rows[0] ? environment(rows[0]) : null;
   }
   async isRegisteredOrigin(origin: string): Promise<boolean> {
     const rows = await this.execute(
-      "select 1 from agent_identification.product_origins where origin=$1 limit 1",
+      "select 1 from agent_identification.environment_origins where origin=$1 limit 1",
       [origin],
     );
     return rows.length > 0;

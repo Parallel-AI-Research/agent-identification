@@ -32,18 +32,23 @@ export function databaseClient(url: string) {
 function demoStore(cipher: SecretCipher): MemoryStore {
   const store = new MemoryStore();
   for (const site of DEMO_SITES) {
-    store.seedProduct({
-      id: randomUUID(),
-      ownerId: null,
-      name: site.id,
-      siteId: site.id,
-      origins: site.origins,
-      secretCiphertext: cipher.seal(DEMO_SECRET, site.id),
-      previousSecretCiphertext: null,
-      previousSecretExpiresAt: null,
-      createdAt: 0,
-      updatedAt: 0,
-    });
+    const id = randomUUID();
+    store.seedProduct(
+      { id, ownerId: null, name: site.id, createdAt: 0, updatedAt: 0 },
+      {
+        id: randomUUID(),
+        productId: id,
+        type: "production",
+        name: "Production",
+        siteId: site.id,
+        origins: site.origins,
+        secretCiphertext: cipher.seal(DEMO_SECRET, site.id),
+        previousSecretCiphertext: null,
+        previousSecretExpiresAt: null,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    );
   }
   return store;
 }

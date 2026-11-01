@@ -6,10 +6,12 @@ import { Button, Notice } from "@/components/ui";
 import { revokeOldSecret, rotateSecret, type ProductState } from "../actions";
 
 export function SecretPanel({
-  id,
+  productId,
+  environmentId,
   previousExpiresAt,
 }: {
-  id: string;
+  productId: string;
+  environmentId: string;
   previousExpiresAt: string | null;
 }) {
   const [result, setResult] = useState<ProductState>({});
@@ -35,7 +37,7 @@ export function SecretPanel({
           <Button
             variant="danger"
             disabled={pending}
-            onClick={() => run(() => revokeOldSecret(id))}
+            onClick={() => run(() => revokeOldSecret(productId, environmentId))}
           >
             Revoke old secret now
           </Button>
@@ -43,7 +45,10 @@ export function SecretPanel({
       ) : confirming ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm">The old secret will keep working for 24 hours.</p>
-          <Button disabled={pending} onClick={() => run(() => rotateSecret(id))}>
+          <Button
+            disabled={pending}
+            onClick={() => run(() => rotateSecret(productId, environmentId))}
+          >
             Rotate now
           </Button>
           <Button variant="secondary" onClick={() => setConfirming(false)}>

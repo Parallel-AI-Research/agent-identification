@@ -6,7 +6,15 @@ import { Badge, Button, Notice } from "@/components/ui";
 import type { Domain } from "@/lib/collector";
 import { verifyDomain, type ProductState } from "../actions";
 
-export function DomainList({ id, domains }: { id: string; domains: Domain[] }) {
+export function DomainList({
+  productId,
+  environmentId,
+  domains,
+}: {
+  productId: string;
+  environmentId: string;
+  domains: Domain[];
+}) {
   const [result, setResult] = useState<ProductState>({});
   const [pending, start] = useTransition();
   return (
@@ -29,7 +37,11 @@ export function DomainList({ id, domains }: { id: string; domains: Domain[] }) {
               <Button
                 variant="secondary"
                 disabled={pending}
-                onClick={() => start(async () => setResult(await verifyDomain(id, domain.domain)))}
+                onClick={() =>
+                  start(async () =>
+                    setResult(await verifyDomain(productId, environmentId, domain.domain)),
+                  )
+                }
               >
                 {pending ? "Checking…" : "Check DNS record"}
               </Button>

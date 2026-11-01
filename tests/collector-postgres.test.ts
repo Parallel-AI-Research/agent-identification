@@ -65,6 +65,12 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261101140000_add_environments.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );

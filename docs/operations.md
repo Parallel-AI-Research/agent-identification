@@ -30,8 +30,9 @@ app. A separate schema and restricted role let it use an existing database.
    npm run sites:import -- --file .local/your-site.json
    ```
 
-   The import keeps site IDs and secrets, so existing installs keep working, and
-   it skips sites that already exist. It also reads a JSON array from
+   Each site becomes the production environment of a product no customer owns. The
+   import keeps site IDs and secrets, so existing installs keep working, and it
+   skips sites that already exist. It also reads a JSON array from
    `AGENT_ID_SITES`. Keep these files and values private. Provide only the public
    site ID and collector URL to browser installations.
 

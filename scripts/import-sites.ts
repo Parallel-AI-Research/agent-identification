@@ -6,7 +6,7 @@ import { PostgresStore, postgresExecutor } from "../collector/postgres-store.js"
 import { SecretCipher, type ProductStore } from "../collector/products.js";
 import { databaseClient } from "./runtime.js";
 
-/** Adds operator sites, keeping their IDs and secrets so existing installs keep working. */
+/** Adds operator sites as production environments, keeping their IDs and secrets. */
 export async function importSites(
   sites: SiteConfig[],
   products: ProductStore,
@@ -20,22 +20,27 @@ export async function importSites(
   const imported: string[] = [];
   const skipped: string[] = [];
   for (const site of sites) {
-    if (await products.getProductBySiteId(site.id)) {
+    if (await products.getEnvironmentBySiteId(site.id)) {
       skipped.push(site.id);
       continue;
     }
-    await products.createProduct({
-      id: randomUUID(),
-      ownerId: null,
-      name: site.id,
-      siteId: site.id,
-      origins: [...new Set(site.origins)].sort(),
-      secretCiphertext: cipher.seal(site.secret, site.id),
-      previousSecretCiphertext: null,
-      previousSecretExpiresAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const id = randomUUID();
+    await products.createProduct(
+      { id, ownerId: null, name: site.id, createdAt: now, updatedAt: now },
+      {
+        id: randomUUID(),
+        productId: id,
+        type: "production",
+        name: "Production",
+        siteId: site.id,
+        origins: [...new Set(site.origins)].sort(),
+        secretCiphertext: cipher.seal(site.secret, site.id),
+        previousSecretCiphertext: null,
+        previousSecretExpiresAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    );
     imported.push(site.id);
   }
   return { imported, skipped };

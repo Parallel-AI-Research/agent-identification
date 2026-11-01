@@ -1,10 +1,13 @@
 import type { Choice } from "../src/protocol.js";
-import type {
-  DomainClaim,
-  ProductChanges,
-  ProductRecord,
-  ProductStore,
-  SecretRotation,
+import {
+  ENVIRONMENT_TYPES,
+  type DomainClaim,
+  type EnvironmentChanges,
+  type EnvironmentRecord,
+  type ProductRecord,
+  type ProductStore,
+  type ProductWithEnvironments,
+  type SecretRotation,
 } from "./products.js";
 
 export interface StoredSession {
@@ -64,41 +67,83 @@ export interface CollectorStore {
 export class MemoryStore implements CollectorStore, ProductStore {
   readonly kind = "memory" as const;
   private products = new Map<string, ProductRecord>();
+  private environments = new Map<string, EnvironmentRecord>();
   private domains = new Map<string, DomainClaim & { ownerId: string }>();
   private sessions = new Map<string, StoredSession>();
   private events = new Map<string, StoredEvent>();
   private rates = new Map<string, { count: number; expiresAt: number }>();
   async checkHealth(): Promise<void> {}
   /** Synchronous so a local fixture can register its sites during startup. */
-  seedProduct(product: ProductRecord): void {
-    if ([...this.products.values()].some((row) => row.siteId === product.siteId)) {
+  seedProduct(product: ProductRecord, production: EnvironmentRecord): void {
+    this.products.set(product.id, { ...product });
+    this.addEnvironment(production);
+  }
+  private addEnvironment(environment: EnvironmentRecord): void {
+    if ([...this.environments.values()].some((row) => row.siteId === environment.siteId)) {
       throw new Error("Duplicate site id");
     }
-    this.products.set(product.id, { ...product, origins: [...product.origins].sort() });
+    this.environments.set(environment.id, {
+      ...environment,
+      origins: [...environment.origins].sort(),
+    });
   }
-  async createProduct(product: ProductRecord): Promise<void> {
-    this.seedProduct(product);
+  private withEnvironments(product: ProductRecord): ProductWithEnvironments {
+    const environments = [...this.environments.values()]
+      .filter((row) => row.productId === product.id)
+      .sort((a, b) => ENVIRONMENT_TYPES.indexOf(a.type) - ENVIRONMENT_TYPES.indexOf(b.type))
+      .map((row) => ({ ...row, origins: [...row.origins] }));
+    return { ...product, environments };
+  }
+  private owned(ownerId: string, productId: string, id: string): EnvironmentRecord | undefined {
+    const row = this.environments.get(id);
+    const product = this.products.get(productId);
+    return row && row.productId === productId && product?.ownerId === ownerId ? row : undefined;
+  }
+  async createProduct(product: ProductRecord, production: EnvironmentRecord): Promise<void> {
+    this.seedProduct(product, production);
   }
   async countProducts(ownerId: string): Promise<number> {
     return (await this.listProducts(ownerId)).length;
   }
-  async listProducts(ownerId: string): Promise<ProductRecord[]> {
+  async listProducts(ownerId: string): Promise<ProductWithEnvironments[]> {
     return [...this.products.values()]
       .filter((row) => row.ownerId === ownerId)
       .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
-      .map((row) => ({ ...row, origins: [...row.origins] }));
+      .map((row) => this.withEnvironments(row));
   }
-  async getProduct(ownerId: string, id: string): Promise<ProductRecord | null> {
+  async getProduct(ownerId: string, id: string): Promise<ProductWithEnvironments | null> {
     const row = this.products.get(id);
-    return row && row.ownerId === ownerId ? { ...row, origins: [...row.origins] } : null;
+    return row && row.ownerId === ownerId ? this.withEnvironments(row) : null;
   }
-  async updateProduct(
+  async renameProduct(
     ownerId: string,
     id: string,
-    changes: ProductChanges,
-  ): Promise<ProductRecord | null> {
+    name: string,
+    now: number,
+  ): Promise<ProductWithEnvironments | null> {
     const row = this.products.get(id);
     if (!row || row.ownerId !== ownerId) return null;
+    row.name = name;
+    row.updatedAt = now;
+    return this.withEnvironments(row);
+  }
+  async createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean> {
+    if (this.products.get(environment.productId)?.ownerId !== ownerId) return false;
+    const taken = [...this.environments.values()].some(
+      (row) => row.productId === environment.productId && row.type === environment.type,
+    );
+    if (taken) return false;
+    this.addEnvironment(environment);
+    return true;
+  }
+  async updateEnvironment(
+    ownerId: string,
+    productId: string,
+    id: string,
+    changes: EnvironmentChanges,
+  ): Promise<EnvironmentRecord | null> {
+    const row = this.owned(ownerId, productId, id);
+    if (!row) return null;
     if (changes.name !== undefined) row.name = changes.name;
     if (changes.origins !== undefined) row.origins = [...changes.origins].sort();
     row.updatedAt = changes.now;
@@ -106,12 +151,12 @@ export class MemoryStore implements CollectorStore, ProductStore {
   }
   async rotateSecret(
     ownerId: string,
+    productId: string,
     id: string,
     rotation: SecretRotation,
-  ): Promise<ProductRecord | null> {
-    const row = this.products.get(id);
-    if (!row || row.ownerId !== ownerId) return null;
-    if (row.secretCiphertext !== rotation.expectedCiphertext) return null;
+  ): Promise<EnvironmentRecord | null> {
+    const row = this.owned(ownerId, productId, id);
+    if (!row || row.secretCiphertext !== rotation.expectedCiphertext) return null;
     row.previousSecretCiphertext = row.secretCiphertext;
     row.previousSecretExpiresAt = rotation.previousSecretExpiresAt;
     row.secretCiphertext = rotation.secretCiphertext;
@@ -120,11 +165,12 @@ export class MemoryStore implements CollectorStore, ProductStore {
   }
   async revokePreviousSecret(
     ownerId: string,
+    productId: string,
     id: string,
     now: number,
-  ): Promise<ProductRecord | null> {
-    const row = this.products.get(id);
-    if (!row || row.ownerId !== ownerId) return null;
+  ): Promise<EnvironmentRecord | null> {
+    const row = this.owned(ownerId, productId, id);
+    if (!row) return null;
     row.previousSecretCiphertext = null;
     row.previousSecretExpiresAt = null;
     row.updatedAt = now;
@@ -153,12 +199,12 @@ export class MemoryStore implements CollectorStore, ProductStore {
     if (row) row.verifiedAt ??= now;
     return true;
   }
-  async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
-    const row = [...this.products.values()].find((value) => value.siteId === siteId);
+  async getEnvironmentBySiteId(siteId: string): Promise<EnvironmentRecord | null> {
+    const row = [...this.environments.values()].find((value) => value.siteId === siteId);
     return row ? { ...row, origins: [...row.origins] } : null;
   }
   async isRegisteredOrigin(origin: string): Promise<boolean> {
-    return [...this.products.values()].some((row) => row.origins.includes(origin));
+    return [...this.environments.values()].some((row) => row.origins.includes(origin));
   }
   async createSession(session: StoredSession): Promise<void> {
     if (this.sessions.has(session.tokenHash)) throw new Error("Duplicate session");

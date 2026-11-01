@@ -9,7 +9,7 @@ import { MemoryStore, type CollectorStore } from "../collector/store.js";
 import {
   ProductDirectory,
   SecretCipher,
-  type ProductRecord,
+  type EnvironmentRecord,
   type ProductStore,
 } from "../collector/products.js";
 import { importSites } from "../scripts/import-sites.js";
@@ -28,6 +28,7 @@ before(async () => {
     "20261020093721_create_agent_identification_collector.sql",
     "20261101120000_add_customer_products.sql",
     "20261101130000_add_domain_claims.sql",
+    "20261101140000_add_environments.sql",
   ]) {
     await database.exec(
       await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8"),
@@ -38,17 +39,36 @@ after(async () => {
   await database?.close();
 });
 
+interface Created {
+  product: { id: string; name: string; environments: Environment[] };
+  environment: Environment;
+  serverSecret: string;
+}
+interface Environment {
+  id: string;
+  type: string;
+  name: string;
+  siteId: string;
+  origins: string[];
+  previousSecretExpiresAt: string | null;
+}
+const path = (created: Created) =>
+  `/products/${created.product.id}/environments/${created.environment.id}`;
+
 const stores: [string, () => Promise<CollectorStore & ProductStore>][] = [
   ["memory", async () => new MemoryStore()],
   [
     "postgres",
     async () => {
       await database.exec(
-        `truncate agent_identification.products cascade;
+        `reset role;
+         truncate agent_identification.products cascade;
          truncate agent_identification.domain_claims;
          truncate agent_identification.sessions cascade;
-         truncate agent_identification.rate_buckets`,
+         truncate agent_identification.rate_buckets;
+         set role agent_id_app`,
       );
+      // Runs as the restricted role, so a missing grant or policy fails here, not in production.
       return new PostgresStore(
         async (sql, parameters) =>
           (await database.query<Record<string, unknown>>(sql, parameters)).rows,
@@ -90,16 +110,23 @@ function fixture(
         },
       }),
     );
-  const create = async (ownerId: string, name: string, origins = [origin]) => {
+  const create = async (ownerId: string, name: string, origins = [origin]): Promise<Created> => {
     const response = await owner(ownerId, "/products", {
       method: "POST",
       body: JSON.stringify({ name, origins }),
     });
     assert.equal(response.status, 201);
-    return (await response.json()) as {
-      product: { id: string; siteId: string; origins: string[] };
-      serverSecret: string;
-    };
+    const created = (await response.json()) as Omit<Created, "environment">;
+    return { ...created, environment: created.product.environments[0]! };
+  };
+  const addEnvironment = async (ownerId: string, base: Created, data: object): Promise<Created> => {
+    const response = await owner(ownerId, `/products/${base.product.id}/environments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    assert.equal(response.status, 201);
+    const created = (await response.json()) as Pick<Created, "environment" | "serverSecret">;
+    return { ...base, ...created };
   };
   const visitor = async (siteId: string, usedOrigin = origin, data: object = {}) =>
     handle(
@@ -122,7 +149,7 @@ function fixture(
         body: JSON.stringify({ choice: "ai_assistant", requestId: randomUUID() }),
       }),
     );
-  return { handle, owner, create, visitor, declare };
+  return { handle, owner, create, addEnvironment, visitor, declare };
 }
 
 for (const [kind, open] of stores) {
@@ -136,9 +163,9 @@ for (const [kind, open] of stores) {
       const { owner, create } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
       const b = await create(owners.bob, "Bob's product", ["https://bob.example"]);
-      assert.notEqual(a.product.siteId, b.product.siteId);
+      assert.notEqual(a.environment.siteId, b.environment.siteId);
       assert.notEqual(a.serverSecret, b.serverSecret);
-      assert.match(a.product.siteId, /^site_[A-Za-z0-9_-]{16}$/);
+      assert.match(a.environment.siteId, /^site_[A-Za-z0-9_-]{16}$/);
       const list = (await (await owner(owners.alice, "/products")).json()) as {
         products: { id: string }[];
       };
@@ -151,19 +178,20 @@ for (const [kind, open] of stores) {
     test("another customer cannot read, change or export a product", async () => {
       const { owner, create, visitor, declare } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
-      const session = (await (await visitor(a.product.siteId)).json()) as CreatedSession;
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
       assert.equal((await declare(session)).status, 200);
 
-      for (const [path, init] of [
+      for (const [route, init] of [
         [`/products/${a.product.id}`, {}],
-        [`/products/${a.product.id}/events`, {}],
+        [path(a), {}],
+        [`${path(a)}/events`, {}],
         [
           `/products/${a.product.id}`,
           { method: "PATCH", body: JSON.stringify({ name: "Taken over" }) },
         ],
       ] as [string, RequestInit][]) {
-        const response = await owner(owners.bob, path, init);
-        assert.equal(response.status, 404, path);
+        const response = await owner(owners.bob, route, init);
+        assert.equal(response.status, 404, route);
         assert.equal(((await response.json()) as { error: string }).error, "Not found");
       }
       const mine = await owner(owners.alice, `/products/${a.product.id}`);
@@ -171,9 +199,9 @@ for (const [kind, open] of stores) {
         ((await mine.json()) as { product: { name: string } }).product.name,
         "Alice's product",
       );
-      const events = (await (
-        await owner(owners.alice, `/products/${a.product.id}/events`)
-      ).json()) as { events: { choice: string }[] };
+      const events = (await (await owner(owners.alice, `${path(a)}/events`)).json()) as {
+        events: { choice: string }[];
+      };
       assert.deepEqual(
         events.events.map((event) => event.choice),
         ["ai_assistant"],
@@ -183,14 +211,14 @@ for (const [kind, open] of stores) {
     test("responses never expose secrets, and the secret is only returned at creation", async () => {
       const { owner, create } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
-      const stored = await store.getProduct(owners.alice, a.product.id);
+      const stored = (await store.getProduct(owners.alice, a.product.id))?.environments[0];
       assert(stored);
       assert(!stored.secretCiphertext.includes(a.serverSecret));
-      assert.equal(cipher.open(stored.secretCiphertext, a.product.siteId), a.serverSecret);
-      for (const path of ["/products", `/products/${a.product.id}`]) {
-        const text = await (await owner(owners.alice, path)).text();
-        assert(!text.includes(a.serverSecret), path);
-        assert(!text.includes("ciphertext"), path);
+      assert.equal(cipher.open(stored.secretCiphertext, a.environment.siteId), a.serverSecret);
+      for (const route of ["/products", `/products/${a.product.id}`, path(a)]) {
+        const text = await (await owner(owners.alice, route)).text();
+        assert(!text.includes(a.serverSecret), route);
+        assert(!text.includes("ciphertext"), route);
       }
     });
 
@@ -217,20 +245,20 @@ for (const [kind, open] of stores) {
     test("a new product works immediately, and only for its exact origins", async () => {
       const { create, visitor, owner } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
-      assert.equal((await visitor(a.product.siteId)).status, 201);
-      assert.equal((await visitor(a.product.siteId, "https://other.example")).status, 403);
+      assert.equal((await visitor(a.environment.siteId)).status, 201);
+      assert.equal((await visitor(a.environment.siteId, "https://other.example")).status, 403);
 
       const next = "https://new.example";
-      const updated = await owner(owners.alice, `/products/${a.product.id}`, {
+      const updated = await owner(owners.alice, path(a), {
         method: "PATCH",
         body: JSON.stringify({ origins: [next] }),
       });
       assert.deepEqual(
-        ((await updated.json()) as { product: { origins: string[] } }).product.origins,
+        ((await updated.json()) as { environment: { origins: string[] } }).environment.origins,
         [next],
       );
-      assert.equal((await visitor(a.product.siteId, next)).status, 201);
-      assert.equal((await visitor(a.product.siteId)).status, 403);
+      assert.equal((await visitor(a.environment.siteId, next)).status, 201);
+      assert.equal((await visitor(a.environment.siteId)).status, 403);
     });
 
     test("owner routes require a sign-in and reject browser requests", async () => {
@@ -245,21 +273,204 @@ for (const [kind, open] of stores) {
       assert.equal((await owner(owners.alice, "/products/not-a-uuid")).status, 404);
     });
 
+    test("a product starts with production, and each environment has its own credentials", async () => {
+      const { owner, create, addEnvironment } = fixture(store);
+      const production = await create(owners.alice, "Alice's product");
+      assert.deepEqual(
+        production.product.environments.map(({ type, name }) => [type, name]),
+        [["production", "Production"]],
+      );
+      const dev = await addEnvironment(owners.alice, production, {
+        type: "dev",
+        origins: ["http://localhost:3000"],
+      });
+      const beta = await addEnvironment(owners.alice, production, {
+        type: "beta",
+        name: "Early access",
+        origins: ["https://beta.alice.example"],
+      });
+      assert.equal(new Set([production, dev, beta].map((item) => item.environment.siteId)).size, 3);
+      assert.equal(new Set([production, dev, beta].map((item) => item.serverSecret)).size, 3);
+      assert.equal(dev.environment.name, "Dev");
+      assert.equal(beta.environment.name, "Early access");
+
+      // Production always comes first, so it can be the default.
+      const listed = (await (
+        await owner(owners.alice, `/products/${production.product.id}`)
+      ).json()) as {
+        product: { environments: Environment[] };
+      };
+      assert.deepEqual(
+        listed.product.environments.map((item) => item.type),
+        ["production", "beta", "dev"],
+      );
+
+      const add = (data: object) =>
+        owner(owners.alice, `/products/${production.product.id}/environments`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      assert.equal((await add({ type: "dev", origins: [origin] })).status, 409);
+      assert.equal((await add({ type: "production", origins: [origin] })).status, 409);
+      assert.equal((await add({ type: "qa", origins: [origin] })).status, 400);
+      assert.equal(
+        (await add({ type: "staging", origins: ["https://*.alice.example"] })).status,
+        400,
+      );
+
+      // The name can change. The type is fixed.
+      const renamed = await owner(owners.alice, path(beta), {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Preview" }),
+      });
+      const { environment } = (await renamed.json()) as { environment: Environment };
+      assert.deepEqual([environment.name, environment.type], ["Preview", "beta"]);
+      const retyped = await owner(owners.alice, path(beta), {
+        method: "PATCH",
+        body: JSON.stringify({ type: "production" }),
+      });
+      assert.equal(retyped.status, 400);
+    });
+
+    test("environments stay isolated from each other within one customer", async () => {
+      const { handle, owner, create, addEnvironment, visitor, declare } = fixture(store);
+      const production = await create(owners.alice, "Alice's product");
+      const devOrigin = "http://localhost:3000";
+      const dev = await addEnvironment(owners.alice, production, {
+        type: "dev",
+        origins: [devOrigin],
+      });
+      const session = (await (
+        await visitor(dev.environment.siteId, devOrigin)
+      ).json()) as CreatedSession;
+      assert.equal((await declare(session, devOrigin)).status, 200);
+
+      // Dev traffic never reaches production's numbers.
+      const events = async (created: Created) =>
+        (
+          (await (await owner(owners.alice, `${path(created)}/events`)).json()) as {
+            events: unknown[];
+          }
+        ).events.length;
+      assert.equal(await events(dev), 1);
+      assert.equal(await events(production), 0);
+
+      // Each site ID works only from its own origins.
+      assert.equal((await visitor(production.environment.siteId, devOrigin)).status, 403);
+      assert.equal((await visitor(dev.environment.siteId, origin)).status, 403);
+
+      // One environment's secret can't read another's events.
+      const exportEvents = (siteId: string, secret: string) =>
+        handle(
+          new Request(`https://collector.test/v1/events?siteId=${siteId}`, {
+            headers: { authorization: `Bearer ${secret}` },
+          }),
+        );
+      assert.equal((await exportEvents(dev.environment.siteId, dev.serverSecret)).status, 200);
+      assert.equal(
+        (await exportEvents(dev.environment.siteId, production.serverSecret)).status,
+        401,
+      );
+      assert.equal(
+        (await exportEvents(production.environment.siteId, dev.serverSecret)).status,
+        401,
+      );
+
+      // Even on a shared origin, a receipt from one environment fails against another.
+      const staging = await addEnvironment(owners.alice, production, {
+        type: "staging",
+        origins: [origin],
+      });
+      const settings = {
+        siteId: staging.environment.siteId,
+        origin,
+        secret: staging.serverSecret,
+        sessionBinding: "host-session",
+        now: new Date(time),
+      };
+      const bound = (await (
+        await visitor(staging.environment.siteId, origin, {
+          bindingContext: createBindingContext(settings),
+        })
+      ).json()) as CreatedSession;
+      const recorded = (await (await declare(bound)).json()) as RecordedDeclaration;
+      const verify = (siteId: string, secret: string) =>
+        handle(
+          new Request("https://collector.test/v1/verify", {
+            method: "POST",
+            headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+            body: JSON.stringify({
+              siteId,
+              origin,
+              sessionBinding: "host-session",
+              receipt: recorded.receipt,
+            }),
+          }),
+        );
+      assert.equal((await verify(staging.environment.siteId, staging.serverSecret)).status, 200);
+      assert.equal(
+        (await verify(production.environment.siteId, production.serverSecret)).status,
+        401,
+      );
+
+      // Rotating one environment leaves the others untouched.
+      assert.equal(
+        (await owner(owners.alice, `${path(dev)}/secret`, { method: "POST" })).status,
+        200,
+      );
+      const current = (await (await owner(owners.alice, path(production))).json()) as {
+        environment: Environment;
+      };
+      assert.equal(current.environment.previousSecretExpiresAt, null);
+      assert.equal(
+        (await exportEvents(production.environment.siteId, production.serverSecret)).status,
+        200,
+      );
+    });
+
+    test("another customer cannot add to or reach a product's environments", async () => {
+      const { owner, create, addEnvironment } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const dev = await addEnvironment(owners.alice, a, {
+        type: "dev",
+        origins: ["http://localhost:3000"],
+      });
+      const b = await create(owners.bob, "Bob's product", ["https://bob.example"]);
+      const adding = await owner(owners.bob, `/products/${a.product.id}/environments`, {
+        method: "POST",
+        body: JSON.stringify({ type: "staging", origins: ["https://bob.example"] }),
+      });
+      assert.equal(adding.status, 404);
+      for (const [route, init] of [
+        [`/products/${a.product.id}/environments`, {}],
+        [path(dev), {}],
+        [`${path(dev)}/events`, {}],
+        [`${path(dev)}/domains`, {}],
+        [`${path(dev)}/secret`, { method: "POST" }],
+        [path(dev), { method: "PATCH", body: JSON.stringify({ name: "Taken" }) }],
+        // Their own product ID doesn't unlock someone else's environment.
+        [`/products/${b.product.id}/environments/${dev.environment.id}`, {}],
+      ] as [string, RequestInit][]) {
+        assert.equal((await owner(owners.bob, route, init)).status, 404, route);
+      }
+      assert.equal((await owner(owners.alice, path(dev))).status, 200);
+    });
+
     test("rotation keeps both secrets working for 24 hours, then only the new one", async () => {
       let clock = time;
       const { handle, owner, create, visitor, declare } = fixture(store, { clock: () => clock });
       const a = await create(owners.alice, "Alice's product");
-      const siteId = a.product.siteId;
-      const rotated = await owner(owners.alice, `/products/${a.product.id}/secret`, {
+      const siteId = a.environment.siteId;
+      const rotated = await owner(owners.alice, `${path(a)}/secret`, {
         method: "POST",
       });
       assert.equal(rotated.status, 200);
-      const { serverSecret: next, product } = (await rotated.json()) as {
+      const { serverSecret: next, environment } = (await rotated.json()) as {
         serverSecret: string;
-        product: { previousSecretExpiresAt: string };
+        environment: { previousSecretExpiresAt: string };
       };
       assert.notEqual(next, a.serverSecret);
-      assert.equal(product.previousSecretExpiresAt, new Date(time + 86400000).toISOString());
+      assert.equal(environment.previousSecretExpiresAt, new Date(time + 86400000).toISOString());
 
       const exportWith = async (secret: string) =>
         (
@@ -293,7 +504,7 @@ for (const [kind, open] of stores) {
         assert.equal(claims.choice, "ai_assistant");
       }
 
-      const again = await owner(owners.alice, `/products/${a.product.id}/secret`, {
+      const again = await owner(owners.alice, `${path(a)}/secret`, {
         method: "POST",
       });
       assert.equal(again.status, 409);
@@ -302,7 +513,7 @@ for (const [kind, open] of stores) {
       assert.equal(await exportWith(a.serverSecret), 401);
       assert.equal(await exportWith(next), 200);
       assert.equal(
-        (await owner(owners.alice, `/products/${a.product.id}/secret`, { method: "POST" })).status,
+        (await owner(owners.alice, `${path(a)}/secret`, { method: "POST" })).status,
         200,
       );
     });
@@ -310,23 +521,20 @@ for (const [kind, open] of stores) {
     test("revoke-now ends the old secret immediately and only for the owner", async () => {
       const { handle, owner, create } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
-      await owner(owners.alice, `/products/${a.product.id}/secret`, { method: "POST" });
-      const path = `/products/${a.product.id}/secret/previous`;
-      assert.equal((await owner(owners.bob, path, { method: "DELETE" })).status, 404);
-      assert.equal(
-        (await owner(owners.bob, `/products/${a.product.id}/secret`, { method: "POST" })).status,
-        404,
-      );
+      await owner(owners.alice, `${path(a)}/secret`, { method: "POST" });
+      const revokePath = `${path(a)}/secret/previous`;
+      assert.equal((await owner(owners.bob, revokePath, { method: "DELETE" })).status, 404);
+      assert.equal((await owner(owners.bob, `${path(a)}/secret`, { method: "POST" })).status, 404);
       const exportOld = () =>
         handle(
-          new Request(`https://collector.test/v1/events?siteId=${a.product.siteId}`, {
+          new Request(`https://collector.test/v1/events?siteId=${a.environment.siteId}`, {
             headers: { authorization: `Bearer ${a.serverSecret}` },
           }),
         );
       assert.equal((await exportOld()).status, 200);
-      const revoked = await owner(owners.alice, path, { method: "DELETE" });
+      const revoked = await owner(owners.alice, revokePath, { method: "DELETE" });
       assert.equal(
-        ((await revoked.json()) as { product: { previousSecretExpiresAt: null } }).product
+        ((await revoked.json()) as { environment: Environment }).environment
           .previousSecretExpiresAt,
         null,
       );
@@ -340,7 +548,7 @@ for (const [kind, open] of stores) {
         "https://www.alice.example",
         "http://localhost:3000",
       ]);
-      const domainsPath = `/products/${a.product.id}/domains`;
+      const domainsPath = `${path(a)}/domains`;
       type Domain = {
         domain: string;
         status: string;
@@ -360,39 +568,37 @@ for (const [kind, open] of stores) {
 
       // Events arrive before the domain is verified.
       const session = (await (
-        await visitor(a.product.siteId, "https://www.alice.example")
+        await visitor(a.environment.siteId, "https://www.alice.example")
       ).json()) as CreatedSession;
       assert.equal((await declare(session, "https://www.alice.example")).status, 200);
 
-      const verify = (ownerId: string, id: string, domain: string) =>
-        owner(ownerId, `/products/${id}/domains/verify`, {
+      const verify = (ownerId: string, created: Created, domain: string) =>
+        owner(ownerId, `${path(created)}/domains/verify`, {
           method: "POST",
           body: JSON.stringify({ domain }),
         });
-      const missing = await verify(owners.alice, a.product.id, "www.alice.example");
+      const missing = await verify(owners.alice, a, "www.alice.example");
       assert.equal(missing.status, 422);
       assert.match(((await missing.json()) as { error: string }).error, /No matching TXT record/);
-      assert.equal((await verify(owners.alice, a.product.id, "other.example")).status, 400);
+      assert.equal((await verify(owners.alice, a, "other.example")).status, 400);
 
       txt.set(before[0]!.record!.name, ["unrelated", before[0]!.record!.value]);
-      assert.equal((await verify(owners.alice, a.product.id, "www.alice.example")).status, 200);
+      assert.equal((await verify(owners.alice, a, "www.alice.example")).status, 200);
       assert.equal((await list())[0]!.status, "verified");
 
       // The same owner can reuse the domain; another owner cannot verify it.
       const second = await create(owners.alice, "Second product", ["https://www.alice.example"]);
-      const reused = (await (
-        await owner(owners.alice, `/products/${second.product.id}/domains`)
-      ).json()) as { domains: Domain[] };
+      const reused = (await (await owner(owners.alice, `${path(second)}/domains`)).json()) as {
+        domains: Domain[];
+      };
       assert.equal(reused.domains[0]!.status, "verified");
 
       const b = await create(owners.bob, "Bob's product", ["https://www.alice.example"]);
-      const theirs = (await (
-        await owner(owners.bob, `/products/${b.product.id}/domains`)
-      ).json()) as {
+      const theirs = (await (await owner(owners.bob, `${path(b)}/domains`)).json()) as {
         domains: Domain[];
       };
       txt.set(theirs.domains[0]!.record!.name, [theirs.domains[0]!.record!.value]);
-      assert.equal((await verify(owners.bob, b.product.id, "www.alice.example")).status, 409);
+      assert.equal((await verify(owners.bob, b, "www.alice.example")).status, 409);
     });
 
     test("operator sites keep their IDs and secrets, and no customer can reach them", async () => {
@@ -413,9 +619,10 @@ for (const [kind, open] of stores) {
           .products,
         [],
       );
-      const stored = (await store.getProductBySiteId("ticket-management")) as ProductRecord;
-      assert.equal(stored.ownerId, null);
-      assert.equal((await owner(owners.alice, `/products/${stored.id}`)).status, 404);
+      const stored = (await store.getEnvironmentBySiteId("ticket-management")) as EnvironmentRecord;
+      assert.equal(stored.type, "production");
+      assert.equal(await store.getProduct(owners.alice, stored.productId), null);
+      assert.equal((await owner(owners.alice, `/products/${stored.productId}`)).status, 404);
 
       // An install bound with the existing secret still verifies after the move to storage.
       const sessionBinding = "host-session-1";
@@ -457,7 +664,7 @@ test("the directory caches misses and hits, and sees changes once invalidated", 
   let lookups = 0;
   const counting = new Proxy(store, {
     get(target, key, receiver) {
-      if (key === "getProductBySiteId") lookups++;
+      if (key === "getEnvironmentBySiteId") lookups++;
       const value = Reflect.get(target, key, receiver);
       return typeof value === "function" ? value.bind(target) : value;
     },
@@ -470,18 +677,23 @@ test("the directory caches misses and hits, and sees changes once invalidated", 
   clock += 1001;
   assert.equal(await directory.find("unknown"), null);
   assert.equal(lookups, 2);
-  await store.createProduct({
-    id: randomUUID(),
-    ownerId: owners.alice,
-    name: "Later",
-    siteId: "unknown",
-    origins: [origin],
-    secretCiphertext: cipher.seal("a-secret-long-enough-for-this-test-00000", "unknown"),
-    previousSecretCiphertext: null,
-    previousSecretExpiresAt: null,
-    createdAt: time,
-    updatedAt: time,
-  });
+  const productId = randomUUID();
+  await store.createProduct(
+    { id: productId, ownerId: owners.alice, name: "Later", createdAt: time, updatedAt: time },
+    {
+      id: randomUUID(),
+      productId,
+      type: "production",
+      name: "Production",
+      siteId: "unknown",
+      origins: [origin],
+      secretCiphertext: cipher.seal("a-secret-long-enough-for-this-test-00000", "unknown"),
+      previousSecretCiphertext: null,
+      previousSecretExpiresAt: null,
+      createdAt: time,
+      updatedAt: time,
+    },
+  );
   directory.invalidate("unknown");
   assert.equal((await directory.find("unknown"))?.id, "unknown");
 });

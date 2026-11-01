@@ -23,7 +23,7 @@ export default async function ProductsPage() {
                 <Card className="transition hover:border-primary/40">
                   <p className="font-medium">{product.name}</p>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {product.origins.join(", ")}
+                    {product.environments[0]?.origins.join(", ")}
                   </p>
                 </Card>
               </Link>

@@ -1,10 +1,22 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { hashToken, type SiteConfig } from "../src/server/tokens.js";
 
+export const ENVIRONMENT_TYPES = ["production", "beta", "staging", "dev"] as const;
+export type EnvironmentType = (typeof ENVIRONMENT_TYPES)[number];
+
 export interface ProductRecord {
   id: string;
   /** Null for operator-provisioned sites, which no customer can reach. */
   ownerId: string | null;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+/** Holds the site ID, secret and origins, so each environment's traffic stays separate. */
+export interface EnvironmentRecord {
+  id: string;
+  productId: string;
+  type: EnvironmentType;
   name: string;
   siteId: string;
   origins: string[];
@@ -14,7 +26,10 @@ export interface ProductRecord {
   createdAt: number;
   updatedAt: number;
 }
-export interface ProductChanges {
+export interface ProductWithEnvironments extends ProductRecord {
+  environments: EnvironmentRecord[];
+}
+export interface EnvironmentChanges {
   name?: string;
   origins?: string[];
   now: number;
@@ -33,21 +48,36 @@ export interface DomainClaim {
 }
 /** Owner-facing methods take the owner first so a query cannot omit the ownership check. */
 export interface ProductStore {
-  createProduct(product: ProductRecord): Promise<void>;
+  createProduct(product: ProductRecord, production: EnvironmentRecord): Promise<void>;
   countProducts(ownerId: string): Promise<number>;
-  listProducts(ownerId: string): Promise<ProductRecord[]>;
-  getProduct(ownerId: string, id: string): Promise<ProductRecord | null>;
-  updateProduct(
+  listProducts(ownerId: string): Promise<ProductWithEnvironments[]>;
+  getProduct(ownerId: string, id: string): Promise<ProductWithEnvironments | null>;
+  renameProduct(
     ownerId: string,
     id: string,
-    changes: ProductChanges,
-  ): Promise<ProductRecord | null>;
+    name: string,
+    now: number,
+  ): Promise<ProductWithEnvironments | null>;
+  /** Returns false when the product already has an environment of this type. */
+  createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean>;
+  updateEnvironment(
+    ownerId: string,
+    productId: string,
+    id: string,
+    changes: EnvironmentChanges,
+  ): Promise<EnvironmentRecord | null>;
   rotateSecret(
     ownerId: string,
+    productId: string,
     id: string,
     rotation: SecretRotation,
-  ): Promise<ProductRecord | null>;
-  revokePreviousSecret(ownerId: string, id: string, now: number): Promise<ProductRecord | null>;
+  ): Promise<EnvironmentRecord | null>;
+  revokePreviousSecret(
+    ownerId: string,
+    productId: string,
+    id: string,
+    now: number,
+  ): Promise<EnvironmentRecord | null>;
   /** Creates missing claims and returns the owner's claims for these domains. */
   claimDomains(
     ownerId: string,
@@ -57,7 +87,7 @@ export interface ProductStore {
   /** Returns false when another owner has already verified the domain. */
   markDomainVerified(ownerId: string, domain: string, now: number): Promise<boolean>;
   /** Collector-internal lookups for install traffic, which has no owner. */
-  getProductBySiteId(siteId: string): Promise<ProductRecord | null>;
+  getEnvironmentBySiteId(siteId: string): Promise<EnvironmentRecord | null>;
   isRegisteredOrigin(origin: string): Promise<boolean>;
 }
 
@@ -193,8 +223,8 @@ export class ProductDirectory implements SiteDirectory {
   async find(id: string): Promise<Site | null> {
     const cached = this.sites.read(id);
     if (cached) return cached.value;
-    const product = await this.products.getProductBySiteId(id);
-    const site = product ? this.toSite(product) : null;
+    const environment = await this.products.getEnvironmentBySiteId(id);
+    const site = environment ? this.toSite(environment) : null;
     this.sites.write(id, site);
     return site;
   }
@@ -209,16 +239,16 @@ export class ProductDirectory implements SiteDirectory {
     this.sites.delete(siteId);
     for (const origin of origins) this.origins.delete(origin);
   }
-  private toSite(product: ProductRecord): Site {
+  private toSite(environment: EnvironmentRecord): Site {
     return {
-      id: product.siteId,
-      origins: product.origins,
-      secret: this.cipher.open(product.secretCiphertext, product.siteId),
+      id: environment.siteId,
+      origins: environment.origins,
+      secret: this.cipher.open(environment.secretCiphertext, environment.siteId),
       previousSecret:
-        product.previousSecretCiphertext === null
+        environment.previousSecretCiphertext === null
           ? null
-          : this.cipher.open(product.previousSecretCiphertext, product.siteId),
-      previousSecretExpiresAt: product.previousSecretExpiresAt,
+          : this.cipher.open(environment.previousSecretCiphertext, environment.siteId),
+      previousSecretExpiresAt: environment.previousSecretExpiresAt,
     };
   }
 }

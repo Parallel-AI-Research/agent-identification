@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
-import { collector, CollectorError, type Domain, type Product } from "@/lib/collector";
+import {
+  collector,
+  CollectorError,
+  type Domain,
+  type Environment,
+  type Product,
+} from "@/lib/collector";
 import { DomainList } from "./domain-list";
 import { InstallTabs } from "./install-tabs";
 import { OriginsForm } from "./origins-form";
@@ -9,10 +15,15 @@ import { SecretPanel } from "./secret-panel";
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   let product: Product;
+  let environment: Environment;
   let domains: Domain[];
   try {
     ({ product } = await collector<{ product: Product }>(`/products/${id}`));
-    ({ domains } = await collector<{ domains: Domain[] }>(`/products/${id}/domains`));
+    // Environment switching arrives with the dashboard views, so this shows production.
+    environment = product.environments[0]!;
+    ({ domains } = await collector<{ domains: Domain[] }>(
+      `/products/${id}/environments/${environment.id}/domains`,
+    ));
   } catch (error) {
     if (error instanceof CollectorError && error.status === 404) notFound();
     throw error;
@@ -22,7 +33,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div>
         <h1 className="text-xl font-semibold">{product.name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Site ID: <code className="font-mono">{product.siteId}</code>. This ID is public.
+          {environment.name} site ID: <code className="font-mono">{environment.siteId}</code>. This
+          ID is public.
         </p>
       </div>
       <Card>
@@ -32,7 +44,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           every agent or prove who a visitor is.
         </p>
         <InstallTabs
-          values={{ siteId: product.siteId, collectorUrl: process.env.COLLECTOR_URL! }}
+          values={{ siteId: environment.siteId, collectorUrl: process.env.COLLECTOR_URL! }}
         />
       </Card>
       <Card>
@@ -40,7 +52,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Only these exact origins can use this product&apos;s site ID.
         </p>
-        <OriginsForm id={product.id} origins={product.origins} />
+        <OriginsForm
+          productId={product.id}
+          environmentId={environment.id}
+          origins={environment.origins}
+        />
       </Card>
       <Card>
         <h2 className="font-semibold">Domain verification</h2>
@@ -48,7 +64,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           Add a DNS record to show you control a domain. Events arrive either way, but an unverified
           domain stays labelled as unverified.
         </p>
-        <DomainList id={product.id} domains={domains} />
+        <DomainList productId={product.id} environmentId={environment.id} domains={domains} />
       </Card>
       <Card>
         <h2 className="font-semibold">Server secret</h2>
@@ -56,7 +72,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           Server-only. Your backend uses it to sign sessions and verify declarations. It never goes
           in browser code.
         </p>
-        <SecretPanel id={product.id} previousExpiresAt={product.previousSecretExpiresAt} />
+        <SecretPanel
+          productId={product.id}
+          environmentId={environment.id}
+          previousExpiresAt={environment.previousSecretExpiresAt}
+        />
       </Card>
     </div>
   );

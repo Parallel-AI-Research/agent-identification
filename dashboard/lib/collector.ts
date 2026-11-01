@@ -2,12 +2,22 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "./supabase/server";
 
-export interface Product {
+export interface Environment {
   id: string;
+  productId: string;
+  type: "production" | "beta" | "staging" | "dev";
   name: string;
   siteId: string;
   origins: string[];
   previousSecretExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface Product {
+  id: string;
+  name: string;
+  /** Production comes first. */
+  environments: Environment[];
   createdAt: string;
   updatedAt: string;
 }
