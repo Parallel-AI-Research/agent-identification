@@ -2,7 +2,10 @@ import { build } from "esbuild";
 import { mkdir, readFile, copyFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { assertFrozenInputs, loadFrozenReleases, restoreFrozenSdk } from "./frozen-releases.mjs";
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const frozenReleases = await loadFrozenReleases();
+await assertFrozenInputs(frozenReleases, pkg);
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 const shared = {
@@ -48,6 +51,7 @@ execFileSync(process.execPath, ["node_modules/typescript/bin/tsc", "-p", "tsconf
   stdio: "inherit",
 });
 await copyFile("src/browser/styles.css", "dist/agent-id.css");
+await assertFrozenInputs(frozenReleases, pkg, ".", { dist: true });
 const sdk = `public/sdk/v${pkg.version}`;
 await mkdir(sdk, { recursive: true });
 await Promise.all(["agent-id.js", "agent-id.css"].map((f) => copyFile(`dist/${f}`, `${sdk}/${f}`)));
@@ -76,4 +80,5 @@ for (const f of ["agent-id.js", "agent-id.css"]) {
   };
 }
 await writeFile(`${sdk}/integrity.json`, JSON.stringify(integrity, null, 2) + "\n");
+await restoreFrozenSdk(frozenReleases);
 console.log(`Built script, ESM, React and server exports for ${pkg.version}.`);

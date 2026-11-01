@@ -12,6 +12,7 @@ export default ts.config(
       "supabase/.branches/**",
       "public/sdk/**",
       "public/downloads/**",
+      "releases/**",
       "public/demo-react/**",
       "test-results/**",
       "playwright-report/**",

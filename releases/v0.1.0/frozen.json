@@ -1,0 +1,82 @@
+{
+  "version": "0.1.0",
+  "retrievedAt": "2026-11-01T10:53:24.789Z",
+  "source": "https://parallel-agent-identification.vercel.app",
+  "artifacts": {
+    "agent-id.js": "75c1628cebccdde74f5b69fb09578ab432f9dcea8d5be7976a278912058538ce",
+    "agent-id.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "integrity.json": "a04a1716ad9f0fad47b3830fcfff672d88117419893a537b8bd9f257890d3723",
+    "parallel-research-agent-identification-0.1.0.tgz": "664e6ba92bc2f6dc94dde33c8fac7dc15b8760bed18f4ee80301dae181e9caa2",
+    "release.json": "c67ed0e48440ade3921d39d9d171ad12fffc07f549dfdeef3b508f6872d3a74a"
+  },
+  "sources": {
+    "LICENSE": "7db02eb83073a947967066fe910af3241a175fb83b2e9af39ae1d7a3565b38bc",
+    "src/browser/index.ts": "d1289e7691c7c6d361d15d1de813c370f7b228dfcf9603841a7ebd3bfa28f8f9",
+    "src/browser/script.ts": "a984bfe4c23d7f5466cffef3b9d75ed25080a33b4794867b8f6117f6bbee69d0",
+    "src/browser/styles.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "src/protocol.ts": "58c1f2e568e8f17ca8c5564c5a07bf55cce9d1064c88cb867720ee7460d91388",
+    "src/react/index.tsx": "9d3fd397f5b9ad30ce849826b8822e942ffd977cb6b938eb178324563ff9212d",
+    "src/server/index.ts": "90dd7344d4dd0fe59b4240d05822525ffe0bc285e96698e393076588d1ebc6ff",
+    "src/server/online.ts": "0f1c089c464b0eaa2c7e4e606000e9c3ea0e1226c013c0ffb1ea44d1affde66f",
+    "src/server/tokens.ts": "478acf6716928565bab9ef748dbb19486dbfd61a781d2682f7b9752f918987f0"
+  },
+  "dist": {
+    "dist/agent-id.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "dist/agent-id.js": "75c1628cebccdde74f5b69fb09578ab432f9dcea8d5be7976a278912058538ce",
+    "dist/browser/index.js": "7dca281817dec29accf1664fea66a5cd41ce4f40d64d686e53c2849e3a05453a",
+    "dist/react/index.js": "1d047d45cf302bfb4f3681f390f9d00ae4039344400ba137ab80f5852bb4b5b6",
+    "dist/server/index.js": "069c27c7efb44bf68c1e5aaf2e8ecc6ab2e0ce8f01d4e3b764f6d2b72eb7a0dc",
+    "dist/types/browser/index.d.ts": "51b27a196c4b9603a452d0eb81293f77cda0085bfb9434a3204e18bb628d171c",
+    "dist/types/browser/script.d.ts": "c8d791565d0e3abf8b67e01e02b3ce95fa75fed00cd2359d33cfbe579f02029a",
+    "dist/types/protocol.d.ts": "ad6f1ca04ca8d7852ae0f547d8c86b075e79a517be9649552987ac34ece01f78",
+    "dist/types/react/index.d.ts": "511062e1f1af8335cd7a35e14cc4f15ceb497fea21fe7288ca5c15a9c48d118c",
+    "dist/types/server/index.d.ts": "90dd7344d4dd0fe59b4240d05822525ffe0bc285e96698e393076588d1ebc6ff",
+    "dist/types/server/online.d.ts": "72b602151a383a19fbb792ce489a4ddcbcb0e98733361620c690dbbb0fbf9915",
+    "dist/types/server/tokens.d.ts": "62df4baebce7cece90d9c1001eaf7481f0654cf7b76f50ee4b99a3f48ea4fa81"
+  },
+  "package": {
+    "name": "@parallel-research/agent-identification",
+    "version": "0.1.0",
+    "description": "Website-owned, session-scoped visitor self-classification widget and server verification helpers",
+    "type": "module",
+    "license": "MIT",
+    "engines": {
+      "node": "24.x"
+    },
+    "files": [
+      "dist",
+      "README.md",
+      "LICENSE"
+    ],
+    "main": "./dist/browser/index.js",
+    "types": "./dist/types/browser/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/types/browser/index.d.ts",
+        "import": "./dist/browser/index.js"
+      },
+      "./react": {
+        "types": "./dist/types/react/index.d.ts",
+        "import": "./dist/react/index.js"
+      },
+      "./server": {
+        "types": "./dist/types/server/index.d.ts",
+        "import": "./dist/server/index.js"
+      },
+      "./styles.css": "./dist/agent-id.css",
+      "./script": "./dist/agent-id.js",
+      "./package.json": "./package.json"
+    },
+    "peerDependencies": {
+      "react": ">=18 <20"
+    },
+    "peerDependenciesMeta": {
+      "react": {
+        "optional": true
+      }
+    },
+    "publishConfig": {
+      "access": "public"
+    }
+  }
+}

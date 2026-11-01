@@ -1,35 +1,25 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-// Exercise the actual npm tarball from a consumer directory outside the repository.
+// Exercise exactly the tarball that deployment will serve, including frozen releases.
 const temp = await mkdtemp(join(tmpdir(), "agent-id-package-"));
 try {
-  const [pack] = JSON.parse(
-    execFileSync(
-      "npm",
-      [
-        "pack",
-        "--json",
-        "--ignore-scripts",
-        "--cache",
-        join(temp, "cache"),
-        "--pack-destination",
-        temp,
-      ],
-      {
-        encoding: "utf8",
-      },
-    ),
-  );
-  const entries = pack.files.map((file) => file.path);
+  execFileSync(process.execPath, ["scripts/release.mjs"], { stdio: "inherit" });
+  const pack = JSON.parse(await readFile("public/downloads/release.json", "utf8"));
+  const tarball = resolve("public/downloads", pack.filename);
+  const entries = execFileSync("tar", ["-tzf", tarball], { encoding: "utf8" })
+    .trim()
+    .split("\n")
+    .map((path) => path.replace(/^package\//, ""));
   assert(entries.includes("dist/agent-id.js"));
   assert(entries.includes("dist/agent-id.css"));
   assert(entries.includes("README.md"));
   assert(entries.every((path) => /^(dist\/|README\.md$|LICENSE$|package\.json$)/.test(path)));
   assert(!entries.some((path) => /\.(map|env)$/.test(path)));
+  await copyFile(tarball, join(temp, pack.filename));
   await writeFile(join(temp, "package.json"), JSON.stringify({ private: true, type: "module" }));
   execFileSync(
     "npm",

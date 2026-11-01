@@ -13,6 +13,7 @@ coverage/
 playwright-report/
 test-results/
 *.tgz
+!releases/v*/parallel-research-agent-identification-*.tgz
 .DS_Store
 supabase/.temp/
 supabase/.branches/
