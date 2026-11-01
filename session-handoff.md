@@ -3,8 +3,8 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector and dashboard are live, and the first real account has created a product. Two dashboard fixes are not deployed yet.
-- Branch / commit: `docs/production-move`, based on `f9397a7`.
+- Current status: The hosted collector and dashboard are live, and the first real account has created a product. The agent setup panel is not deployed yet.
+- Branch / commit: `feat/agent-setup-instructions`, based on `b124aa8`.
 
 ## Completed This Session
 
@@ -42,4 +42,4 @@
 
 ## Recommended Next Step
 
-- Deploy the merged dashboard fixes, confirm a declaration from a real site, then mark `feat-003` done and start `feat-004`.
+- Deploy the agent setup panel, confirm a declaration from a real site, then mark `feat-003` done and start `feat-011`.
