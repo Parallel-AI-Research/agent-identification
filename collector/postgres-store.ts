@@ -113,7 +113,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
        )
        insert into agent_identification.environment_origins (environment_id, origin)
        select environment.id, value
-       from environment, jsonb_array_elements_text($13::jsonb) as value`,
+       from environment, jsonb_array_elements_text($13::text::jsonb) as value`,
       [
         p.id,
         p.ownerId,
@@ -194,7 +194,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
        ), origins as (
          insert into agent_identification.environment_origins (environment_id, origin)
          select created.id, value
-         from created, jsonb_array_elements_text($10::jsonb) as value
+         from created, jsonb_array_elements_text($10::text::jsonb) as value
        )
        select id from created`,
       [
@@ -240,11 +240,11 @@ export class PostgresStore implements CollectorStore, ProductStore {
          returning e.id
        ), removed as (
          delete from agent_identification.environment_origins
-         where $6::jsonb is not null and environment_id in (select id from target)
-           and origin not in (select jsonb_array_elements_text($6::jsonb))
+         where $6::text::jsonb is not null and environment_id in (select id from target)
+           and origin not in (select jsonb_array_elements_text($6::text::jsonb))
        ), added as (
          insert into agent_identification.environment_origins (environment_id, origin)
-         select target.id, value from target, jsonb_array_elements_text($6::jsonb) as value
+         select target.id, value from target, jsonb_array_elements_text($6::text::jsonb) as value
          on conflict do nothing
        )
        select id from target`,
@@ -303,14 +303,14 @@ export class PostgresStore implements CollectorStore, ProductStore {
     await this.execute(
       `insert into agent_identification.domain_claims (owner_id, domain, token, created_at)
        select $1, claim->>'domain', claim->>'token', $3
-       from jsonb_array_elements($2::jsonb) as claim
+       from jsonb_array_elements($2::text::jsonb) as claim
        on conflict (owner_id, domain) do nothing`,
       [ownerId, JSON.stringify(claims), now],
     );
     const rows = await this.execute(
       `select domain, token, verified_at from agent_identification.domain_claims
        where owner_id=$1 and domain in (
-         select claim->>'domain' from jsonb_array_elements($2::jsonb) as claim
+         select claim->>'domain' from jsonb_array_elements($2::text::jsonb) as claim
        ) order by domain`,
       [ownerId, JSON.stringify(claims)],
     );
