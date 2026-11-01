@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  agentPrompt,
   packageSnippet,
   parseOrigins,
   reactSnippet,
@@ -31,4 +32,17 @@ test("origins can be separated by new lines, commas or spaces, without duplicate
     "https://b.example",
   ]);
   assert.deepEqual(parseOrigins("  \n "), []);
+});
+
+test("agent instructions are specific to the product and carry no secret", () => {
+  const prompt = agentPrompt(values, ["https://a.example", "https://b.example"]);
+  assert(prompt.includes(values.siteId));
+  assert(prompt.includes(values.collectorUrl));
+  assert(prompt.includes("https://a.example, https://b.example"));
+  assert(prompt.includes(scriptSnippet(values)));
+  assert(prompt.includes(reactSnippet(values)));
+  assert(!prompt.includes("YOUR-SITE-ID"));
+  // The secret is only ever named as an environment variable the customer sets.
+  assert.deepEqual(prompt.match(/AGENT_ID_SITE_SECRET/g)?.length, 1);
+  assert(prompt.includes("Don't describe it as detecting agents"));
 });

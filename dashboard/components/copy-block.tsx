@@ -27,14 +27,22 @@ async function copyText(value: string, element: HTMLElement | null): Promise<boo
   }
 }
 
-export function CopyBlock({ value, label = "Copy" }: { value: string; label?: string }) {
+export function CopyBlock({
+  value,
+  label = "Copy",
+  wrap = false,
+}: {
+  value: string;
+  label?: string;
+  wrap?: boolean;
+}) {
   const [result, setResult] = useState<"idle" | "copied" | "blocked">("idle");
   const code = useRef<HTMLElement>(null);
   return (
     <div className="relative">
       <pre
         tabIndex={0}
-        className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-[13px] leading-relaxed sm:pr-28"
+        className={`overflow-x-auto rounded-md bg-muted p-3 font-mono text-[13px] leading-relaxed sm:pr-28 ${wrap ? "break-words whitespace-pre-wrap" : ""}`}
       >
         <code ref={code}>{value}</code>
       </pre>
