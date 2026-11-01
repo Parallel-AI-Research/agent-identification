@@ -59,6 +59,12 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261101130000_add_domain_claims.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );

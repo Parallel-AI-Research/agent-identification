@@ -19,6 +19,18 @@ export interface ProductChanges {
   origins?: string[];
   now: number;
 }
+export interface SecretRotation {
+  /** The secret being replaced, so concurrent rotations cannot both win. */
+  expectedCiphertext: string;
+  secretCiphertext: string;
+  previousSecretExpiresAt: number;
+  now: number;
+}
+export interface DomainClaim {
+  domain: string;
+  token: string;
+  verifiedAt: number | null;
+}
 /** Owner-facing methods take the owner first so a query cannot omit the ownership check. */
 export interface ProductStore {
   createProduct(product: ProductRecord): Promise<void>;
@@ -30,6 +42,20 @@ export interface ProductStore {
     id: string,
     changes: ProductChanges,
   ): Promise<ProductRecord | null>;
+  rotateSecret(
+    ownerId: string,
+    id: string,
+    rotation: SecretRotation,
+  ): Promise<ProductRecord | null>;
+  revokePreviousSecret(ownerId: string, id: string, now: number): Promise<ProductRecord | null>;
+  /** Creates missing claims and returns the owner's claims for these domains. */
+  claimDomains(
+    ownerId: string,
+    claims: { domain: string; token: string }[],
+    now: number,
+  ): Promise<DomainClaim[]>;
+  /** Returns false when another owner has already verified the domain. */
+  markDomainVerified(ownerId: string, domain: string, now: number): Promise<boolean>;
   /** Collector-internal lookups for install traffic, which has no owner. */
   getProductBySiteId(siteId: string): Promise<ProductRecord | null>;
   isRegisteredOrigin(origin: string): Promise<boolean>;

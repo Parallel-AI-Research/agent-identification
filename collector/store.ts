@@ -1,5 +1,11 @@
 import type { Choice } from "../src/protocol.js";
-import type { ProductChanges, ProductRecord, ProductStore } from "./products.js";
+import type {
+  DomainClaim,
+  ProductChanges,
+  ProductRecord,
+  ProductStore,
+  SecretRotation,
+} from "./products.js";
 
 export interface StoredSession {
   id: string;
@@ -58,6 +64,7 @@ export interface CollectorStore {
 export class MemoryStore implements CollectorStore, ProductStore {
   readonly kind = "memory" as const;
   private products = new Map<string, ProductRecord>();
+  private domains = new Map<string, DomainClaim & { ownerId: string }>();
   private sessions = new Map<string, StoredSession>();
   private events = new Map<string, StoredEvent>();
   private rates = new Map<string, { count: number; expiresAt: number }>();
@@ -96,6 +103,55 @@ export class MemoryStore implements CollectorStore, ProductStore {
     if (changes.origins !== undefined) row.origins = [...changes.origins].sort();
     row.updatedAt = changes.now;
     return { ...row, origins: [...row.origins] };
+  }
+  async rotateSecret(
+    ownerId: string,
+    id: string,
+    rotation: SecretRotation,
+  ): Promise<ProductRecord | null> {
+    const row = this.products.get(id);
+    if (!row || row.ownerId !== ownerId) return null;
+    if (row.secretCiphertext !== rotation.expectedCiphertext) return null;
+    row.previousSecretCiphertext = row.secretCiphertext;
+    row.previousSecretExpiresAt = rotation.previousSecretExpiresAt;
+    row.secretCiphertext = rotation.secretCiphertext;
+    row.updatedAt = rotation.now;
+    return { ...row, origins: [...row.origins] };
+  }
+  async revokePreviousSecret(
+    ownerId: string,
+    id: string,
+    now: number,
+  ): Promise<ProductRecord | null> {
+    const row = this.products.get(id);
+    if (!row || row.ownerId !== ownerId) return null;
+    row.previousSecretCiphertext = null;
+    row.previousSecretExpiresAt = null;
+    row.updatedAt = now;
+    return { ...row, origins: [...row.origins] };
+  }
+  async claimDomains(
+    ownerId: string,
+    claims: { domain: string; token: string }[],
+    _now: number,
+  ): Promise<DomainClaim[]> {
+    return claims.map(({ domain, token }) => {
+      const key = `${ownerId}:${domain}`;
+      if (!this.domains.has(key)) {
+        this.domains.set(key, { ownerId, domain, token, verifiedAt: null });
+      }
+      const { token: stored, verifiedAt } = this.domains.get(key)!;
+      return { domain, token: stored, verifiedAt };
+    });
+  }
+  async markDomainVerified(ownerId: string, domain: string, now: number): Promise<boolean> {
+    const taken = [...this.domains.values()].some(
+      (row) => row.domain === domain && row.ownerId !== ownerId && row.verifiedAt !== null,
+    );
+    if (taken) return false;
+    const row = this.domains.get(`${ownerId}:${domain}`);
+    if (row) row.verifiedAt ??= now;
+    return true;
   }
   async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
     const row = [...this.products.values()].find((value) => value.siteId === siteId);

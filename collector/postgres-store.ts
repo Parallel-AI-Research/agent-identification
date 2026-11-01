@@ -6,7 +6,13 @@ import type {
   StoredSession,
 } from "./store.js";
 import type { Choice } from "../src/protocol.js";
-import type { ProductChanges, ProductRecord, ProductStore } from "./products.js";
+import type {
+  DomainClaim,
+  ProductChanges,
+  ProductRecord,
+  ProductStore,
+  SecretRotation,
+} from "./products.js";
 
 /** Works with postgres.js, a Postgres pool, or PGlite without interpolating values. */
 export type QueryExecutor = (
@@ -70,7 +76,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
     await this.execute(
       `select 1 from agent_identification.sessions,
        agent_identification.events, agent_identification.rate_buckets,
-       agent_identification.products, agent_identification.product_origins limit 0`,
+       agent_identification.products, agent_identification.product_origins,
+       agent_identification.domain_claims limit 0`,
       [],
     );
   }
@@ -147,6 +154,80 @@ export class PostgresStore implements CollectorStore, ProductStore {
       [ownerId, id, changes.name ?? null, changes.now, origins],
     );
     return rows[0] ? this.getProduct(ownerId, id) : null;
+  }
+  async rotateSecret(
+    ownerId: string,
+    id: string,
+    rotation: SecretRotation,
+  ): Promise<ProductRecord | null> {
+    const rows = await this.execute(
+      `update agent_identification.products
+       set previous_secret_ciphertext=secret_ciphertext, previous_secret_expires_at=$3,
+           secret_ciphertext=$4, updated_at=$5
+       where owner_id=$1 and id=$2 and secret_ciphertext=$6 returning id`,
+      [
+        ownerId,
+        id,
+        rotation.previousSecretExpiresAt,
+        rotation.secretCiphertext,
+        rotation.now,
+        rotation.expectedCiphertext,
+      ],
+    );
+    return rows[0] ? this.getProduct(ownerId, id) : null;
+  }
+  async revokePreviousSecret(
+    ownerId: string,
+    id: string,
+    now: number,
+  ): Promise<ProductRecord | null> {
+    const rows = await this.execute(
+      `update agent_identification.products
+       set previous_secret_ciphertext=null, previous_secret_expires_at=null, updated_at=$3
+       where owner_id=$1 and id=$2 returning id`,
+      [ownerId, id, now],
+    );
+    return rows[0] ? this.getProduct(ownerId, id) : null;
+  }
+  async claimDomains(
+    ownerId: string,
+    claims: { domain: string; token: string }[],
+    now: number,
+  ): Promise<DomainClaim[]> {
+    if (!claims.length) return [];
+    await this.execute(
+      `insert into agent_identification.domain_claims (owner_id, domain, token, created_at)
+       select $1, claim->>'domain', claim->>'token', $3
+       from jsonb_array_elements($2::jsonb) as claim
+       on conflict (owner_id, domain) do nothing`,
+      [ownerId, JSON.stringify(claims), now],
+    );
+    const rows = await this.execute(
+      `select domain, token, verified_at from agent_identification.domain_claims
+       where owner_id=$1 and domain in (
+         select claim->>'domain' from jsonb_array_elements($2::jsonb) as claim
+       ) order by domain`,
+      [ownerId, JSON.stringify(claims)],
+    );
+    return rows.map((row) => ({
+      domain: String(row.domain),
+      token: String(row.token),
+      verifiedAt: row.verified_at === null ? null : Number(row.verified_at),
+    }));
+  }
+  async markDomainVerified(ownerId: string, domain: string, now: number): Promise<boolean> {
+    try {
+      await this.execute(
+        `update agent_identification.domain_claims set verified_at=$3
+         where owner_id=$1 and domain=$2 and verified_at is null`,
+        [ownerId, domain, now],
+      );
+      return true;
+    } catch (error) {
+      // The partial unique index is what guarantees one verified owner per domain.
+      if ((error as { code?: string }).code === "23505") return false;
+      throw error;
+    }
   }
   async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
     const rows = await this.execute(

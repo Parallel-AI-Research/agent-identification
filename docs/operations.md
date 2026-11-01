@@ -89,10 +89,12 @@ not pretend a logout-related revocation succeeded if the service is unavailable.
 Your own logout must invalidate the actual application session regardless.
 
 Each site's secret signs its contexts/receipts and authenticates server exports
-and online verification. It is not a browser API key. Rotating it invalidates
-old signatures and export access. After rotation, start new widget sessions;
-an already rendered choice is not an authorization decision. Rotate the database
-login separately through your database operator tooling.
+and online verification. It is not a browser API key. Customers rotate it from
+the dashboard: the new secret is shown once, the old one keeps working for 24
+hours so their deployment can catch up, and revoking it ends it sooner. Both take
+effect within about 30 seconds because of site caching. Rotating operator sites
+has no dashboard path. Rotate the database login separately through your database
+operator tooling.
 
 ## Release
 

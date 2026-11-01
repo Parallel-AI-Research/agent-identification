@@ -27,6 +27,7 @@ before(async () => {
   for (const file of [
     "20261020093721_create_agent_identification_collector.sql",
     "20261101120000_add_customer_products.sql",
+    "20261101130000_add_domain_claims.sql",
   ]) {
     await database.exec(
       await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8"),
@@ -44,6 +45,7 @@ const stores: [string, () => Promise<CollectorStore & ProductStore>][] = [
     async () => {
       await database.exec(
         `truncate agent_identification.products cascade;
+         truncate agent_identification.domain_claims;
          truncate agent_identification.sessions cascade;
          truncate agent_identification.rate_buckets`,
       );
@@ -55,12 +57,21 @@ const stores: [string, () => Promise<CollectorStore & ProductStore>][] = [
   ],
 ];
 
-function fixture(store: CollectorStore & ProductStore) {
+function fixture(
+  store: CollectorStore & ProductStore,
+  options: { clock?: () => number; txt?: Map<string, string[]> } = {},
+) {
+  const clock = options.clock ?? (() => time);
   const handle = createCollector({
     directory: new ProductDirectory(store, cipher, { ttlMs: 0 }),
     store,
-    now: () => new Date(time),
+    now: () => new Date(clock()),
     owners: {
+      resolveTxt: async (name) => {
+        const values = options.txt?.get(name);
+        if (!values) throw new Error("ENOTFOUND");
+        return values.map((value) => [value]);
+      },
       // A credential here is simply the owner's ID; real tokens are covered in owner-auth tests.
       authenticate: async (request) =>
         request.headers.get("authorization")?.replace("Bearer ", "") ?? null,
@@ -232,6 +243,156 @@ for (const [kind, open] of stores) {
       assert.equal(browser.status, 403);
       assert.equal(browser.headers.get("access-control-allow-origin"), null);
       assert.equal((await owner(owners.alice, "/products/not-a-uuid")).status, 404);
+    });
+
+    test("rotation keeps both secrets working for 24 hours, then only the new one", async () => {
+      let clock = time;
+      const { handle, owner, create, visitor, declare } = fixture(store, { clock: () => clock });
+      const a = await create(owners.alice, "Alice's product");
+      const siteId = a.product.siteId;
+      const rotated = await owner(owners.alice, `/products/${a.product.id}/secret`, {
+        method: "POST",
+      });
+      assert.equal(rotated.status, 200);
+      const { serverSecret: next, product } = (await rotated.json()) as {
+        serverSecret: string;
+        product: { previousSecretExpiresAt: string };
+      };
+      assert.notEqual(next, a.serverSecret);
+      assert.equal(product.previousSecretExpiresAt, new Date(time + 86400000).toISOString());
+
+      const exportWith = async (secret: string) =>
+        (
+          await handle(
+            new Request(`https://collector.test/v1/events?siteId=${siteId}`, {
+              headers: { authorization: `Bearer ${secret}` },
+            }),
+          )
+        ).status;
+      assert.equal(await exportWith(a.serverSecret), 200);
+      assert.equal(await exportWith(next), 200);
+
+      // A server that hasn't deployed yet and one that has can both complete a protected action.
+      for (const [index, secret] of [a.serverSecret, next].entries()) {
+        const settings = {
+          siteId,
+          origin,
+          secret,
+          sessionBinding: `host-session-${index}`,
+          now: new Date(clock),
+        };
+        const session = (await (
+          await visitor(siteId, origin, { bindingContext: createBindingContext(settings) })
+        ).json()) as CreatedSession;
+        const recorded = (await (await declare(session)).json()) as RecordedDeclaration;
+        const claims = await verifyDeclarationOnline(recorded.receipt, {
+          ...settings,
+          apiUrl: "https://collector.test",
+          fetch: (input, init) => handle(new Request(input as URL, init)),
+        });
+        assert.equal(claims.choice, "ai_assistant");
+      }
+
+      const again = await owner(owners.alice, `/products/${a.product.id}/secret`, {
+        method: "POST",
+      });
+      assert.equal(again.status, 409);
+
+      clock = time + 86400001;
+      assert.equal(await exportWith(a.serverSecret), 401);
+      assert.equal(await exportWith(next), 200);
+      assert.equal(
+        (await owner(owners.alice, `/products/${a.product.id}/secret`, { method: "POST" })).status,
+        200,
+      );
+    });
+
+    test("revoke-now ends the old secret immediately and only for the owner", async () => {
+      const { handle, owner, create } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      await owner(owners.alice, `/products/${a.product.id}/secret`, { method: "POST" });
+      const path = `/products/${a.product.id}/secret/previous`;
+      assert.equal((await owner(owners.bob, path, { method: "DELETE" })).status, 404);
+      assert.equal(
+        (await owner(owners.bob, `/products/${a.product.id}/secret`, { method: "POST" })).status,
+        404,
+      );
+      const exportOld = () =>
+        handle(
+          new Request(`https://collector.test/v1/events?siteId=${a.product.siteId}`, {
+            headers: { authorization: `Bearer ${a.serverSecret}` },
+          }),
+        );
+      assert.equal((await exportOld()).status, 200);
+      const revoked = await owner(owners.alice, path, { method: "DELETE" });
+      assert.equal(
+        ((await revoked.json()) as { product: { previousSecretExpiresAt: null } }).product
+          .previousSecretExpiresAt,
+        null,
+      );
+      assert.equal((await exportOld()).status, 401);
+    });
+
+    test("DNS verification is non-blocking, and a domain has one verified owner", async () => {
+      const txt = new Map<string, string[]>();
+      const { owner, create, visitor, declare } = fixture(store, { txt });
+      const a = await create(owners.alice, "Alice's product", [
+        "https://www.alice.example",
+        "http://localhost:3000",
+      ]);
+      const domainsPath = `/products/${a.product.id}/domains`;
+      type Domain = {
+        domain: string;
+        status: string;
+        record: { name: string; value: string } | null;
+      };
+      const list = async () =>
+        ((await (await owner(owners.alice, domainsPath)).json()) as { domains: Domain[] }).domains;
+      const before = await list();
+      assert.deepEqual(
+        before.map(({ domain, status }) => [domain, status]),
+        [
+          ["www.alice.example", "unverified"],
+          ["localhost", "not_applicable"],
+        ],
+      );
+      assert.equal(before[0]!.record!.name, "_agent-identification.www.alice.example");
+
+      // Events arrive before the domain is verified.
+      const session = (await (
+        await visitor(a.product.siteId, "https://www.alice.example")
+      ).json()) as CreatedSession;
+      assert.equal((await declare(session, "https://www.alice.example")).status, 200);
+
+      const verify = (ownerId: string, id: string, domain: string) =>
+        owner(ownerId, `/products/${id}/domains/verify`, {
+          method: "POST",
+          body: JSON.stringify({ domain }),
+        });
+      const missing = await verify(owners.alice, a.product.id, "www.alice.example");
+      assert.equal(missing.status, 422);
+      assert.match(((await missing.json()) as { error: string }).error, /No matching TXT record/);
+      assert.equal((await verify(owners.alice, a.product.id, "other.example")).status, 400);
+
+      txt.set(before[0]!.record!.name, ["unrelated", before[0]!.record!.value]);
+      assert.equal((await verify(owners.alice, a.product.id, "www.alice.example")).status, 200);
+      assert.equal((await list())[0]!.status, "verified");
+
+      // The same owner can reuse the domain; another owner cannot verify it.
+      const second = await create(owners.alice, "Second product", ["https://www.alice.example"]);
+      const reused = (await (
+        await owner(owners.alice, `/products/${second.product.id}/domains`)
+      ).json()) as { domains: Domain[] };
+      assert.equal(reused.domains[0]!.status, "verified");
+
+      const b = await create(owners.bob, "Bob's product", ["https://www.alice.example"]);
+      const theirs = (await (
+        await owner(owners.bob, `/products/${b.product.id}/domains`)
+      ).json()) as {
+        domains: Domain[];
+      };
+      txt.set(theirs.domains[0]!.record!.name, [theirs.domains[0]!.record!.value]);
+      assert.equal((await verify(owners.bob, b.product.id, "www.alice.example")).status, 409);
     });
 
     test("operator sites keep their IDs and secrets, and no customer can reach them", async () => {
