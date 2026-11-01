@@ -71,7 +71,7 @@ await verifyDeclarationOnline(receipt, {
  * Instructions a customer can paste into their own coding agent. These hold only public
  * values, so the prompt is safe to share with any tool.
  */
-export function agentPrompt(values: InstallValues, origins: string[]): string {
+export function agentPrompt(values: InstallValues, origins: string[], docsUrl: string): string {
   return `Add the Agent Identification widget to this website.
 
 Install details:
@@ -100,7 +100,9 @@ Rules:
 - If the site has a Content Security Policy, allow ${values.collectorUrl} in script-src, style-src and connect-src.
 - Don't add server verification unless I ask. If I do, read the secret from the AGENT_ID_SITE_SECRET environment variable, never commit it, and never put it in browser code. Ask me to set that variable myself.
 - This records what visitors choose to declare. Don't describe it as detecting agents or proving who a visitor is.
-- Tell me which files you changed and what you checked.`;
+- Tell me which files you changed and what you checked.
+
+Full documentation is at ${docsUrl}.`;
 }
 
 /** Accepts origins separated by new lines, commas or spaces. */

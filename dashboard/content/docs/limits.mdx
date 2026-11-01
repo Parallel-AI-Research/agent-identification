@@ -1,0 +1,31 @@
+---
+title: What it can't do
+description: What a recorded answer does and doesn't tell you.
+---
+
+These limits matter if you're making decisions from this data.
+
+## What each record means
+
+| What you have            | What it shows                                       | What it doesn't show                                      |
+| ------------------------ | --------------------------------------------------- | --------------------------------------------------------- |
+| An "AI assistant" answer | The session recorded that response.                 | Verified identity, or permission to act.                  |
+| A "Person" answer        | The session recorded that response.                 | That the visitor is a person. It's self-reported too.     |
+| A verified receipt       | The answer belongs to a session your server bound.  | That the answer is true, or that an AI took every action. |
+| No answer                | Nothing was recorded in the data you're looking at. | That the visitor was human.                               |
+
+## It doesn't detect agents
+
+The widget asks. An agent can skip an optional prompt, or choose a different answer. Required mode asks every visitor to choose, but it accepts all three answers, so it isn't detection either.
+
+A visitor who doesn't answer stays unknown.
+
+## It doesn't grant permission
+
+A declaration is not an authorization decision. Your existing permissions stay in charge, and protected actions still need your own server checks.
+
+## What's collected today
+
+Events keep the session ID, origin, answer and timestamps. Tokens and session bindings are stored only as hashes, and raw IP addresses aren't stored. Records are removed after seven days. No browsing history, screenshots or form contents are collected.
+
+This will change when activity tracking arrives, and any change will be in the [changelog](/changelog).

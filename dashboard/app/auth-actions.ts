@@ -24,7 +24,7 @@ export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {
           : "Email or password is incorrect.",
     };
   }
-  redirect("/products");
+  redirect("/dashboard");
 }
 
 export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {
@@ -59,7 +59,7 @@ export async function updatePassword(_: AuthState, form: FormData): Promise<Auth
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
-  redirect("/products");
+  redirect("/dashboard");
 }
 
 export async function signOut(): Promise<void> {

@@ -1,6 +1,16 @@
 # Dashboard
 
-The customer dashboard: sign up, add a product, get installation instructions, and manage origins, domains and the server secret. It is a thin client: the collector's owner API enforces ownership, so this app holds no database credentials.
+The public site and the customer dashboard. It is a thin client: the collector's owner API enforces ownership, so this app holds no database credentials.
+
+| Address                                     | What's there                                              | Sign-in  |
+| ------------------------------------------- | --------------------------------------------------------- | -------- |
+| `/`                                         | Landing page                                              | No       |
+| `/docs`                                     | Docs, from `content/docs`                                 | No       |
+| `/changelog`                                | Updates, from `content/changelog`                         | No       |
+| `/llms.txt`, `/llms-full.txt`, `/docs/*.md` | Docs for coding agents                                    | No       |
+| `/dashboard`                                | Products, install instructions, origins, domains, secrets | Required |
+
+To publish a changelog post, add an `.mdx` file to `content/changelog` with a `title`, `description` and `date`. To add a docs page, add a file to `content/docs` and list it in `meta.json`.
 
 ## Run it locally
 
@@ -18,7 +28,7 @@ npm ci
 npm run dev
 ```
 
-The app runs on http://127.0.0.1:3100. Local emails appear in Mailpit on http://127.0.0.1:54324.
+The app runs on http://127.0.0.1:3100. Deleting `.next` fixes type errors that name old routes after moving pages. Local emails appear in Mailpit on http://127.0.0.1:54324.
 
 ## Test it
 

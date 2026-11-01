@@ -1,0 +1,29 @@
+---
+title: Set up with a coding agent
+description: Hand the installation to Claude Code, Cursor, Codex or another coding agent.
+---
+
+Your coding agent can do the install for you. In the dashboard, open your product and choose **Set this up with your coding agent**, then paste the instructions into your agent.
+
+The instructions are generated for your product. They include your site ID, the collector and your allowed origins. They hold no secrets, so they're safe to share with any tool.
+
+## What the agent does
+
+1. Works out how your project renders its pages.
+2. Adds the widget to your shared layout or template.
+3. Loads a page and checks that the answer is recorded.
+4. Tells you which files it changed and what it checked.
+
+## What to check yourself
+
+- **The prompt is visible to your visitors.** Make sure you're happy with where it appears before it reaches production.
+- **Your server secret isn't in the code.** It should only ever come from an environment variable that you set.
+- **Local testing needs its own origin.** A local address only works if you add it to your product.
+
+## Docs for agents
+
+These docs are also published in plain text, so your agent can read them directly:
+
+- [`/llms.txt`](/llms.txt) lists every page.
+- [`/llms-full.txt`](/llms-full.txt) has all the docs in one file.
+- Add `.md` to any docs address for that page in Markdown, such as [`/docs/quickstart.md`](/docs/quickstart.md).

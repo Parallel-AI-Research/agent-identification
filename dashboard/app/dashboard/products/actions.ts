@@ -29,7 +29,7 @@ export async function createProduct(_: ProductState, form: FormData): Promise<Pr
         origins: parseOrigins(String(form.get("origins") ?? "")),
       }),
     });
-    revalidatePath("/products");
+    revalidatePath("/dashboard");
     return created;
   });
 }
@@ -48,7 +48,7 @@ export async function updateOrigins(
       method: "PATCH",
       body: JSON.stringify({ origins: parseOrigins(String(form.get("origins") ?? "")) }),
     });
-    revalidatePath(`/products/${productId}`);
+    revalidatePath(`/dashboard/products/${productId}`);
     return { success: "Origins saved. Changes reach the collector within 30 seconds." };
   });
 }
@@ -62,7 +62,7 @@ export async function rotateSecret(
       `${environmentPath(productId, environmentId)}/secret`,
       { method: "POST" },
     );
-    revalidatePath(`/products/${productId}`);
+    revalidatePath(`/dashboard/products/${productId}`);
     return { serverSecret };
   });
 }
@@ -75,7 +75,7 @@ export async function revokeOldSecret(
     await collector(`${environmentPath(productId, environmentId)}/secret/previous`, {
       method: "DELETE",
     });
-    revalidatePath(`/products/${productId}`);
+    revalidatePath(`/dashboard/products/${productId}`);
     return { success: "The old secret has been revoked." };
   });
 }
@@ -90,7 +90,7 @@ export async function verifyDomain(
       `${environmentPath(productId, environmentId)}/domains/verify`,
       { method: "POST", body: JSON.stringify({ domain }) },
     );
-    revalidatePath(`/products/${productId}`);
+    revalidatePath(`/dashboard/products/${productId}`);
     return { success: `${domain} is verified.` };
   });
 }

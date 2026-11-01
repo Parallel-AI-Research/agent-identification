@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PRIVATE = ["/products", "/reset-password"];
+const PRIVATE = ["/dashboard", "/reset-password"];
 const GUEST_ONLY = ["/sign-in", "/sign-up"];
 
 export async function proxy(request: NextRequest) {
@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const path = request.nextUrl.pathname;
   const target = data?.claims
-    ? GUEST_ONLY.includes(path) && "/products"
+    ? GUEST_ONLY.includes(path) && "/dashboard"
     : PRIVATE.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) && "/sign-in";
   if (target) {
     const redirect = NextResponse.redirect(new URL(target, request.url));
@@ -41,4 +41,14 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+// Public pages stay out of this, so they can be cached and never depend on sign-in.
+export const config = {
+  matcher: [
+    "/dashboard/:path*",
+    "/sign-in",
+    "/sign-up",
+    "/forgot-password",
+    "/reset-password",
+    "/auth/:path*",
+  ],
+};

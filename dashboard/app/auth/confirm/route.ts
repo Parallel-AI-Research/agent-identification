@@ -3,14 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 
 // Only known paths, so a crafted email link can't redirect elsewhere.
-const NEXT_PATHS = new Set(["/products", "/reset-password"]);
+const NEXT_PATHS = new Set(["/dashboard", "/reset-password"]);
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/products";
+  const next = searchParams.get("next") ?? "/dashboard";
   const supabase = await supabaseServer();
   let confirmed = false;
   if (code) {

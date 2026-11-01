@@ -1,0 +1,43 @@
+---
+title: Quickstart
+description: Go from a new account to your first recorded answer.
+---
+
+You can read these docs without an account. You'll need one to add a product, because each site ID belongs to its owner.
+
+## 1. Add a product
+
+[Create an account](/sign-up) and confirm your email. In the [dashboard](/dashboard), choose **Add product**, then enter a name and the origins your product runs on.
+
+Origins must be exact. `https://example.com` and `https://www.example.com` are separate origins, so list both if you use both.
+
+## 2. Save your server secret
+
+The dashboard shows your server secret once. Save it somewhere private, even if you don't need it yet. Only your server should ever hold it, and if you lose it, you can rotate it for a new one.
+
+## 3. Install the widget
+
+Your product page has a snippet with your own site ID. The quickest option is the script tag:
+
+```html
+<div id="visitor-choice"></div>
+<script
+  defer
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.1.0/agent-id.js"
+  data-site="YOUR-SITE-ID"
+  data-target="#visitor-choice"
+  data-mode="optional"
+></script>
+```
+
+See [Install](/docs/install) for the JavaScript and React options, or hand the job to your [coding agent](/docs/coding-agents).
+
+## 4. Check it works
+
+Load a page on one of your origins and answer the prompt. It should say **Response recorded**.
+
+If the prompt doesn't appear, check that the page's origin exactly matches one you listed. A local address such as `http://localhost:3000` only works if you add it to your product.
+
+## 5. Verify your domain
+
+This step is optional and never blocks your data. On your product page, add the DNS record shown, then choose **Check DNS record**. Until then, the domain is labelled as unverified.

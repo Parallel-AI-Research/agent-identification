@@ -1,0 +1,47 @@
+---
+title: Server verification
+description: Tie a declaration to your own signed-in session, and check it before a protected action.
+---
+
+The script tag on its own records an answer, but your server can't rely on it. To check an answer before a protected action, add two small pieces to your existing server.
+
+A declaration never replaces your permissions. Run your normal checks first, and treat any error here as a reason to deny or defer the action.
+
+## 1. Create a binding context
+
+Add an authenticated endpoint that creates a short-lived context from your server's actual current session:
+
+```ts
+import { createBindingContext } from "@parallel-research/agent-identification/server";
+
+const settings = {
+  siteId: "YOUR-SITE-ID",
+  origin: "https://your-website.example",
+  secret: process.env.AGENT_ID_SITE_SECRET!,
+  sessionBinding: currentAuthenticatedSession.id,
+};
+const context = createBindingContext(settings);
+```
+
+Return it from a same-origin endpoint that isn't cached, then pass it to the widget through the `bindingContext` option. Refresh it after it expires.
+
+Never take the expected origin or session from browser input, and never put the secret or a login cookie in your HTML.
+
+## 2. Verify before the action
+
+```ts
+import { verifyDeclarationOnline } from "@parallel-research/agent-identification/server";
+
+const declaration = await verifyDeclarationOnline(receiptFromRequest, {
+  ...settings,
+  apiUrl: "https://parallel-agent-identification.vercel.app",
+});
+```
+
+Online verification also confirms that the session hasn't been revoked. Anonymous script-only receipts deliberately can't pass this check.
+
+## Rotating your secret
+
+In the dashboard, choose **Rotate secret**. The new secret is shown once, and the old one keeps working for 24 hours so you can deploy without an outage. If a secret may have leaked, choose **Revoke old secret now**. Both changes take effect within about 30 seconds.
+
+During those 24 hours, use online verification. An offline check with `verifyDeclaration` can fail if your server and the receipt are on different secrets.
