@@ -3,8 +3,8 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector and dashboard are live, and the first real account has created a product. The public site, docs and changelog are built but not deployed.
-- Branch / commit: `feat/public-site-docs`, based on `c8801ae`.
+- Current status: The hosted collector, dashboard, public site, docs and changelog are live, and the first real account has created a product.
+- Branch / commit: `docs/feat-011-done`, based on `4a9f31b`.
 
 ## Completed This Session
 
@@ -32,6 +32,7 @@
 
 - The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
 - The generated snippet has not recorded a declaration on a real customer site yet.
+- The hosted collector keeps serving the old demo page until its next deploy. After that, `npm run smoke:hosted` runs 9 checks rather than 12, and the widget reset is covered by the local browser tests only.
 
 ## Next Session Startup
 
@@ -42,4 +43,4 @@
 
 ## Recommended Next Step
 
-- Deploy `feat-011`, then confirm a declaration from a real site, mark `feat-003` done and start `feat-004`.
+- Confirm a declaration from a real site, mark `feat-003` done, then start `feat-004`.

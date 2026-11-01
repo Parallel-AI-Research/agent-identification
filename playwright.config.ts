@@ -22,13 +22,13 @@ export default defineConfig({
     {
       command: "npm run dev:collector",
       url: "http://127.0.0.1:4310/health",
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       env: { AGENT_ID_DEMO: "true" },
     },
     {
       command: "npm run dev:examples",
       url: "http://127.0.0.1:4311/plain/",
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
     },
   ],
 });

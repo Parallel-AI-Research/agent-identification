@@ -14,7 +14,6 @@ export default ts.config(
       "public/sdk/**",
       "public/downloads/**",
       "releases/**",
-      "public/demo-react/**",
       "test-results/**",
       "playwright-report/**",
       "examples/react/app.js",

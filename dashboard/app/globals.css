@@ -17,7 +17,7 @@
   --color-fd-ring: #6666d7;
 }
 
-@theme inline {
+@theme {
   --color-background: #f8f9fc;
   --color-foreground: #212a3e;
   --color-card: #fff;
@@ -37,6 +37,36 @@
   --radius-lg: 0.6rem;
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dark {
+  --color-background: #0f1117;
+  --color-foreground: #e6e9f0;
+  --color-card: #171a21;
+  --color-primary: #7c7ef0;
+  --color-primary-foreground: #fff;
+  --color-muted: #1e222b;
+  --color-muted-foreground: #9aa3b2;
+  --color-accent: #23254a;
+  --color-accent-foreground: #c4c6ff;
+  --color-destructive: #f0717e;
+  --color-success: #4ccb8b;
+  --color-warning: #e6b450;
+  --color-border: #262b36;
+  --color-input: #323846;
+  --color-ring: #7c7ef0;
+
+  --color-fd-background: #0f1117;
+  --color-fd-foreground: #e6e9f0;
+  --color-fd-muted-foreground: #9aa3b2;
+  --color-fd-card: #171a21;
+  --color-fd-popover: #171a21;
+  --color-fd-border: #262b36;
+  --color-fd-primary: #8b8df5;
+  --color-fd-primary-foreground: #fff;
+  --color-fd-accent: #23254a;
+  --color-fd-accent-foreground: #c4c6ff;
+  --color-fd-ring: #7c7ef0;
 }
 
 body {

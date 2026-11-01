@@ -6,7 +6,6 @@ dist/
 public/sdk/
 public/downloads/
 releases/
-public/demo-react/
 examples/react/app.js
 .local/
 .vercel/

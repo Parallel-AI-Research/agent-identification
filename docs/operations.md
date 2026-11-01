@@ -44,8 +44,7 @@ app. A separate schema and restricted role let it use an existing database.
 
 Set the production and preview environments separately. Do not reuse the known
 local demo secret. The runtime refuses memory storage in production. Restrict
-preview access while setting up; a public demo needs its exact origin included
-in a dedicated demo site's origins.
+preview access while setting up.
 
 Site changes reach running instances within about 30 seconds, because lookups are
 cached briefly to keep public traffic away from the database. No wildcard origin or credentialed cross-origin cookie requests are used.
@@ -141,7 +140,7 @@ not mean the package is published to npm's registry.
 Published v0.1.0 is archived in `releases/v0.1.0/`. Builds validate its checksums
 and restore the exact published SDK, tarball and manifests. The archived tarball
 keeps its original README, including historical installation instructions; the
-current landing page and source documentation contain the updated instructions.
+current public docs and source documentation contain the updated instructions.
 Do not edit the archive to update documentation. SDK source, compiled output or
 package metadata changes under the frozen version fail the build/release; bump
 the SDK version for those changes. Repository README and build/test script edits

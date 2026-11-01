@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** `feat-011`, built and awaiting deployment. `feat-003` needs one real declaration from a customer site. `feat-002` is done.
+**Active Feature:** `feat-003`, which needs one real declaration from a customer site. `feat-002` and `feat-011` are done.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -18,16 +18,16 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [x] Dedicated Supabase project migrated, with the existing sites imported unchanged.
 - [x] Hosted collector moved to the new code and database, and hosted smoke checks passed.
 - [x] Dashboard deployed at https://parallel-agent-dashboard.vercel.app, with Supabase redirects set.
+- [x] Removed the collector's demo page, its React copy and the local `public-demo` site. The hosted page stays up until the next collector deploy.
 
 ### What's In Progress
 
-- [ ] Deploying the public site, docs and changelog (`feat-011`).
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
 
 ### What's Next
 
-1. Merge and deploy `feat-011`, then confirm a declaration from a real site and mark `feat-003` done.
-2. Decide when to clear the old collector data and retire its settings, as listed under risks.
+1. Confirm a declaration from a real site and mark `feat-003` done.
+2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site, once the demo removal is deployed.
 3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
 
 ## Blockers / Risks
@@ -46,9 +46,12 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 
 ## Decisions Made
 
-- **The public site is light mode only for now**
-  - Context: the dashboard has no dark theme, and matching both keeps the product consistent.
-  - Alternatives considered: dark mode on the docs alone, which would make the two feel like different products.
+- **The collector's demo page is gone**
+  - Context: the public site and docs replaced it, so the owner asked to remove it. The collector now serves the API, the SDK and `/trial/`, and its root URL returns 404.
+  - Alternatives considered: redirecting the root URL to the public site, which nothing needs yet.
+- **One navbar across the public site, docs and dashboard**
+  - Context: every page shares the same navigation, with Docs and Changelog on the left, a light and dark toggle, and a Dashboard button or account menu at the far right.
+  - Alternatives considered: a separate dashboard header, which hid the docs and needed its own toggle.
 - **Credentials belong to environments, not products**
   - Context: one product needs separate production, beta, staging and dev analytics, so each environment has its own site ID, secret and origins.
   - Alternatives considered: tagging events with an environment under one site ID, which would let dev traffic use production's credentials.

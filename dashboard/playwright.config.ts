@@ -34,14 +34,14 @@ export default defineConfig({
       command: "npm run dev:collector",
       cwd: "..",
       url: `${collectorUrl}/health`,
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       env: { AGENT_ID_DEMO: "true", SUPABASE_URL: supabaseUrl },
     },
     {
       command: "npm run dev",
       url: "http://127.0.0.1:3100/sign-in",
       timeout: 120_000,
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       env: {
         NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: stack.PUBLISHABLE_KEY ?? stack.ANON_KEY ?? "",
