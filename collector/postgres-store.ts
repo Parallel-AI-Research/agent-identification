@@ -6,6 +6,7 @@ import type {
   StoredSession,
 } from "./store.js";
 import type { Choice } from "../src/protocol.js";
+import type { ProductChanges, ProductRecord, ProductStore } from "./products.js";
 
 /** Works with postgres.js, a Postgres pool, or PGlite without interpolating values. */
 export type QueryExecutor = (
@@ -26,6 +27,7 @@ function session(row: Record<string, unknown>): StoredSession {
     origin: String(row.origin),
     tokenHash: String(row.token_hash),
     bindingHash: row.binding_hash === null ? null : String(row.binding_hash),
+    signingSecretHash: (row.signing_secret_hash ?? null) as string | null,
     createdAt: Number(row.created_at),
     expiresAt: Number(row.expires_at),
     revokedAt: row.revoked_at === null ? null : Number(row.revoked_at),
@@ -36,7 +38,29 @@ function session(row: Record<string, unknown>): StoredSession {
   };
 }
 
-export class PostgresStore implements CollectorStore {
+function product(row: Record<string, unknown>): ProductRecord {
+  // Drivers differ on whether a jsonb column arrives parsed.
+  const origins = typeof row.origins === "string" ? JSON.parse(row.origins) : row.origins;
+  return {
+    id: String(row.id),
+    ownerId: row.owner_id === null ? null : String(row.owner_id),
+    name: String(row.name),
+    siteId: String(row.site_id),
+    origins: origins as string[],
+    secretCiphertext: String(row.secret_ciphertext),
+    previousSecretCiphertext: row.previous_secret_ciphertext as string | null,
+    previousSecretExpiresAt:
+      row.previous_secret_expires_at === null ? null : Number(row.previous_secret_expires_at),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+const PRODUCT_COLUMNS = `p.*, coalesce((
+  select jsonb_agg(o.origin order by o.origin)
+  from agent_identification.product_origins o where o.product_id = p.id
+), '[]'::jsonb) as origins`;
+
+export class PostgresStore implements CollectorStore, ProductStore {
   readonly kind = "postgres" as const;
   constructor(private execute: QueryExecutor) {}
 
@@ -45,17 +69,115 @@ export class PostgresStore implements CollectorStore {
     // reading or returning visitor records.
     await this.execute(
       `select 1 from agent_identification.sessions,
-       agent_identification.events, agent_identification.rate_buckets limit 0`,
+       agent_identification.events, agent_identification.rate_buckets,
+       agent_identification.products, agent_identification.product_origins limit 0`,
       [],
     );
+  }
+
+  async createProduct(p: ProductRecord): Promise<void> {
+    // One statement, so a product can never exist without its origins.
+    await this.execute(
+      `with created as (
+         insert into agent_identification.products
+         (id, owner_id, name, site_id, secret_ciphertext, previous_secret_ciphertext,
+          previous_secret_expires_at, created_at, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id
+       )
+       insert into agent_identification.product_origins (product_id, origin)
+       select created.id, value from created, jsonb_array_elements_text($10::jsonb) as value`,
+      [
+        p.id,
+        p.ownerId,
+        p.name,
+        p.siteId,
+        p.secretCiphertext,
+        p.previousSecretCiphertext,
+        p.previousSecretExpiresAt,
+        p.createdAt,
+        p.updatedAt,
+        JSON.stringify(p.origins),
+      ],
+    );
+  }
+  async countProducts(ownerId: string): Promise<number> {
+    const rows = await this.execute(
+      "select count(*) as total from agent_identification.products where owner_id=$1",
+      [ownerId],
+    );
+    return Number(rows[0]?.total);
+  }
+  async listProducts(ownerId: string): Promise<ProductRecord[]> {
+    const rows = await this.execute(
+      `select ${PRODUCT_COLUMNS} from agent_identification.products p
+       where p.owner_id=$1 order by p.created_at desc, p.id desc`,
+      [ownerId],
+    );
+    return rows.map(product);
+  }
+  async getProduct(ownerId: string, id: string): Promise<ProductRecord | null> {
+    const rows = await this.execute(
+      `select ${PRODUCT_COLUMNS} from agent_identification.products p
+       where p.owner_id=$1 and p.id=$2`,
+      [ownerId, id],
+    );
+    return rows[0] ? product(rows[0]) : null;
+  }
+  async updateProduct(
+    ownerId: string,
+    id: string,
+    changes: ProductChanges,
+  ): Promise<ProductRecord | null> {
+    const origins = changes.origins === undefined ? null : JSON.stringify(changes.origins);
+    const rows = await this.execute(
+      `with target as (
+         update agent_identification.products
+         set name=coalesce($3,name), updated_at=$4
+         where owner_id=$1 and id=$2 returning id
+       ), removed as (
+         delete from agent_identification.product_origins
+         where $5::jsonb is not null and product_id in (select id from target)
+           and origin not in (select jsonb_array_elements_text($5::jsonb))
+       ), added as (
+         insert into agent_identification.product_origins (product_id, origin)
+         select target.id, value from target, jsonb_array_elements_text($5::jsonb) as value
+         on conflict do nothing
+       )
+       select id from target`,
+      [ownerId, id, changes.name ?? null, changes.now, origins],
+    );
+    return rows[0] ? this.getProduct(ownerId, id) : null;
+  }
+  async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
+    const rows = await this.execute(
+      `select ${PRODUCT_COLUMNS} from agent_identification.products p where p.site_id=$1`,
+      [siteId],
+    );
+    return rows[0] ? product(rows[0]) : null;
+  }
+  async isRegisteredOrigin(origin: string): Promise<boolean> {
+    const rows = await this.execute(
+      "select 1 from agent_identification.product_origins where origin=$1 limit 1",
+      [origin],
+    );
+    return rows.length > 0;
   }
 
   async createSession(s: StoredSession): Promise<void> {
     await this.execute(
       `insert into agent_identification.sessions
-       (id, site_id, origin, token_hash, binding_hash, created_at, expires_at)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
-      [s.id, s.siteId, s.origin, s.tokenHash, s.bindingHash, s.createdAt, s.expiresAt],
+       (id, site_id, origin, token_hash, binding_hash, signing_secret_hash, created_at, expires_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        s.id,
+        s.siteId,
+        s.origin,
+        s.tokenHash,
+        s.bindingHash,
+        s.signingSecretHash,
+        s.createdAt,
+        s.expiresAt,
+      ],
     );
   }
   async getSession(hash: string): Promise<StoredSession | null> {

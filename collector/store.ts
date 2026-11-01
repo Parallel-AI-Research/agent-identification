@@ -1,4 +1,5 @@
 import type { Choice } from "../src/protocol.js";
+import type { ProductChanges, ProductRecord, ProductStore } from "./products.js";
 
 export interface StoredSession {
   id: string;
@@ -6,6 +7,8 @@ export interface StoredSession {
   origin: string;
   tokenHash: string;
   bindingHash: string | null;
+  /** Fingerprint of the site secret that signed this session's binding context. */
+  signingSecretHash: string | null;
   createdAt: number;
   expiresAt: number;
   revokedAt: number | null;
@@ -52,12 +55,55 @@ export interface CollectorStore {
 }
 
 /** Development/test storage. Production must use shared persistent storage. */
-export class MemoryStore implements CollectorStore {
+export class MemoryStore implements CollectorStore, ProductStore {
   readonly kind = "memory" as const;
+  private products = new Map<string, ProductRecord>();
   private sessions = new Map<string, StoredSession>();
   private events = new Map<string, StoredEvent>();
   private rates = new Map<string, { count: number; expiresAt: number }>();
   async checkHealth(): Promise<void> {}
+  /** Synchronous so a local fixture can register its sites during startup. */
+  seedProduct(product: ProductRecord): void {
+    if ([...this.products.values()].some((row) => row.siteId === product.siteId)) {
+      throw new Error("Duplicate site id");
+    }
+    this.products.set(product.id, { ...product, origins: [...product.origins].sort() });
+  }
+  async createProduct(product: ProductRecord): Promise<void> {
+    this.seedProduct(product);
+  }
+  async countProducts(ownerId: string): Promise<number> {
+    return (await this.listProducts(ownerId)).length;
+  }
+  async listProducts(ownerId: string): Promise<ProductRecord[]> {
+    return [...this.products.values()]
+      .filter((row) => row.ownerId === ownerId)
+      .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+      .map((row) => ({ ...row, origins: [...row.origins] }));
+  }
+  async getProduct(ownerId: string, id: string): Promise<ProductRecord | null> {
+    const row = this.products.get(id);
+    return row && row.ownerId === ownerId ? { ...row, origins: [...row.origins] } : null;
+  }
+  async updateProduct(
+    ownerId: string,
+    id: string,
+    changes: ProductChanges,
+  ): Promise<ProductRecord | null> {
+    const row = this.products.get(id);
+    if (!row || row.ownerId !== ownerId) return null;
+    if (changes.name !== undefined) row.name = changes.name;
+    if (changes.origins !== undefined) row.origins = [...changes.origins].sort();
+    row.updatedAt = changes.now;
+    return { ...row, origins: [...row.origins] };
+  }
+  async getProductBySiteId(siteId: string): Promise<ProductRecord | null> {
+    const row = [...this.products.values()].find((value) => value.siteId === siteId);
+    return row ? { ...row, origins: [...row.origins] } : null;
+  }
+  async isRegisteredOrigin(origin: string): Promise<boolean> {
+    return [...this.products.values()].some((row) => row.origins.includes(origin));
+  }
   async createSession(session: StoredSession): Promise<void> {
     if (this.sessions.has(session.tokenHash)) throw new Error("Duplicate session");
     this.sessions.set(session.tokenHash, { ...session });
