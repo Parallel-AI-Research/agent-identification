@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** `feat-011`, built and awaiting deployment. `feat-003` needs one real declaration from a customer site. `feat-002` is done.
+**Active Feature:** `feat-003`, which needs one real declaration from a customer site. `feat-002` and `feat-011` are done.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -21,12 +21,11 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 
 ### What's In Progress
 
-- [ ] Deploying the public site, docs and changelog (`feat-011`).
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
 
 ### What's Next
 
-1. Merge and deploy `feat-011`, then confirm a declaration from a real site and mark `feat-003` done.
+1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks.
 3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
 

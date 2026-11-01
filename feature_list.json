@@ -69,7 +69,7 @@
       "name": "Public site, docs and changelog",
       "description": "Give the product a public home: a landing page, documentation with a sidebar, search and on-page contents, and a changelog for releases and new features. The signed-in dashboard moves under /dashboard.",
       "dependencies": ["feat-002"],
-      "status": "in-progress",
+      "status": "done",
       "acceptance": [
         "/ is a public landing page that explains what the product does and what it can't do.",
         "/docs has a sidebar, search and on-page contents, and needs no sign-in.",
@@ -86,7 +86,7 @@
         "The site can launch on its vercel.app address, and a custom domain can follow."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01, local only: 24/24 Playwright tests pass in Chromium and WebKit, covering the signed-out home page, every docs page, search, the changelog, plain-text docs for agents, cacheable public pages, sign-in only for /dashboard, and redirects from old product links. Not done: the public site is not deployed."
+      "evidence": "2026-11-01, hosted: the public site is deployed at parallel-agent-dashboard.vercel.app. All 6 docs pages, the changelog and both posts load signed out, search returns results, /llms.txt, /llms-full.txt and Markdown pages respond, and public pages aren't marked private. Signed-out visitors reach /dashboard only through sign-in, and a real signed-in session followed an old /products link to its product. Locally, 24/24 Playwright tests pass in Chromium and WebKit, and CI passed on the merged code."
     },
     {
       "id": "feat-004",
