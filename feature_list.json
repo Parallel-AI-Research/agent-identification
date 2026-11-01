@@ -82,11 +82,11 @@
       ],
       "decisions": [
         "The public site, docs and changelog live in the dashboard app, using Fumadocs.",
-        "Reading, learning and trying a demo need no account. Creating a product does, because a site ID must belong to someone.",
+        "Reading and learning need no account. Creating a product does, because a site ID must belong to someone.",
         "The site can launch on its vercel.app address, and a custom domain can follow."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01, hosted: the public site is deployed at parallel-agent-dashboard.vercel.app. All 6 docs pages, the changelog and both posts load signed out, search returns results, /llms.txt, /llms-full.txt and Markdown pages respond, and public pages aren't marked private. Signed-out visitors reach /dashboard only through sign-in, and a real signed-in session followed an old /products link to its product. Locally, 24/24 Playwright tests pass in Chromium and WebKit, and CI passed on the merged code."
+      "evidence": "2026-11-01, hosted: the public site is deployed at parallel-agent-dashboard.vercel.app. All 6 docs pages, the changelog and both posts load signed out, search returns results, /llms.txt, /llms-full.txt and Markdown pages respond, and public pages aren't marked private. Signed-out visitors reach /dashboard only through sign-in, and a real signed-in session followed an old /products link to its product. Locally, 24/24 Playwright tests pass in Chromium and WebKit, and CI passed on the merged code. 2026-11-01, local: after the shared navbar, dark mode and demo page removal, ./init.sh --full passed with 108/108 collector, 4/4 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests. Six before and after screenshots of /trial/ matched byte for byte."
     },
     {
       "id": "feat-004",

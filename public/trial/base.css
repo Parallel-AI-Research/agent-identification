@@ -11,8 +11,7 @@
 body {
   margin: 0;
 }
-header,
-footer {
+header {
   max-width: 1160px;
   margin: auto;
   padding: 28px 32px;
@@ -24,11 +23,6 @@ footer {
 }
 header {
   border-bottom: 1px solid #d9ddd4;
-}
-header a {
-  font-weight: 750;
-  color: #254d3c;
-  text-decoration: none;
 }
 main {
   max-width: 1160px;
@@ -55,23 +49,6 @@ h1 {
   max-width: 610px;
   line-height: 1.65;
   color: #5a6a61;
-}
-a {
-  color: #285d43;
-  text-underline-offset: 4px;
-}
-.links {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin: 26px 0 42px;
-  font-size: 14px;
-}
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
 }
 .card {
   background: #fffefa;
@@ -125,12 +102,7 @@ button:disabled {
   opacity: 0.5;
   cursor: wait;
 }
-button.secondary {
-  background: transparent;
-  color: #285d43;
-}
 button:focus-visible,
-a:focus-visible,
 input:focus-visible {
   outline: 3px solid #bc9b35;
   outline-offset: 3px;
@@ -138,59 +110,11 @@ input:focus-visible {
 form[inert] {
   opacity: 0.5;
 }
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-  margin-top: 22px;
-  font-size: 13px;
-}
-output {
-  display: block;
-  font-size: 13px;
-  margin-top: 12px;
-  color: #285d43;
-}
-pre {
-  background: #eef1e9;
-  padding: 16px;
-  border-radius: 8px;
-  overflow-x: auto;
-}
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  line-height: 1.8;
-}
 .small {
   font-size: 12px;
 }
-.divider {
-  margin-top: 28px;
-  padding-top: 12px;
-  border-top: 1px solid #e0e3d9;
-}
-.note {
-  margin-top: 32px;
-  padding: 24px;
-  background: #ecefe5;
-  border-radius: 12px;
-  line-height: 1.8;
-  font-size: 13px;
-}
-.trial-links {
-  margin-top: 24px;
-}
-footer {
-  color: #69796d;
-}
 @media (max-width: 760px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  header,
-  footer {
+  header {
     align-items: start;
     flex-direction: column;
   }

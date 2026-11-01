@@ -43,38 +43,10 @@ async function isGated(page: Page) {
   return page.locator("#announcement-form").evaluate((element) => (element as HTMLElement).inert);
 }
 
-test("landing copies an unconfigured installation template while keeping its demo separate", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        writeText: async (text: string) => sessionStorage.setItem("copied-install-snippet", text),
-      },
-    });
-  });
-  const session = await load(page, "/");
-  expect(session.siteId).toBe("public-demo");
-  const snippet = await page.locator("#install-code").textContent();
-  const installation = await page.locator("#install-code").evaluate((element) => {
-    const script = new DOMParser()
-      .parseFromString(element.textContent ?? "", "text/html")
-      .querySelector("script")!;
-    return { siteId: script.dataset.site, src: script.src };
-  });
-  expect(installation).toEqual({
-    siteId: "YOUR-SITE-ID",
-    src: `${api}/sdk/v0.1.0/agent-id.js`,
-  });
-  await expect(page.locator("body")).not.toContainText("useparallel.com");
-  await expect(page.locator("#package-code")).toContainText("npm install");
-  await page.getByRole("button", { name: "Copy snippet", exact: true }).click();
-  await expect(page.locator("#copy-result")).toHaveText("Copied.");
-  expect(await page.evaluate(() => sessionStorage.getItem("copied-install-snippet"))).toBe(snippet);
-  const links = await page
-    .locator("a[href]")
-    .evaluateAll((elements) => elements.map((element) => (element as HTMLAnchorElement).href));
-  expect(links).toContain(`${api}/trial/`);
+test("the collector serves the trial page and no public page of its own", async ({ request }) => {
+  expect((await request.get(`${api}/`)).status()).toBe(404);
+  expect((await request.get(`${api}/demo-react/`)).status()).toBe(404);
+  expect((await request.get(`${api}/trial/base.css`)).ok()).toBe(true);
 });
 
 test("trial presents an ordinary task without installation or experiment controls", async ({
@@ -167,17 +139,9 @@ test("optional trial completes its task without auto-submitting identification",
   expect(await events(request, session.sessionId)).toHaveLength(0);
 });
 
-test("trial does not inherit the landing declaration and starts fresh on reload", async ({
-  page,
-  request,
-}) => {
-  const landing = await load(page, "/");
-  await page.getByRole("button", { name: "Person", exact: true }).click();
-  await expect(page.getByText("Response recorded: Person.", { exact: true })).toBeVisible();
-
+test("trial starts fresh on reload", async ({ page, request }) => {
   const trial = await load(page);
   expect(trial.siteId).toBe(siteId);
-  expect(trial.sessionId).not.toBe(landing.sessionId);
   expect(trial.choice).toBeNull();
   expect(await isGated(page)).toBe(true);
   await page.getByRole("button", { name: "AI assistant", exact: true }).click();

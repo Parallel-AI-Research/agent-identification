@@ -22,7 +22,6 @@ const LIMITS = [
 ];
 
 export default function HomePage() {
-  const demo = process.env.COLLECTOR_URL;
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-16 sm:py-24">
       <h1 className="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -33,21 +32,13 @@ export default function HomePage() {
         can tell you whether they&apos;re an AI assistant or a person. No changes for agent
         builders, and nothing for visitors to install.
       </p>
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-8">
         <Link
           className="inline-flex h-10 items-center rounded-md bg-fd-primary px-4 text-sm font-medium text-fd-primary-foreground"
           href="/docs/quickstart"
         >
           Read the quickstart
         </Link>
-        {demo ? (
-          <a
-            className="inline-flex h-10 items-center rounded-md border bg-fd-card px-4 text-sm font-medium"
-            href={demo}
-          >
-            Try the demo
-          </a>
-        ) : null}
       </div>
 
       <section className="mt-20">

@@ -6,7 +6,6 @@ dashboard/tsconfig.tsbuildinfo
 dist/
 public/sdk/
 public/downloads/
-public/demo-react/
 examples/react/app.js
 .local/
 .env

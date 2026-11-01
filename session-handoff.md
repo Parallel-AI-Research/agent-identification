@@ -32,6 +32,7 @@
 
 - The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
 - The generated snippet has not recorded a declaration on a real customer site yet.
+- The hosted collector keeps serving the old demo page until its next deploy. After that, `npm run smoke:hosted` runs 9 checks rather than 12, and the widget reset is covered by the local browser tests only.
 
 ## Next Session Startup
 

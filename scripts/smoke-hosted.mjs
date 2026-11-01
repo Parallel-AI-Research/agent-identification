@@ -140,48 +140,13 @@ try {
   delete browserEnv.AGENT_ID_TRIAL_SECRET;
   browser = await chromium.launch({ env: browserEnv, channel: "chromium" });
 
-  currentStep = "public-demo-record-and-reset";
-  const landing = await newPage();
-  await landing.goto(baseUrl);
-  await landing.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
-  check(
-    (await landing.locator("#install-code").textContent()).includes("data-site") &&
-      (await landing.locator("#package-code").textContent()).includes("npm install"),
-    "Landing installation instructions are missing.",
-  );
-  check(
-    (await landing.locator('a[href="/trial/"]').count()) > 0,
-    "Landing does not link to the clean trial.",
-  );
-  check(await gated(landing, "#demo-form"), "Public demo must initially gate its form.");
-  await landing.screenshot({ path: screenshotPath, fullPage: true });
-  await chmod(screenshotPath, 0o600);
-  const publicDeclaration = await declare(landing, "public-demo", baseUrl);
-  check(!(await gated(landing, "#demo-form")), "Accepted demo declaration did not unlock.");
-  const revoked = landing.waitForResponse(
-    (response) =>
-      response.url() === `${baseUrl}/v1/sessions/current` &&
-      response.request().method() === "DELETE",
-  );
-  const restarted = landing.waitForResponse(
-    (response) =>
-      response.url() === `${baseUrl}/v1/sessions` && response.request().method() === "POST",
-  );
-  await landing.getByRole("button", { name: "Start a new session", exact: true }).click();
-  check((await revoked).status() === 204, "Public demo reset did not revoke.");
-  const fresh = await (await restarted).json();
-  check(
-    fresh.sessionId !== publicDeclaration.sessionId && fresh.choice === null,
-    "Reset reused declaration.",
-  );
-  check(await gated(landing, "#demo-form"), "Reset must gate the form again.");
-  report.checks.push("public-demo-recorded", "public-demo-reset-revoked");
-
   currentStep = "clean-required-trial";
   const trial = await newPage();
   await trial.goto(`${baseUrl}/trial/`);
   await trial.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
   check(await gated(trial, "#announcement-form"), "Required trial must gate its form.");
+  await trial.screenshot({ path: screenshotPath, fullPage: true });
+  await chmod(screenshotPath, 0o600);
   const trialText = await trial.locator("body").evaluate((body) => {
     const clone = body.cloneNode(true);
     clone.querySelector("#visitor-choice")?.remove();
@@ -283,20 +248,6 @@ try {
   } else {
     report.trialSecretChecks = "skipped: AGENT_ID_TRIAL_SECRET was not supplied";
   }
-
-  currentStep = "react-demo";
-  const react = await newPage();
-  await react.goto(`${baseUrl}/demo-react/`);
-  await react.getByRole("button", { name: "AI assistant", exact: true }).waitFor();
-  check(await gated(react, "#publish-form"), "React form was not initially gated.");
-  await declare(react, "public-demo", baseUrl);
-  await react.getByText("Application received: ai_assistant", { exact: true }).waitFor();
-  check(!(await gated(react, "#publish-form")), "React form did not unlock.");
-  check(
-    (await react.getByRole("link", { name: "Open script example" }).getAttribute("href")) === "/",
-    "Hosted React example links to the local example path.",
-  );
-  report.checks.push("react-callback-and-hosted-links");
 
   currentStep = "fixture-cross-origin-script";
   const fixture = await newPage();

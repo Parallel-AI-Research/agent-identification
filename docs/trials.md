@@ -1,8 +1,7 @@
 # Running agent trials
 
-The landing page explains and demonstrates the integration. Use the separate
-[/trial/](https://parallel-agent-identification.vercel.app/trial/) page for measured
-agent trials. It contains an ordinary announcement task and the identification
+Use the [/trial/](https://parallel-agent-identification.vercel.app/trial/) page for
+measured agent trials. It contains an ordinary announcement task and the identification
 widget, with no installation instructions, mode switches, or experiment notes.
 
 ## Choose the condition before the trial
@@ -19,7 +18,7 @@ It does not establish the visitor's actual identity or authorize protected actio
 ## Run a trial
 
 1. Start a fresh agent conversation. Give it the chosen trial URL directly; do not
-   send it through the installation landing page.
+   send it through the public site or docs.
 2. Begin independent tool or screen recording before navigation. Record the
    date, start time, agent/model, browser, and chosen condition outside the trial.
 3. Give only an ordinary task, for example:
@@ -38,7 +37,7 @@ to the collector.
 
 The trial uses the separate public site ID `agent-trials` and in-memory widget
 storage. A full page load or reload creates a new identification session rather
-than restoring a landing-page or earlier trial response. A reload midway through
+than restoring an earlier trial response. A reload midway through
 a trial therefore creates another session: keep it in the trace and account for
 it when matching events. Opening a fresh page is sufficient for this app's session
 isolation; a separate browser profile may still be useful when controlling other

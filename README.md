@@ -8,11 +8,8 @@ This is **visible, self-reported classification**. It does not detect every agen
 prove identity, or grant permissions. An agent can skip an optional prompt or
 choose a different answer. Required mode asks every visitor to choose.
 
-**Live demo and installation template:**
-[parallel-agent-identification.vercel.app](https://parallel-agent-identification.vercel.app).
-Use
-`https://parallel-agent-identification.vercel.app` wherever the examples below
-say `https://YOUR-COLLECTOR`.
+The hosted collector is `https://parallel-agent-identification.vercel.app`. Use it
+wherever the examples below say `https://YOUR-COLLECTOR`.
 
 ## Add it to a website
 

@@ -10,7 +10,6 @@ export const DEMO_SECRET = "test-only-secret-not-for-production-00000001";
 const DEMO_ENCRYPTION_KEY = "dGVzdC1vbmx5LWVuY3J5cHRpb24ta2V5LTAwMDAwMDE";
 const DEMO_SITES = [
   { id: "demo-site", origins: ["http://127.0.0.1:4311", "http://127.0.0.1:4312"] },
-  { id: "public-demo", origins: ["http://127.0.0.1:4310"] },
   { id: "agent-trials", origins: ["http://127.0.0.1:4310"] },
 ];
 

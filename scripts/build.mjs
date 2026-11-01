@@ -64,13 +64,6 @@ await build({
   minify: true,
   define: { "process.env.NODE_ENV": '"development"' },
 });
-await mkdir("public/demo-react", { recursive: true });
-await copyFile("examples/react/app.js", "public/demo-react/app.js");
-await copyFile("examples/styles.css", "public/demo-react/styles.css");
-await writeFile(
-  "public/demo-react/index.html",
-  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="agent-id-api" content="/"><meta name="agent-id-site" content="public-demo"><meta name="agent-id-react-path" content="/demo-react/"><meta name="agent-id-script-path" content="/"><title>Agent Identification · React example</title><link rel="stylesheet" href="/demo-react/styles.css"><script defer src="/demo-react/app.js"></script></head><body><div id="root"></div></body></html>`,
-);
 const integrity = { version: pkg.version, assets: {} };
 for (const f of ["agent-id.js", "agent-id.css"]) {
   const b = await readFile(`dist/${f}`);

@@ -13,11 +13,9 @@ const server = createServer(async (req, res) => {
       (url.pathname.startsWith("/sdk/") ||
         url.pathname.startsWith("/downloads/") ||
         url.pathname.startsWith("/trial/") ||
-        url.pathname.startsWith("/demo-react/") ||
-        ["/demo.js", "/demo.css", "/trial", "/demo-react"].includes(url.pathname) ||
-        url.pathname === "/")
+        url.pathname === "/trial")
     ) {
-      if (["/trial", "/demo-react"].includes(url.pathname)) {
+      if (url.pathname === "/trial") {
         res.writeHead(308, { Location: `${url.pathname}/${url.search}` });
         res.end();
         return;
