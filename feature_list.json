@@ -1,0 +1,173 @@
+{
+  "note": "Proposed build order from the 1 November 2026 MVP plan. These are planned work, not implemented capabilities. Items in openDecisions are not yet agreed.",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "Agent harness baseline",
+      "description": "Agents can start, verify and resume work in this repository from its instruction and state files.",
+      "dependencies": [],
+      "status": "done",
+      "acceptance": [
+        "./init.sh and ./init.sh --full run the documented verification and fail on errors.",
+        "The harness validator scores all five subsystems.",
+        "Harness files stay out of the published package and the deployed site."
+      ],
+      "openDecisions": [],
+      "evidence": "2026-11-01: ./init.sh --full exited 0 with 60/60 tests and 48/48 Chromium and WebKit browser tests. A misformatted file made ./init.sh exit 1. validate-harness scored 100/100, a structural score only. npm pack --dry-run listed 15 files, none of them harness files, and Vercel serves only public/. Firefox and hosted smoke checks were not run."
+    },
+    {
+      "id": "feat-002",
+      "name": "Customer and product ownership",
+      "description": "Replace operator-only site provisioning with persisted customer and product ownership, enforced on every product, settings and telemetry query.",
+      "dependencies": ["feat-001"],
+      "status": "blocked",
+      "acceptance": [
+        "Two independent customers can create products and receive different configuration.",
+        "Neither customer can read or modify the other's products or telemetry, at the API as well as the UI.",
+        "Demo and ticket-app installations keep working through the migration."
+      ],
+      "openDecisions": ["Customer auth mechanism", "Dashboard framework and location"],
+      "evidence": ""
+    },
+    {
+      "id": "feat-003",
+      "name": "Signup, add product and install instructions",
+      "description": "Self-service flow: sign up, add a product with its exact permitted origins, then copy script or package instructions for the chosen integration.",
+      "dependencies": ["feat-002"],
+      "status": "blocked",
+      "acceptance": [
+        "Owners can sign up, sign in, recover their account and sign out without operator help.",
+        "Each product gets a generated public installation identifier; any server credential is separate and labelled server-only.",
+        "Invalid or unapproved origins fail clearly.",
+        "Secrets never appear in the browser bundle or public snippet.",
+        "The chosen domain-control check is implemented and tested; an origin allowlist alone is not treated as proof of ownership.",
+        "No pre-populated customer account, site ID, key or domain allowlist ships with onboarding."
+      ],
+      "openDecisions": ["Domain ownership verification method", "Credential rotation flow"],
+      "evidence": ""
+    },
+    {
+      "id": "feat-004",
+      "name": "Installation connection check",
+      "description": "Show real setup states driven by received events: waiting for installation, receiving events, or an actionable error.",
+      "dependencies": ["feat-003"],
+      "status": "not-started",
+      "acceptance": [
+        "A real first event moves a product to receiving events.",
+        "Copying a snippet never shows a product as connected.",
+        "A failing installation shows an error the owner can act on."
+      ],
+      "openDecisions": [],
+      "evidence": ""
+    },
+    {
+      "id": "feat-005",
+      "name": "Activity event contract",
+      "description": "Extend the declaration model with repeatable activity events, so a declaration is one event type rather than the whole session timeline.",
+      "dependencies": ["feat-004"],
+      "status": "blocked",
+      "acceptance": [
+        "The contract covers product, session, event ID and timestamp, with duplicate handling.",
+        "Independent signals keep their sources, and conflicting signals stay inspectable.",
+        "Agent name, provider claim and stated purpose are optional self-report, and unknown is valid.",
+        "The account reference is an opaque ID supplied by the host server and labelled as the account used, not as proof of delegation.",
+        "Action events distinguish attempted, rejected and application-confirmed outcomes, without arbitrary page or form contents.",
+        "src/protocol.ts and docs/protocol.md change together.",
+        "The change ships as a new versioned release and published v0.1.0 assets stay unchanged."
+      ],
+      "openDecisions": [
+        "Exact approved event fields",
+        "Page and resource redaction rules",
+        "Retention for the customer product"
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "feat-006",
+      "name": "Browser and server activity collection",
+      "description": "Collect access and activity evidence independently of whether a visitor answers the widget, through a browser integration and a server or edge integration.",
+      "dependencies": ["feat-005"],
+      "status": "blocked",
+      "acceptance": [
+        "Visits and relevant actions are recorded for both answered and unanswered prompts.",
+        "Retries are idempotent.",
+        "Browser-supplied principal claims cannot become server-confirmed attribution.",
+        "Errors never appear as successful recording.",
+        "Logout, new-account and new-session boundaries work.",
+        "Behaviour is verified with the ticket app as an integration fixture, without coupling the repositories."
+      ],
+      "openDecisions": ["First server or edge adapter and any paid infrastructure dependency"],
+      "evidence": ""
+    },
+    {
+      "id": "feat-007",
+      "name": "Product-owner dashboard",
+      "description": "Overview, recent-session list with date and product filters, and session timeline built on real collected data, showing provenance and coverage limits in plain language.",
+      "dependencies": ["feat-004", "feat-006"],
+      "status": "not-started",
+      "acceptance": [
+        "An external tester can install the integration and find their own test session without an operator query or private database access.",
+        "Counts reconcile with event records, and requests, sessions and completed actions are counted separately.",
+        "Retries, asset requests and client/server duplicates do not inflate counts, and a session with both a verified provider and a self-declaration is not double-counted.",
+        "Customer isolation holds at the API as well as the UI.",
+        "Empty, loading, disconnected and error states are covered.",
+        "Unclassified sessions stay unknown and are never labelled human."
+      ],
+      "openDecisions": [],
+      "evidence": ""
+    },
+    {
+      "id": "feat-008",
+      "name": "Detection adapters",
+      "description": "Add supported signals one at a time and test what each contributes, covering provider signature verification and heuristic automation signals used as evidence.",
+      "dependencies": ["feat-006"],
+      "status": "blocked",
+      "acceptance": [
+        "Signatures are validated with their scope, and a header that merely names a provider is not trusted.",
+        "Spoofed, expired, replayed and tampered signatures are tested wherever signature verification exists.",
+        "Ordinary automation is not labelled an AI agent.",
+        "A self-declaration is never promoted to verified identity, and a Person answer does not erase contradictory evidence.",
+        "No numerical confidence score ships without a defensible meaning and validation."
+      ],
+      "openDecisions": [
+        "Which provider signatures to support first",
+        "What evidence justifies a classification"
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "feat-009",
+      "name": "Controlled validation",
+      "description": "Run the pilot acceptance work against a frozen, documented test matrix.",
+      "dependencies": ["feat-007", "feat-008"],
+      "status": "blocked",
+      "acceptance": [
+        "The matrix covers cooperative agents, silent agents, agents choosing Person, ordinary scripted automation, humans and mixed human/agent sessions.",
+        "Tests cover API-only access, JavaScript-disabled clients, denied actions and abandoned visits.",
+        "Missed agents, false positives, attribution errors, task outcome and coverage are reported separately.",
+        "The real model, browser, control method and any assistance are recorded.",
+        "Small successful batches are reported as exploratory, not as proof of universal reliability."
+      ],
+      "openDecisions": [
+        "Pilot success thresholds for detection accuracy, coverage and acceptable false positives"
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "feat-010",
+      "name": "External-test release",
+      "description": "Prepare a documented pilot: run package, HTTP, database, tenant-isolation, browser and hosted checks, then verify onboarding with a new account and a new product.",
+      "dependencies": ["feat-009"],
+      "status": "not-started",
+      "acceptance": [
+        "All checks pass against the deployed target, not only local builds.",
+        "The onboarding journey is verified with a new account and a new product.",
+        "Concise install, uninstall and troubleshooting instructions exist.",
+        "Retention is defined, and deletion and cleanup are tested.",
+        "Release claims stay limited to a documented pilot, not enterprise procurement, compliance, universal detection or verified delegation."
+      ],
+      "openDecisions": [],
+      "evidence": ""
+    }
+  ]
+}
