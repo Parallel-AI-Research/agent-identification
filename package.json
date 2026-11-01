@@ -45,7 +45,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts tests/*.test.mjs",
     "test:e2e": "playwright test",
     "smoke:hosted": "node scripts/smoke-hosted.mjs",
     "test:package": "node scripts/test-package.mjs",

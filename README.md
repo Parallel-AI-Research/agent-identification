@@ -204,11 +204,24 @@ npx playwright install chromium firefox webkit
 npm run test:e2e
 ```
 
-After deployment, run `npm run smoke:hosted -- https://YOUR-COLLECTOR`.
-With `AGENT_ID_SITE_SECRET` set to Parallel's private server secret, it also checks
-event export, bound-session verification and revocation. The cross-origin page is
-an intercepted browser fixture; this does not install anything on Parallel's
-website. Sanitized results stay in ignored `.local/`.
+After deployment, supply a registered fixture site ID and its exact allowed
+origins explicitly:
+
+```sh
+npm run smoke:hosted -- https://YOUR-COLLECTOR \
+  --site YOUR-FIXTURE-SITE-ID \
+  --origin https://fixture.example \
+  --origin https://alternate.fixture.example
+```
+
+The first origin must differ from the collector and runs the browser fixture;
+every supplied origin is checked for CORS, session creation and revocation.
+With `AGENT_ID_SITE_SECRET` set to that
+fixture site's private server secret, the smoke test also checks event export,
+bound-session verification and revocation. Fixture website requests are
+intercepted in the browser; the test does not read or modify those websites.
+The collector must already have the fixture site and origins registered. There
+is no default customer site. Sanitized results stay in ignored `.local/`.
 
 See [operating the collector](docs/operations.md), [API contract](docs/protocol.md)
 and [integration examples](examples/README.md). Production requires PostgreSQL
