@@ -3,25 +3,28 @@
 ## Current Objective
 
 - Goal: Build the analytics MVP in `feature_list.json` order.
-- Current status: Product decisions recorded. No MVP feature has started.
-- Branch / commit: based on `185e4d0`.
+- Current status: `feat-002` and `feat-003` pass locally. Nothing is deployed.
+- Branch / commit: `feat/customer-ownership`, based on `dc3e780`.
 
 ## Completed This Session
 
-- [x] Resolved the open product decisions with the owner, except numeric pilot targets.
-- [x] Created a dedicated Supabase project for the customer product.
+- [x] Built database-backed sites, the owner API, rotation and DNS verification.
+- [x] Built the customer dashboard.
+- [x] Applied the first three customer migrations to the dedicated Supabase project.
+- [x] Moved site credentials and origins from products to environments.
 
 ## Verification Evidence
 
-| Check             | Command                | Result  | Notes                                  |
-| ----------------- | ---------------------- | ------- | -------------------------------------- |
-| Repository checks | `./init.sh`            | Pass    | 60/60 tests                            |
-| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                  |
-| Supabase project  | `supabase projects`    | Healthy | Empty; the collector has not moved yet |
+| Check             | Command                            | Result  | Notes                      |
+| ----------------- | ---------------------------------- | ------- | -------------------------- |
+| Collector         | `npm test`                         | Pass    | 86/86                      |
+| SDK browsers      | `npm run test:e2e`                 | Pass    | 48/48, Chromium and WebKit |
+| Dashboard journey | `npm run test:e2e` in `dashboard/` | Pass    | 6/6, local Supabase        |
+| Harness structure | `validate-harness.mjs`             | 100/100 | Structural score only      |
 
 ## Files Changed
 
-- `feature_list.json`, `progress.md`, `session-handoff.md`
+- `collector/`, `dashboard/`, `supabase/`, `scripts/`, `docs/`, `init.sh`, CI, `AGENTS.md` and state files.
 
 ## Decisions Made
 
@@ -29,8 +32,9 @@
 
 ## Blockers / Risks
 
-- `feat-009` stays blocked until a baseline run gives it numeric targets.
-- Moving the collector schema must keep the demo, trial and ticket-app installs working.
+- The hosted collector still runs the old code and database.
+- The environments migration is not applied to the dedicated Supabase project yet.
+- Supabase production auth settings and custom SMTP are not configured.
 
 ## Next Session Startup
 
@@ -41,4 +45,4 @@
 
 ## Recommended Next Step
 
-- Start `feat-002`, beginning with moving sites from the `AGENT_ID_SITES` environment variable into the database.
+- After review and merge, get the owner's approval to move the hosted collector, following the steps in `progress.md`.

@@ -9,6 +9,8 @@ Standalone website-owner SDK. Do not couple it to the ticket-management research
 - All HTTP clients fail visibly on errors; never report acceptance without a validated response.
 - Make small commits after relevant tests pass. Before release run npm run check and the cross-origin browser/package integration suite.
 - Shared contracts: src/protocol.ts and docs/protocol.md. Coordinate changes before altering them.
+- `src/` is frozen at the published 0.1.0 release, so changing it needs a version bump. Collector and dashboard code live in `collector/` and `dashboard/`.
+- The Supabase CLI link in this repository points at the research project. Pass `--db-url` for the customer project, and never run `supabase db push` without checking the target.
 
 ## Startup Workflow
 
@@ -50,10 +52,10 @@ Before ending a session:
 ## Verification Commands
 
 ```bash
-./init.sh         # npm ci if needed, then npm run check
-./init.sh --full  # also the Chromium and WebKit browser suite
+./init.sh         # npm ci if needed, npm run check, dashboard checks
+./init.sh --full  # also browser suites, the dashboard build and its e2e tests
 ```
 
-`npm run check` covers build, type checks, lint, formatting, unit/database/HTTP tests and a packed-package consumer.
+`npm run check` covers build, type checks, lint, formatting, unit/database/HTTP tests and a packed-package consumer. Dashboard e2e tests need the local stack (`supabase start`), and `--full` says plainly when it skips them. They use local accounts only, so never point them at a hosted project.
 
 Firefox is configured but excluded from `--full`: local startup failed on 21 October before any behavioural result. Never report Chromium/WebKit results as Firefox coverage, and do not keep relaunching a browser that fails to start. Hosted smoke checks need explicit configuration; see `docs/operations.md`.

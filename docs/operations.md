@@ -6,14 +6,20 @@ The reference deployment is a Vercel Node function backed by PostgreSQL. It
 shares no Auth sessions, accounts, tickets or research tables with the research
 app. A separate schema and restricted role let it use an existing database.
 
-1. Apply `supabase/migrations/20261020093721_create_agent_identification_collector.sql`
-   using an administrator. It creates the private `agent_identification` schema
-   and a restricted `agent_id_app` role with no login/password.
+1. Apply everything in `supabase/migrations/` in order, using an administrator.
+   This creates the private `agent_identification` schema, the customer product
+   tables and a restricted `agent_id_app` role with no login/password.
 2. Give that role a random password and enable `LOGIN` through your database
    operator tooling. Never save the password in a migration or Git.
 3. Set `DATABASE_URL` to its transaction-pooler connection and provide your
    database's CA as `DATABASE_SSL_CA` when needed. TLS verification stays enabled.
-4. Generate a site:
+4. Set `AGENT_ID_ENCRYPTION_KEY` to 32 random base64url bytes
+   (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`). It encrypts site
+   secrets at rest, so keep a private backup: losing it loses every site secret.
+5. Set `SUPABASE_URL` to the project whose sign-ins own products. The collector
+   only reads that project's public signing keys.
+6. Customers create their own sites through the owner API. To add an operator
+   site, which no customer owns, generate and import it:
 
    ```sh
    mkdir -p .local
@@ -21,15 +27,19 @@ app. A separate schema and restricted role let it use an existing database.
      --origin https://your-website.example \
      --origin https://www.your-website.example \
      --out .local/your-site.json
+   npm run sites:import -- --file .local/your-site.json
    ```
 
-5. Set `AGENT_ID_SITES` to a JSON **array** of site objects. Keep the file and
-   environment private. Provide only the public site ID and collector URL to
-   browser installations.
-6. Set `PRUNE_SECRET` to a different random value, and `CRON_SECRET` to that same
+   Each site becomes the production environment of a product no customer owns. The
+   import keeps site IDs and secrets, so existing installs keep working, and it
+   skips sites that already exist. It also reads a JSON array from
+   `AGENT_ID_SITES`. Keep these files and values private. Provide only the public
+   site ID and collector URL to browser installations.
+
+7. Set `PRUNE_SECRET` to a different random value, and `CRON_SECRET` to that same
    value for Vercel's authenticated cron request. Disable the local memory fixture
    with `AGENT_ID_DEMO=false`.
-7. Deploy this repository. `vercel.json` builds the package, versioned script/CSS
+8. Deploy this repository. `vercel.json` builds the package, versioned script/CSS
    and npm tarball. Route `/v1/*`, `/internal/*` and `/health` to the function.
 
 Set the production and preview environments separately. Do not reuse the known
@@ -37,10 +47,23 @@ local demo secret. The runtime refuses memory storage in production. Restrict
 preview access while setting up; a public demo needs its exact origin included
 in a dedicated demo site's origins.
 
-When adding another website, generate another site ID/secret and add its exact
-origins. No wildcard origin or credentialed cross-origin cookie requests are used.
+Site changes reach running instances within about 30 seconds, because lookups are
+cached briefly to keep public traffic away from the database. No wildcard origin or credentialed cross-origin cookie requests are used.
 The public site ID and `Origin` checks are not proof that a request is legitimate:
 non-browser clients can copy both. All declarations remain self-reported.
+
+## Dashboard
+
+The customer dashboard is a separate Vercel project with its root directory set to
+`dashboard/`. It holds no database credentials; the collector's owner API enforces
+ownership.
+
+1. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `COLLECTOR_URL` and `SITE_URL` as listed in `dashboard/.env.example`.
+2. In the Supabase project, set the site URL to the dashboard's URL and allow
+   `SITE_URL/auth/confirm` as a redirect, with and without `?next=/reset-password`.
+3. Configure custom SMTP before external testing. Supabase's built-in email sender
+   is heavily rate limited.
 
 ## Logs and retention
 
@@ -80,10 +103,12 @@ not pretend a logout-related revocation succeeded if the service is unavailable.
 Your own logout must invalidate the actual application session regardless.
 
 Each site's secret signs its contexts/receipts and authenticates server exports
-and online verification. It is not a browser API key. Rotating it invalidates
-old signatures and export access. After rotation, start new widget sessions;
-an already rendered choice is not an authorization decision. Rotate the database
-login separately through your database operator tooling.
+and online verification. It is not a browser API key. Customers rotate it from
+the dashboard: the new secret is shown once, the old one keeps working for 24
+hours so their deployment can catch up, and revoking it ends it sooner. Both take
+effect within about 30 seconds because of site caching. Rotating operator sites
+has no dashboard path. Rotate the database login separately through your database
+operator tooling.
 
 ## Release
 

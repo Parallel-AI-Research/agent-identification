@@ -18,33 +18,38 @@
     },
     {
       "id": "feat-002",
-      "name": "Customer and product ownership",
-      "description": "Replace operator-only site provisioning with persisted customer and product ownership, enforced on every product, settings and telemetry query.",
+      "name": "Customer, product and environment ownership",
+      "description": "Replace operator-only site provisioning with persisted ownership in the hierarchy account, product, environment, enforced on every product, environment, settings and telemetry query. Each environment holds its own site ID, server secret and allowed origins, so production, beta, staging and dev analytics stay separate.",
       "dependencies": ["feat-001"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Two independent customers can create products and receive different configuration.",
-        "Neither customer can read or modify the other's products or telemetry, at the API as well as the UI.",
+        "Neither customer can read or modify the other's products, environments or telemetry, at the API as well as the UI.",
         "Demo and ticket-app installations keep working through the migration.",
         "Sites and their origins load from the database, replacing the AGENT_ID_SITES environment variable.",
-        "Site secrets are encrypted at rest, because the collector must read them to sign."
+        "Site secrets are encrypted at rest, because the collector must read them to sign.",
+        "A new product starts with a production environment. Beta, staging and dev environments can be added, each with its own site ID, server secret, origins and snippet.",
+        "An environment's type is fixed and its name is editable.",
+        "Environments are isolated within a customer: every event belongs to exactly one environment, dev traffic never reaches production's data, and one environment's site ID, secret or receipt never works for another."
       ],
       "decisions": [
         "Customer auth uses Supabase Auth in a dedicated project, separate from the research app's accounts. The collector schema moves to that project.",
-        "The dashboard is a Next.js app in dashboard/ in this repository, deployed as a second Vercel project."
+        "The dashboard is a Next.js app in dashboard/ in this repository, deployed as a second Vercel project.",
+        "The hierarchy is account, product, environment. A company is one account for now, because teams and roles are outside the MVP.",
+        "Each environment has a fixed type of production, beta, staging or dev, and a product has at most one of each, so production can be the default view."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-01, local only: 95/95 tests pass on memory and Postgres stores, with the Postgres owner API suite running as the restricted database role. They cover isolation between customers and between environments, encrypted secrets, Supabase token rejection, a migration test that keeps site IDs and secrets, and an imported operator site completing online verification. The environments migration has not been applied to the dedicated Supabase project. Not done: the hosted collector has not moved, so existing installs have not been verified through the real migration."
     },
     {
       "id": "feat-003",
       "name": "Signup, add product and install instructions",
       "description": "Self-service flow: sign up, add a product with its exact permitted origins, then copy script or package instructions for the chosen integration.",
       "dependencies": ["feat-002"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Owners can sign up, sign in, recover their account and sign out without operator help.",
-        "Each product gets a generated public installation identifier; any server credential is separate and labelled server-only.",
+        "Each environment gets a generated public installation identifier; any server credential is separate and labelled server-only.",
         "Invalid or unapproved origins fail clearly.",
         "Secrets never appear in the browser bundle or public snippet.",
         "The DNS TXT check is implemented and tested, unverified domains are labelled, and a domain cannot have two verified owners.",
@@ -56,7 +61,7 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-01, local only: 6/6 Playwright tests pass in Chromium and WebKit against a local Supabase stack, covering sign-up with email confirmation, sign-in, password reset, sign-out, invalid origins, a generated snippet recording a declaration from a real separate origin, customer isolation in the UI, rotation and revoke-now. API tests cover the 24-hour overlap and one verified owner per domain. Real DNS lookups were checked, but no real domain has been verified end to end. Not done: the dashboard is not deployed, and hosted Supabase email and redirects are not configured."
     },
     {
       "id": "feat-004",
@@ -123,7 +128,7 @@
     {
       "id": "feat-007",
       "name": "Product-owner dashboard",
-      "description": "Overview, recent-session list with date and product filters, and session timeline built on real collected data, showing provenance and coverage limits in plain language.",
+      "description": "Overview, recent-session list with date and product filters, and session timeline built on real collected data for one environment at a time, showing provenance and coverage limits in plain language.",
       "dependencies": ["feat-004", "feat-006"],
       "status": "not-started",
       "acceptance": [
@@ -133,10 +138,13 @@
         "Customer isolation holds at the API as well as the UI.",
         "Empty, loading, disconnected and error states are covered.",
         "Unclassified sessions stay unknown and are never labelled human.",
-        "Every signal stays visible, and conflicting signals are shown rather than resolved."
+        "Every signal stays visible, and conflicting signals are shown rather than resolved.",
+        "An environment switcher defaults to production and keeps the choice in the URL, and each environment's analytics are shown separately.",
+        "Customers can add an environment and copy its snippet from the dashboard."
       ],
       "decisions": [
-        "Sessions show Verified signer, Declared AI, Declared person, Suspected automation or Unknown, with no numeric score."
+        "Sessions show Verified signer, Declared AI, Declared person, Suspected automation or Unknown, with no numeric score.",
+        "Side-by-side environment comparison is out of scope for the MVP."
       ],
       "openDecisions": [],
       "evidence": ""

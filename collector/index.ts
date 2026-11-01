@@ -11,11 +11,24 @@ import {
   verifyDeclaration,
   type SiteConfig,
 } from "../src/server/tokens.js";
+import { bearer, body, eventLimit, HttpError } from "./http.js";
+import { handleOwnerRequest, type OwnerApiOptions } from "./owner-api.js";
+import {
+  activeSecrets,
+  secretFingerprint,
+  staticDirectory,
+  type Site,
+  type SiteDirectory,
+} from "./products.js";
 import type { CollectorStore, StoredSession } from "./store.js";
 
 export type { SiteConfig } from "../src/server/tokens.js";
 export interface CollectorOptions {
-  sites: SiteConfig[];
+  /** Fixed sites for tests and local fixtures. Deployments use `directory`. */
+  sites?: SiteConfig[];
+  directory?: SiteDirectory;
+  /** Enables the customer API. Without it, owner routes do not exist. */
+  owners?: OwnerApiOptions;
   store: CollectorStore;
   now?: () => Date;
   pruneSecret?: string;
@@ -30,15 +43,6 @@ export interface CollectorOptions {
     maxDeclarations: number;
   };
 }
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-const MAX_BODY = 8192;
 const SESSION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PUBLIC_PATHS = new Map<string, string[]>([
   ["/v1/sessions", ["POST"]],
@@ -46,56 +50,6 @@ const PUBLIC_PATHS = new Map<string, string[]>([
   ["/v1/declarations", ["POST"]],
 ]);
 
-function bearer(request: Request): string {
-  const value = request.headers.get("authorization") ?? "";
-  const match = /^Bearer ([^\s]{1,2048})$/i.exec(value);
-  if (!match) throw new HttpError(401, "Authentication required");
-  return match[1]!;
-}
-async function body(request: Request, allowedKeys: string[]): Promise<Record<string, unknown>> {
-  if (
-    request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() !== "application/json"
-  ) {
-    throw new HttpError(415, "Content-Type must be application/json");
-  }
-  const length = request.headers.get("content-length");
-  if (length !== null && (!/^\d+$/.test(length) || Number(length) > MAX_BODY)) {
-    throw new HttpError(413, "Request body too large");
-  }
-  if (!request.body) throw new HttpError(400, "A JSON object is required");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    for (;;) {
-      const result = await reader.read();
-      if (result.done) break;
-      size += result.value.byteLength;
-      if (size > MAX_BODY) {
-        await reader.cancel();
-        throw new HttpError(413, "Request body too large");
-      }
-      chunks.push(result.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw new HttpError(400, "A valid JSON object is required");
-  }
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    Array.isArray(parsed) ||
-    Object.keys(parsed).some((key) => !allowedKeys.includes(key))
-  ) {
-    throw new HttpError(400, "Unexpected request fields");
-  }
-  return parsed as Record<string, unknown>;
-}
 function status(session: StoredSession): SessionStatus {
   return {
     sessionId: session.id,
@@ -117,13 +71,15 @@ function boundedInteger(value: number, min: number, max: number, label: string):
 export function createCollector(
   options: CollectorOptions,
 ): (request: Request) => Promise<Response> {
-  const sites = new Map<string, SiteConfig>();
-  for (const site of options.sites) {
+  const fixed = options.sites ?? [];
+  const seen = new Set<string>();
+  for (const site of fixed) {
     validateSite(site);
-    if (sites.has(site.id)) throw new Error("Duplicate site id");
-    sites.set(site.id, { ...site, origins: [...site.origins] });
+    if (seen.has(site.id)) throw new Error("Duplicate site id");
+    seen.add(site.id);
   }
-  if (!sites.size) throw new Error("At least one site is required");
+  if (!seen.size && !options.directory) throw new Error("At least one site is required");
+  const directory = options.directory ?? staticDirectory(fixed);
   if (options.production && options.store.kind !== "postgres") {
     throw new Error("Production requires persistent Postgres storage");
   }
@@ -144,12 +100,11 @@ export function createCollector(
   boundedInteger(rate.windowSeconds, 1, 3600, "rate window");
   boundedInteger(rate.maxSessions, 1, 10000, "session rate limit");
   boundedInteger(rate.maxDeclarations, 1, 10000, "declaration rate limit");
-  const allOrigins = new Set([...sites.values()].flatMap((site) => site.origins));
   let nextPruneAt = 0;
 
   async function limited(
     request: Request,
-    site: SiteConfig,
+    site: Site,
     category: "sessions" | "declarations",
     now: number,
   ): Promise<void> {
@@ -169,19 +124,27 @@ export function createCollector(
     );
     if (!allowed) throw new HttpError(429, "Too many requests; try again later");
   }
-  function siteFor(id: unknown, origin: string | null): SiteConfig {
-    const site = isSiteId(id) ? sites.get(id) : undefined;
+  async function lookup(id: unknown): Promise<Site | null> {
+    return isSiteId(id) ? directory.find(id) : null;
+  }
+  async function siteFor(id: unknown, origin: string | null): Promise<Site> {
+    const site = await lookup(id);
     if (!site || !origin || !site.origins.includes(origin)) {
       throw new HttpError(403, "Site or origin is not allowed");
     }
     return site;
   }
+  function holdsSecret(request: Request, site: Site | null, now: number): site is Site {
+    if (!site) return false;
+    const token = bearer(request);
+    return activeSecrets(site, now).some((secret) => secretEquals(token, secret));
+  }
   async function authenticated(
     request: Request,
     now: number,
     allowRevoked = false,
-  ): Promise<{ site: SiteConfig; session: StoredSession }> {
-    const site = siteFor(request.headers.get("x-agent-site"), request.headers.get("origin"));
+  ): Promise<{ site: Site; session: StoredSession }> {
+    const site = await siteFor(request.headers.get("x-agent-site"), request.headers.get("origin"));
     const token = bearer(request);
     if (!SESSION_TOKEN.test(token)) throw new HttpError(401, "Invalid or expired session");
     const session = await store.getSession(hashToken(token));
@@ -205,9 +168,6 @@ export function createCollector(
       "x-content-type-options": "nosniff",
     });
     const publicRoute = PUBLIC_PATHS.get(url.pathname);
-    if (publicRoute && origin && allOrigins.has(origin)) {
-      headers.set("access-control-allow-origin", origin);
-    }
     const respond = (payload: unknown, code = 200): Response => {
       const responseHeaders = new Headers(headers);
       if (code !== 204) responseHeaders.set("content-type", "application/json; charset=utf-8");
@@ -219,6 +179,8 @@ export function createCollector(
     try {
       const now = clock().getTime();
       if (!Number.isFinite(now)) throw new Error("Invalid collector clock");
+      const knownOrigin = publicRoute && origin ? await directory.hasOrigin(origin) : false;
+      if (knownOrigin) headers.set("access-control-allow-origin", origin!);
       if (url.pathname === "/health" && request.method === "GET") {
         await store.checkHealth();
         return respond({ ok: true, version: VERSION, storage: store.kind });
@@ -226,23 +188,19 @@ export function createCollector(
       if (url.pathname === "/v1/events") {
         if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
         if (origin !== null) throw new HttpError(403, "Events require a server-to-server request");
-        const site = sites.get(url.searchParams.get("siteId") ?? "");
-        if (!site || !secretEquals(bearer(request), site.secret)) {
+        const site = await lookup(url.searchParams.get("siteId"));
+        if (!holdsSecret(request, site, now)) {
           throw new HttpError(401, "Invalid site credentials");
         }
-        const limitValue = url.searchParams.get("limit") ?? "100";
-        if (!/^\d+$/.test(limitValue) || Number(limitValue) < 1 || Number(limitValue) > 1000) {
-          throw new HttpError(400, "Limit must be 1–1000");
-        }
-        return respond({ events: await store.listEvents(site.id, Number(limitValue)) });
+        return respond({ events: await store.listEvents(site.id, eventLimit(url)) });
       }
       if (url.pathname === "/v1/verify") {
         if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
         if (origin !== null)
           throw new HttpError(403, "Verification requires a server-to-server request");
         const data = await body(request, ["siteId", "origin", "sessionBinding", "receipt"]);
-        const site = sites.get(typeof data.siteId === "string" ? data.siteId : "");
-        if (!site || !secretEquals(bearer(request), site.secret)) {
+        const site = await lookup(data.siteId);
+        if (!holdsSecret(request, site, now)) {
           throw new HttpError(401, "Invalid site credentials");
         }
         if (
@@ -253,17 +211,21 @@ export function createCollector(
         )
           throw new HttpError(400, "Invalid verification request");
         let claims;
-        try {
-          claims = verifyDeclaration(data.receipt, {
-            siteId: site.id,
-            origin: data.origin,
-            sessionBinding: data.sessionBinding,
-            secret: site.secret,
-            now: new Date(now),
-          });
-        } catch {
-          throw new HttpError(401, "Declaration is invalid or expired");
+        for (const secret of activeSecrets(site, now)) {
+          try {
+            claims = verifyDeclaration(data.receipt, {
+              siteId: site.id,
+              origin: data.origin,
+              sessionBinding: data.sessionBinding,
+              secret,
+              now: new Date(now),
+            });
+            break;
+          } catch {
+            // During a rotation the receipt may belong to the other active secret.
+          }
         }
+        if (!claims) throw new HttpError(401, "Declaration is invalid or expired");
         const session = await store.getSessionById(claims.sessionId);
         if (
           !session ||
@@ -305,8 +267,17 @@ export function createCollector(
         }
         return respond({ removedSessions: total, removedRateBuckets: totalRateBuckets, more });
       }
+      if (options.owners && url.pathname.startsWith("/v1/owner/")) {
+        return await handleOwnerRequest(request, url, {
+          owners: options.owners,
+          store,
+          directory,
+          now,
+          respond,
+        });
+      }
       if (!publicRoute) throw new HttpError(404, "Not found");
-      if (!origin || !allOrigins.has(origin)) throw new HttpError(403, "Origin is not allowed");
+      if (!origin || !knownOrigin) throw new HttpError(403, "Origin is not allowed");
       if (request.method === "OPTIONS") {
         const intended = request.headers.get("access-control-request-method");
         const requestedHeaders = (request.headers.get("access-control-request-headers") ?? "")
@@ -336,25 +307,32 @@ export function createCollector(
       }
       if (url.pathname === "/v1/sessions") {
         const data = await body(request, ["siteId", "bindingContext"]);
-        const site = siteFor(data.siteId, origin);
+        const site = await siteFor(data.siteId, origin);
         await limited(request, site, "sessions", now);
         let bindingHash: string | null = null;
+        let signingSecretHash: string | null = null;
         let expiresAt = Math.floor(now / 1000) * 1000 + ttl * 1000;
         if (data.bindingContext !== undefined) {
           if (typeof data.bindingContext !== "string")
             throw new HttpError(400, "Invalid binding context");
-          try {
-            const claims = verifyBindingContext(data.bindingContext, {
-              siteId: site.id,
-              origin,
-              secret: site.secret,
-              now: new Date(now),
-            });
-            bindingHash = claims.bindingHash;
-            expiresAt = Math.min(expiresAt, claims.exp * 1000);
-          } catch {
-            throw new HttpError(400, "Invalid or expired binding context");
+          let claims;
+          for (const secret of activeSecrets(site, now)) {
+            try {
+              claims = verifyBindingContext(data.bindingContext, {
+                siteId: site.id,
+                origin,
+                secret,
+                now: new Date(now),
+              });
+              signingSecretHash = secretFingerprint(secret);
+              break;
+            } catch {
+              // During a rotation the context may use the other active secret.
+            }
           }
+          if (!claims) throw new HttpError(400, "Invalid or expired binding context");
+          bindingHash = claims.bindingHash;
+          expiresAt = Math.min(expiresAt, claims.exp * 1000);
         }
         const sessionToken = randomBytes(32).toString("base64url");
         const session: StoredSession = {
@@ -363,6 +341,7 @@ export function createCollector(
           origin,
           tokenHash: hashToken(sessionToken),
           bindingHash,
+          signingSecretHash,
           createdAt: now,
           expiresAt,
           revokedAt: null,
@@ -386,6 +365,12 @@ export function createCollector(
       }
       await limited(request, site, "declarations", now);
       const eventId = randomUUID();
+      // A customer's server checks receipts with its own secret, so a session bound by
+      // a not-yet-replaced secret must be answered with that same secret.
+      const signingSecret =
+        activeSecrets(site, now).find(
+          (secret) => secretFingerprint(secret) === session.signingSecretHash,
+        ) ?? site.secret;
       const receipt = mintDeclaration(
         {
           siteId: site.id,
@@ -397,7 +382,7 @@ export function createCollector(
           iat: Math.floor(now / 1000),
           exp: Math.floor(session.expiresAt / 1000),
         },
-        site.secret,
+        signingSecret,
       );
       const outcome = await store.recordDeclaration({
         tokenHash: session.tokenHash,

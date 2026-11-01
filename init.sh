@@ -26,19 +26,36 @@ if [ "$current_node" != "$required_node" ]; then
 fi
 
 # npm ci deletes node_modules, so run it only when the lockfile has changed.
-if [ node_modules/.package-lock.json -nt package-lock.json ]; then
-  echo "=== Dependencies up to date ==="
-else
-  echo "=== npm ci ==="
-  npm ci
-fi
+install_if_needed() {
+  if [ "$1/node_modules/.package-lock.json" -nt "$1/package-lock.json" ]; then
+    echo "=== Dependencies up to date ($1) ==="
+  else
+    echo "=== npm ci ($1) ==="
+    (cd "$1" && npm ci)
+  fi
+}
+install_if_needed .
+install_if_needed dashboard
 
 echo "=== npm run check ==="
 npm run check
 
+echo "=== dashboard checks ==="
+(cd dashboard && npm run typecheck && npm run lint && npm test)
+
 if [ "$full" = true ]; then
   echo "=== npm run test:e2e (chromium, webkit) ==="
   npm run test:e2e -- --project=chromium --project=webkit
+
+  echo "=== dashboard build ==="
+  (cd dashboard && npm run build)
+
+  if supabase status >/dev/null 2>&1; then
+    echo "=== dashboard e2e (chromium, webkit) ==="
+    (cd dashboard && npm run test:e2e)
+  else
+    echo "=== dashboard e2e SKIPPED: local Supabase is not running (supabase start) ==="
+  fi
 fi
 
 echo "=== Verification Complete ==="

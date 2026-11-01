@@ -20,6 +20,7 @@ function makeSession(): StoredSession {
     origin: "https://postgres.test",
     tokenHash: hashToken(randomUUID()),
     bindingHash: null,
+    signingSecretHash: null,
     createdAt: time,
     expiresAt: time + 1800000,
     revokedAt: null,
@@ -52,6 +53,24 @@ before(async () => {
   );
   assert(migration.startsWith(schema), "Deployment migration must use the tested collector schema");
   await db.exec(migration);
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261101120000_add_customer_products.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261101130000_add_domain_claims.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261101140000_add_environments.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );
