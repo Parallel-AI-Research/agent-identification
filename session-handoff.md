@@ -3,32 +3,34 @@
 ## Current Objective
 
 - Goal: Build the analytics MVP in `feature_list.json` order.
-- Current status: Harness added. No MVP feature has started.
-- Branch / commit: `chore/agent-harness`, based on `a036c42`.
+- Current status: Product decisions recorded. No MVP feature has started.
+- Branch / commit: based on `185e4d0`.
 
 ## Completed This Session
 
-- [x] Added the agent harness (`feat-001`).
+- [x] Resolved the open product decisions with the owner, except numeric pilot targets.
+- [x] Created a dedicated Supabase project for the customer product.
 
 ## Verification Evidence
 
-| Check             | Command                | Result  | Notes                           |
-| ----------------- | ---------------------- | ------- | ------------------------------- |
-| Repository checks | `./init.sh`            | Pass    | 60/60 tests                     |
-| Browser suite     | `./init.sh --full`     | Pass    | 48/48, Chromium and WebKit only |
-| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only           |
+| Check             | Command                | Result  | Notes                                  |
+| ----------------- | ---------------------- | ------- | -------------------------------------- |
+| Repository checks | `./init.sh`            | Pass    | 60/60 tests                            |
+| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                  |
+| Supabase project  | `supabase projects`    | Healthy | Empty; the collector has not moved yet |
 
 ## Files Changed
 
-- `AGENTS.md`, `CLAUDE.md`, `feature_list.json`, `init.sh`, `progress.md`, `session-handoff.md`
+- `feature_list.json`, `progress.md`, `session-handoff.md`
 
 ## Decisions Made
 
-- See `progress.md`.
+- See `decisions` in `feature_list.json` and the list in `progress.md`.
 
 ## Blockers / Risks
 
-- `feat-002` needs the owner to choose the customer auth mechanism and the dashboard framework and location.
+- `feat-009` stays blocked until a baseline run gives it numeric targets.
+- Moving the collector schema must keep the demo, trial and ticket-app installs working.
 
 ## Next Session Startup
 
@@ -39,4 +41,4 @@
 
 ## Recommended Next Step
 
-- Ask the owner for the two `feat-002` decisions, then record them in `feature_list.json` and set the feature to `not-started`.
+- Start `feat-002`, beginning with moving sites from the `AGENT_ID_SITES` environment variable into the database.
