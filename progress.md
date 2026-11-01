@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** `feat-002` and `feat-003`. Both are live and need one real signup to finish.
+**Active Feature:** `feat-003`. `feat-002` is done. The first real signup worked and found two dashboard bugs, whose fixes need deploying.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -21,11 +21,11 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 
 ### What's In Progress
 
-- [ ] The first real signup through the hosted dashboard, which the owner will do with their own account.
+- [ ] Deploying the two dashboard fixes, then confirming the generated snippet on a real customer site.
 
 ### What's Next
 
-1. After that signup, mark `feat-002` and `feat-003` done, or fix what it reveals.
+1. Merge and deploy the dashboard fixes, confirm a declaration from a real site, then mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks.
 3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
 
@@ -83,8 +83,9 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] Moved sites: each secret and origin matched the previous live collector, and stored secrets are encrypted.
 - [x] A forged token was rejected with 401, which shows the collector reaches Supabase's signing keys.
 - [x] Published SDK files match the frozen `0.1.0` release.
-- [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 8/8 dashboard journey tests.
-- [ ] Not run: a real signup on the hosted dashboard, a real domain verified end to end, and any trial of an agent using this harness.
+- [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 10/10 dashboard journey tests.
+- [x] First real account: signed up, confirmed its email, signed in and created a product on the hosted service.
+- [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session
 

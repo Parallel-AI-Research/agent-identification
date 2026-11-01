@@ -3,7 +3,7 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector and dashboard are live. No real account has used them yet.
+- Current status: The hosted collector and dashboard are live, and the first real account has created a product. Two dashboard fixes are not deployed yet.
 - Branch / commit: `docs/production-move`, based on `f9397a7`.
 
 ## Completed This Session
@@ -31,7 +31,7 @@
 ## Blockers / Risks
 
 - The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
-- No real account has completed the hosted journey.
+- The generated snippet has not recorded a declaration on a real customer site yet.
 
 ## Next Session Startup
 
@@ -42,4 +42,4 @@
 
 ## Recommended Next Step
 
-- Ask how the owner's first hosted signup went. If it worked, mark `feat-002` and `feat-003` done and start `feat-004`.
+- Deploy the merged dashboard fixes, confirm a declaration from a real site, then mark `feat-003` done and start `feat-004`.

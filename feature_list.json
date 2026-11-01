@@ -21,7 +21,7 @@
       "name": "Customer, product and environment ownership",
       "description": "Replace operator-only site provisioning with persisted ownership in the hierarchy account, product, environment, enforced on every product, environment, settings and telemetry query. Each environment holds its own site ID, server secret and allowed origins, so production, beta, staging and dev analytics stay separate.",
       "dependencies": ["feat-001"],
-      "status": "in-progress",
+      "status": "done",
       "acceptance": [
         "Two independent customers can create products and receive different configuration.",
         "Neither customer can read or modify the other's products, environments or telemetry, at the API as well as the UI.",
@@ -39,7 +39,7 @@
         "Each environment has a fixed type of production, beta, staging or dev, and a product has at most one of each, so production can be the default view."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01, hosted: the live collector now loads sites from the dedicated Supabase project. Hosted smoke checks passed (12 checks, 10/10 sessions revoked) using the existing ticket-app site, including bound verification with its unchanged secret. Each imported site's secret and origins were confirmed to match the previous live collector, and published SDK files match the frozen release. Locally, 108/108 tests pass, with the owner API suite also running through the real Postgres driver as the restricted role, covering isolation between customers and between environments. Not done: no real customer account has created a product on the hosted service."
+      "evidence": "2026-11-01, hosted: the live collector now loads sites from the dedicated Supabase project. Hosted smoke checks passed (12 checks, 10/10 sessions revoked) using the existing ticket-app site, including bound verification with its unchanged secret. Each imported site's secret and origins were confirmed to match the previous live collector, and published SDK files match the frozen release. Locally, 108/108 tests pass, with the owner API suite also running through the real Postgres driver as the restricted role, covering isolation between customers and between environments. The first real customer account then created a product on the hosted service, which stored one production environment and its origins."
     },
     {
       "id": "feat-003",
@@ -61,7 +61,7 @@
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 8/8 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. Not done: no real account has completed the hosted journey, and no real domain has been verified end to end. Custom email is still needed before external testers."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, now fixed but not yet deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. Not done: the fixes are not deployed, the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
     },
     {
       "id": "feat-004",
