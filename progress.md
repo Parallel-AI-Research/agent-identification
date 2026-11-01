@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** `feat-003`. `feat-002` is done. The first real signup worked and found two dashboard bugs, whose fixes need deploying.
+**Active Feature:** `feat-003`. `feat-002` is done. The first real signup worked, and the two bugs it found are fixed and deployed.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -21,13 +21,14 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 
 ### What's In Progress
 
-- [ ] Deploying the two dashboard fixes, then confirming the generated snippet on a real customer site.
+- [ ] Deploying the agent setup panel, and confirming the generated snippet on a real customer site.
 
 ### What's Next
 
-1. Merge and deploy the dashboard fixes, confirm a declaration from a real site, then mark `feat-003` done.
+1. Merge and deploy the agent setup panel, confirm a declaration from a real site, then mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks.
-3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
+3. Build `feat-011`, starting by moving the dashboard to `/dashboard` before more links depend on `/products`.
+4. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
 
 ## Blockers / Risks
 

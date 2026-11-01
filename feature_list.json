@@ -54,14 +54,39 @@
         "Secrets never appear in the browser bundle or public snippet.",
         "The DNS TXT check is implemented and tested, unverified domains are labelled, and a domain cannot have two verified owners.",
         "No pre-populated customer account, site ID, key or domain allowlist ships with onboarding.",
-        "Secret rotation works without an outage, and revoke-now ends the old secret immediately."
+        "Secret rotation works without an outage, and revoke-now ends the old secret immediately.",
+        "Install instructions include a panel of setup instructions for a customer's coding agent, generated for that product and holding only public values."
       ],
       "decisions": [
         "Domain control uses a DNS TXT record and does not block events. A domain shows as unverified until the check passes, and each domain has one verified owner.",
         "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, now fixed but not yet deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. Not done: the fixes are not deployed, the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, both fixed and deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. The copy fallback was confirmed on the live site in a browser that denies clipboard access. Not done: the agent setup panel is not deployed, the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
+    },
+    {
+      "id": "feat-011",
+      "name": "Public site, docs and changelog",
+      "description": "Give the product a public home: a landing page, documentation with a sidebar, search and on-page contents, and a changelog for releases and new features. The signed-in dashboard moves under /dashboard.",
+      "dependencies": ["feat-002"],
+      "status": "not-started",
+      "acceptance": [
+        "/ is a public landing page that explains what the product does and what it can't do.",
+        "/docs has a sidebar, search and on-page contents, and needs no sign-in.",
+        "/changelog lists releases and new features, one page per update, and needs no sign-in.",
+        "Docs and changelog posts are files in the repository, so a new post is a small pull request.",
+        "Products, analytics and settings move under /dashboard, and existing /products links redirect there.",
+        "Only /dashboard requires sign-in, and creating a product still requires an account.",
+        "Docs are also published in a form coding agents can read, such as llms.txt.",
+        "Docs keep the product's limits clear: a declaration is self-reported, not detection or verified identity."
+      ],
+      "decisions": [
+        "The public site, docs and changelog live in the dashboard app, using Fumadocs.",
+        "Reading, learning and trying a demo need no account. Creating a product does, because a site ID must belong to someone.",
+        "The site can launch on its vercel.app address, and a custom domain can follow."
+      ],
+      "openDecisions": [],
+      "evidence": ""
     },
     {
       "id": "feat-004",

@@ -7,6 +7,7 @@ import {
   type Environment,
   type Product,
 } from "@/lib/collector";
+import { AgentSetup } from "./agent-setup";
 import { DomainList } from "./domain-list";
 import { InstallTabs } from "./install-tabs";
 import { OriginsForm } from "./origins-form";
@@ -28,6 +29,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     if (error instanceof CollectorError && error.status === 404) notFound();
     throw error;
   }
+  const install = { siteId: environment.siteId, collectorUrl: process.env.COLLECTOR_URL! };
   return (
     <div className="space-y-6">
       <div>
@@ -43,9 +45,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           Add this to your site. It records what visitors choose to declare, so it can&apos;t detect
           every agent or prove who a visitor is.
         </p>
-        <InstallTabs
-          values={{ siteId: environment.siteId, collectorUrl: process.env.COLLECTOR_URL! }}
-        />
+        <InstallTabs values={install} />
+        <AgentSetup values={install} origins={environment.origins} />
       </Card>
       <Card>
         <h2 className="font-semibold">Website origins</h2>

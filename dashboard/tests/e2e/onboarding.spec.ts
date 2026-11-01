@@ -81,6 +81,12 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   expect(siteId).toBeTruthy();
   expect(snippet).not.toContain("YOUR-SITE-ID");
 
+  await page.getByText("Set this up with your coding agent").click();
+  const instructions = page.locator("details pre code");
+  await expect(instructions).toContainText(siteId!);
+  await expect(instructions).toContainText("Response recorded");
+  await expect(instructions).not.toContainText(secret);
+
   // The generated snippet works from a real server on the customer's own origin.
   const website = createServer((_, response) => {
     response.writeHead(200, { "content-type": "text/html" });
