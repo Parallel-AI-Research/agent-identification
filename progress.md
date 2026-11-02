@@ -18,7 +18,7 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [x] Dedicated Supabase project migrated, with the existing sites imported unchanged.
 - [x] Hosted collector moved to the new code and database, and hosted smoke checks passed.
 - [x] Dashboard deployed at https://parallel-agent-dashboard.vercel.app, with Supabase redirects set.
-- [x] Removed the collector's demo page, its React copy and the local `public-demo` site. The hosted page stays up until the next collector deploy.
+- [x] Removed the collector's demo page, its React copy and the local `public-demo` site, and deployed the change on 2 November. The live collector's root URL now returns 404.
 
 ### What's In Progress
 
@@ -27,7 +27,7 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 ### What's Next
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
-2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site, once the demo removal is deployed.
+2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
 3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
 
 ## Blockers / Risks
@@ -87,6 +87,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 ## Evidence of Completion
 
 - [x] Hosted smoke checks: 12 checks passed against the live address, with 10/10 sessions revoked.
+- [x] After the demo removal on 2 November, hosted smoke checks passed 9 checks, with 7/7 sessions revoked. The cross-origin fixture check still covers the widget's reset.
 - [x] Moved sites: each secret and origin matched the previous live collector, and stored secrets are encrypted.
 - [x] A forged token was rejected with 401, which shows the collector reaches Supabase's signing keys.
 - [x] Published SDK files match the frozen `0.1.0` release.

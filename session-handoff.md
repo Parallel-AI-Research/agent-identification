@@ -14,11 +14,11 @@
 
 ## Verification Evidence
 
-| Check             | Command                | Result  | Notes                             |
-| ----------------- | ---------------------- | ------- | --------------------------------- |
-| Hosted collector  | `npm run smoke:hosted` | Pass    | 12 checks, 10/10 sessions revoked |
-| Collector         | `npm test`             | Pass    | 108/108                           |
-| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only             |
+| Check             | Command                | Result  | Notes                                        |
+| ----------------- | ---------------------- | ------- | -------------------------------------------- |
+| Hosted collector  | `npm run smoke:hosted` | Pass    | 9 checks, 7/7 sessions revoked on 2 November |
+| Collector         | `npm test`             | Pass    | 108/108                                      |
+| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                        |
 
 ## Files Changed
 
@@ -32,7 +32,7 @@
 
 - The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
 - The generated snippet has not recorded a declaration on a real customer site yet.
-- The hosted collector keeps serving the old demo page until its next deploy. After that, `npm run smoke:hosted` runs 9 checks rather than 12, and the widget reset is covered by the local browser tests only.
+- The unused `public-demo` site is still in the hosted database, waiting for the owner's cleanup decision.
 
 ## Next Session Startup
 
