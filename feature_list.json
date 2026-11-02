@@ -215,7 +215,7 @@
         "Detection targets are set after a small baseline run and frozen before the measured pilot."
       ],
       "openDecisions": [
-        "Numeric detection, coverage and false-positive targets, set from the baseline run"
+        "Numeric detection, coverage and false-positive targets, set from the baseline run. The owner's goal is 90–100% identification; what that share is measured against needs defining before any customer is told it."
       ],
       "evidence": ""
     },
@@ -234,6 +234,26 @@
       ],
       "decisions": [],
       "openDecisions": [],
+      "evidence": ""
+    },
+    {
+      "id": "feat-012",
+      "name": "Agent-only delivery",
+      "description": "Offer the declaration to agents through the channels they read, without human visitors seeing it: an off-screen element for agents that read page text or the accessibility tree, the full prompt only for browsers that show automation signals, instructions in the HTML only for known agent fetchers, and a WebMCP tool. Record which channel offered it and which got an answer.",
+      "dependencies": ["feat-005"],
+      "status": "blocked",
+      "acceptance": [
+        "Human visitors in an ordinary browser never see the widget.",
+        "Each channel records when it offers the declaration and when it gets an answer, so coverage is reported per channel.",
+        "Coverage comes from real-agent trials, and agents that show no signals are reported as missed, not assumed covered.",
+        "Install instructions, docs and the coding-agent prompt no longer put a visible prompt in front of every visitor.",
+        "It ships as a new SDK version, and published v0.1.0 assets stay unchanged."
+      ],
+      "decisions": ["The widget is for agents. Human visitors must never see it."],
+      "openDecisions": [
+        "Whether to build it. The owner decides.",
+        "Whether screen reader users may hear the off-screen element, or agents that read the accessibility tree go without it."
+      ],
       "evidence": ""
     }
   ]
