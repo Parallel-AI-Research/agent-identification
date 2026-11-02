@@ -520,3 +520,30 @@ test("an unconfirmed page view retries with the same ID, then reports and reject
     String(url).endsWith("/v1/page-views") ? json({ results: [] }) : json({}, 500);
   await assert.rejects(widget.pageView(), /did not confirm/);
 });
+
+test("automation signals are off by default, and opting in reports what the browser shows", async () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis.navigator, "webdriver");
+  Object.defineProperty(globalThis.navigator, "webdriver", { configurable: true, get: () => true });
+  disposables.push(() => {
+    if (previous) Object.defineProperty(globalThis.navigator, "webdriver", previous);
+    else Reflect.deleteProperty(globalThis.navigator, "webdriver");
+  });
+  let current = environment().options;
+  const signals: { id: string; signal: string; detail: string }[] = [];
+  globalThis.fetch = async (url, request) => {
+    if (String(url).endsWith("/v1/sessions")) {
+      return json({ ...status(current), sessionToken: token }, 201);
+    }
+    const sent = (JSON.parse(String(request!.body)) as { signals: typeof signals }).signals[0]!;
+    signals.push(sent);
+    return json({ results: [{ id: sent.id, status: "recorded" }] });
+  };
+  await mount(current).ready;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(signals.length, 0);
+  current = environment().options;
+  await mount({ ...current, automationSignals: true }).ready;
+  await until(() => signals.length === 1);
+  assert.equal(signals[0]!.signal, "webdriver");
+  assert.equal(signals[0]!.detail, "navigator.webdriver");
+});

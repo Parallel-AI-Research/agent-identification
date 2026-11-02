@@ -2,7 +2,7 @@ export interface InstallValues {
   siteId: string;
   collectorUrl: string;
 }
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 export function scriptSnippet({ siteId, collectorUrl }: InstallValues): string {
   return `<div id="visitor-choice"></div>

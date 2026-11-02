@@ -1,11 +1,14 @@
 import {
+  BROWSER_SIGNALS,
   isActionName,
+  isSignal,
   isOutcome,
   isReference,
   isRoutePattern,
   MAX_PATH,
   routePath,
   type Outcome,
+  type Signal,
 } from "../src/protocol.js";
 import { isUuid } from "../src/server/tokens.js";
 import { HttpError } from "./http.js";
@@ -116,6 +119,59 @@ export function actionInputs(value: unknown, now: number): ActionInput[] {
       accountRef: (item.accountRef as string | undefined) ?? null,
       sessionBinding: (binding as string | undefined) ?? null,
       occurredAt: time(item.occurredAt, now),
+    };
+  });
+}
+
+export interface SignalInput {
+  id: string;
+  signal: Signal;
+  detail: string | null;
+  occurredAt: string;
+  sessionBinding: string | null;
+}
+/** A page may report only what it can observe; a server may also report a user agent's claim. */
+export function signalInputs(
+  value: unknown,
+  now: number,
+  from: "browser" | "server",
+): SignalInput[] {
+  return list(value, "signals", 10).map((item) => {
+    fields(item, [
+      "id",
+      "signal",
+      "detail",
+      "occurredAt",
+      ...(from === "server" ? ["sessionBinding"] : []),
+    ]);
+    if (!isSignal(item.signal) || (from === "browser" && !BROWSER_SIGNALS.includes(item.signal))) {
+      throw new HttpError(
+        400,
+        `signal must be one of ${(from === "browser" ? BROWSER_SIGNALS : ["webdriver", "headless_browser", "agent_user_agent"]).join(", ")}`,
+      );
+    }
+    const detail = item.detail;
+    if (
+      detail !== undefined &&
+      detail !== null &&
+      (typeof detail !== "string" || !/^[\x20-\x7e]{1,100}$/.test(detail))
+    ) {
+      throw new HttpError(400, "detail must be short printable text");
+    }
+    const binding = item.sessionBinding;
+    if (
+      binding !== undefined &&
+      binding !== null &&
+      (typeof binding !== "string" || binding.length < 1 || binding.length > 512)
+    ) {
+      throw new HttpError(400, "sessionBinding must be your server's own session binding");
+    }
+    return {
+      id: id(item.id),
+      signal: item.signal,
+      detail: (detail as string | undefined) ?? null,
+      occurredAt: time(item.occurredAt, now),
+      sessionBinding: (binding as string | undefined) ?? null,
     };
   });
 }

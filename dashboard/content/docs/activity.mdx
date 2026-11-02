@@ -7,14 +7,14 @@ Each session has one timeline. The widget adds page views, your server adds what
 
 ## Page views
 
-From SDK 0.4.0 the widget records a page view on each page load, whether or not the visitor answers. It sends the path only: no query string or fragment, and parts that look like IDs or email addresses are replaced with `:id`. The collector masks every path again itself.
+Since SDK 0.4.0 the widget records a page view on each page load, whether or not the visitor answers. It sends the path only: no query string or fragment, and parts that look like IDs or email addresses are replaced with `:id`. The collector masks every path again itself.
 
 If your paths hold other personal details, give your own route pattern, such as `/tickets/:id`:
 
 ```html
 <script
   defer
-  src="…/sdk/v0.4.0/agent-id.js"
+  src="…/sdk/v0.5.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-route="/tickets/:id"
 ></script>
@@ -66,6 +66,19 @@ curl https://parallel-agent-identification.vercel.app/v1/actions \
   -H "Authorization: Bearer $AGENT_ID_SITE_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"siteId":"YOUR-SITE-ID","actions":[{"id":"8d4f…","action":"ticket.update","outcome":"confirmed","occurredAt":"2026-11-02T12:00:00Z"}]}'
+```
+
+## Automation signals
+
+Signals are evidence that a visitor is automated, for agents that neither sign nor answer. They never prove an AI agent: an automated browser might be an ordinary test script, and anyone can put an agent's name in a user agent. A session whose strongest evidence is a signal is labelled **Suspected automation**.
+
+- **From the page:** add `data-automation-signals="on"`, or pass `automationSignals: true`, and the widget reports whether the browser says it's automated (`navigator.webdriver`) or headless. It's off by default.
+- **From your server:** `reportRequestSignals(request, options)` reads the request's user agent. It reports a token that an AI agent or crawler publishes for itself, such as `ChatGPT-User` or `ClaudeBot`, and headless Chrome. It skips other requests without a network call.
+
+```ts
+import { reportRequestSignals } from "@parallel-research/agent-identification/server";
+
+void reportRequestSignals(request, { apiUrl, siteId, secret, sessionBinding });
 ```
 
 ## In the dashboard

@@ -415,3 +415,31 @@ test("page views can be turned off", async ({ page, request }) => {
   expect(sent).toEqual([]);
   expect(await pageViews(request, sessionId)).toEqual([]);
 });
+
+test("opting in reports this browser's automation as a signal, never as an agent", async ({
+  page,
+  request,
+}) => {
+  const sessionId = await load(page, "/plain/?signals=on");
+  const automated = await page.evaluate(() => navigator.webdriver);
+  const signals = async () => {
+    const response = await request.get(
+      `${api}/v1/activity?siteId=${siteId}&type=signal&sessionId=${sessionId}`,
+      { headers: { Authorization: `Bearer ${siteSecret}` } },
+    );
+    return ((await response.json()) as { events: { signal: string; evidence: string }[] }).events;
+  };
+  await expect.poll(async () => (await signals()).length).toBe(automated ? 1 : 0);
+  if (automated) {
+    expect(await signals()).toEqual([
+      expect.objectContaining({ signal: "webdriver", evidence: "browser_reported" }),
+    ]);
+  }
+  // Without opting in, nothing is sent. A new tab starts its own session.
+  const quiet = await load(await page.context().newPage(), "/plain/");
+  const response = await request.get(
+    `${api}/v1/activity?siteId=${siteId}&type=signal&sessionId=${quiet}`,
+    { headers: { Authorization: `Bearer ${siteSecret}` } },
+  );
+  expect(((await response.json()) as { events: unknown[] }).events).toEqual([]);
+});

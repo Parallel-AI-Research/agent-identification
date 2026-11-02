@@ -148,6 +148,12 @@ export default async function ActivityPage({
             </li>
           ))}
         </ul>
+        {overview.signals ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {overview.signals} automation {overview.signals === 1 ? "signal" : "signals"}: evidence
+            of automation, never proof of an AI agent.
+          </p>
+        ) : null}
         {overview.withoutSession.actions || overview.withoutSession.signedRequests ? (
           <p className="mt-3 text-sm text-muted-foreground">
             Your server also reported {overview.withoutSession.actions} actions and{" "}

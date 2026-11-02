@@ -8,6 +8,7 @@ import type {
   ActivityEvent,
   DeclarationEvent,
   PageViewEvent,
+  SignalEvent,
   SignatureEvent,
 } from "../src/protocol.js";
 
@@ -124,7 +125,8 @@ test("each session is counted once, with one label and every signal kept", async
     signedRequests: { verified: 2, unverified: 1 },
     actions: { attempted: 1, rejected: 0, confirmed: 2 },
     declarations: { ai_assistant: 1, person: 1, prefer_not_to_say: 1 },
-    withoutSession: { actions: 1, signedRequests: 1 },
+    signals: 0,
+    withoutSession: { actions: 1, signedRequests: 1, signals: 0 },
   });
   // Counts reconcile with the events they come from.
   assert.equal(overview.pageViews, recorded.filter((event) => event.type === "page_view").length);
@@ -156,4 +158,58 @@ test("a Person answer is a label of its own, and two signers are a conflict", ()
   assert.equal(byId.get(person)!.label, "declared_person");
   assert.deepEqual(byId.get(person)!.conflicts, []);
   assert.equal(byId.get(twice)!.conflicts.length, 1);
+});
+
+function flagged(
+  sessionId: string | null,
+  signal: SignalEvent["signal"],
+  detail: string | null,
+): SignalEvent {
+  const fromPage = sessionId !== null && signal !== "agent_user_agent";
+  return {
+    id: randomUUID(),
+    siteId,
+    sessionId,
+    origin: fromPage ? origin : null,
+    type: "signal",
+    source: fromPage ? "browser" : "server",
+    evidence: fromPage ? "browser_reported" : "host_reported",
+    occurredAt: at(2),
+    receivedAt: at(2),
+    accountRef: null,
+    signal,
+    detail,
+  };
+}
+
+test("automation signals suggest automation, never an AI agent, and a Person answer can't hide them", () => {
+  const [automated, claimed, person, declaredAi] = [
+    randomUUID(),
+    randomUUID(),
+    randomUUID(),
+    randomUUID(),
+  ];
+  const { overview, sessions } = summarize([
+    flagged(automated, "webdriver", null),
+    flagged(claimed, "agent_user_agent", "ChatGPT-User"),
+    declared(person, "person"),
+    flagged(person, "headless_browser", "HeadlessChrome"),
+    declared(declaredAi, "ai_assistant"),
+    flagged(declaredAi, "webdriver", null),
+    flagged(null, "agent_user_agent", "GPTBot"),
+  ]);
+  const byId = new Map(sessions.map((session) => [session.sessionId, session]));
+  assert.equal(byId.get(automated)!.label, "suspected_automation");
+  assert.deepEqual(byId.get(automated)!.automationSignals, ["webdriver"]);
+  assert.equal(byId.get(claimed)!.label, "suspected_automation");
+  assert.deepEqual(byId.get(claimed)!.automationSignals, ["agent_user_agent: ChatGPT-User"]);
+  assert.equal(byId.get(person)!.label, "suspected_automation");
+  assert.equal(byId.get(person)!.conflicts.length, 1);
+  // What an agent says about itself still outranks heuristics.
+  assert.equal(byId.get(declaredAi)!.label, "declared_ai");
+  assert.equal(overview.signals, 5);
+  assert.equal(overview.withoutSession.signals, 1);
+  for (const session of sessions) {
+    assert.notEqual(session.label, "verified_signer");
+  }
 });

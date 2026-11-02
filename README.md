@@ -22,7 +22,7 @@ on servers.
 <div id="visitor-choice"></div>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.4.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.5.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="optional"
@@ -40,7 +40,7 @@ To require a choice before using a section of the page:
 <form id="checkout"><!-- Your existing form --></form>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.4.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.5.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="required"
@@ -72,7 +72,7 @@ The collector serves a versioned npm tarball; npm registry publication is not
 required:
 
 ```sh
-npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.4.0.tgz
+npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.5.0.tgz
 ```
 
 ```js
@@ -177,7 +177,7 @@ For a restrictive Content Security Policy, allow the collector in `script-src`,
 `style-src` and `connect-src`. Use external integration scripts or your existing
 nonce policy. The widget uses an external stylesheet and requires no inline
 script/style exceptions. Its `styleUrl` can point to your own copy of the CSS.
-Versioned asset hashes are at `/sdk/v0.4.0/integrity.json`.
+Versioned asset hashes are at `/sdk/v0.5.0/integrity.json`.
 
 ## Development and operating the collector
 

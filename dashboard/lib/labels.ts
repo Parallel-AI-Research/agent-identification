@@ -33,6 +33,12 @@ export function describe(event: ActivityItem): string {
       return `Viewed ${event.route ?? event.path}`;
     case "action":
       return `${event.action} ${event.outcome}`;
+    case "signal":
+      return event.signal === "agent_user_agent"
+        ? `User agent claims to be ${event.detail ?? "an AI agent"}`
+        : event.signal === "webdriver"
+          ? "Automated browser (webdriver flag)"
+          : "Headless browser";
     case "signature":
       return event.result === "verified"
         ? `Signed by ${event.signer ?? "a verified signer"}${event.path ? ` on ${event.path}` : ""}`

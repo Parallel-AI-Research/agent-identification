@@ -135,14 +135,15 @@ export interface Analytics {
     signedRequests: { verified: number; unverified: number };
     actions: Outcomes;
     declarations: { ai_assistant: number; person: number; prefer_not_to_say: number };
-    withoutSession: { actions: number; signedRequests: number };
+    signals: number;
+    withoutSession: { actions: number; signedRequests: number; signals: number };
   };
   sessions: SessionSummary[];
 }
 /** One event on a session's timeline. Fields beyond the shared ones depend on its type. */
 export interface ActivityItem {
   id: string;
-  type: "declaration" | "page_view" | "action" | "signature";
+  type: "declaration" | "page_view" | "action" | "signature" | "signal";
   evidence: string;
   occurredAt: string;
   receivedAt: string;
@@ -160,4 +161,6 @@ export interface ActivityItem {
   signatureAgent?: string | null;
   result?: string;
   verifier?: string | null;
+  signal?: "webdriver" | "headless_browser" | "agent_user_agent";
+  detail?: string | null;
 }

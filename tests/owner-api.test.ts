@@ -23,6 +23,7 @@ import type {
   DeclarationEvent,
   PageViewEvent,
   RecordedDeclaration,
+  SignalEvent,
   SignatureEvent,
 } from "../src/protocol.js";
 
@@ -40,6 +41,7 @@ const MIGRATIONS = [
   "20261102130000_add_activity_events.sql",
   "20261102140000_add_signature_events.sql",
   "20261102150000_add_session_binding_index.sql",
+  "20261102160000_add_signal_events.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -732,6 +734,52 @@ for (const [kind, open] of stores) {
       assert.equal(other.overview.sessions, 0);
       assert.equal((await analytics(owners.alice, a, "?range=1y")).status, 400);
       assert.equal((await analytics(owners.bob, a)).status, 404);
+    });
+
+    test("automation signals round-trip as evidence from the page or the server", async () => {
+      const { create } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const at = new Date(time).toISOString();
+      const fromPage: SignalEvent = {
+        id: randomUUID(),
+        siteId: a.environment.siteId,
+        sessionId: randomUUID(),
+        origin,
+        type: "signal",
+        source: "browser",
+        evidence: "browser_reported",
+        occurredAt: at,
+        receivedAt: at,
+        accountRef: null,
+        signal: "webdriver",
+        detail: "navigator.webdriver",
+      };
+      const fromServer: SignalEvent = {
+        ...fromPage,
+        id: randomUUID(),
+        sessionId: null,
+        origin: null,
+        source: "server",
+        evidence: "host_reported",
+        signal: "agent_user_agent",
+        detail: "ChatGPT-User",
+      };
+      for (const event of [fromPage, fromServer]) {
+        assert.equal((await store.recordActivity(event)).status, "recorded");
+      }
+      for (const invalid of [
+        { ...fromPage, id: randomUUID(), signal: "agent_user_agent" },
+        { ...fromServer, id: randomUUID(), origin },
+        { ...fromServer, id: randomUUID(), evidence: "signature_verified" },
+      ] as SignalEvent[]) {
+        await assert.rejects(store.recordActivity(invalid), /Invalid activity event/);
+      }
+      const listed = await store.listActivity(a.environment.siteId, { limit: 10, type: "signal" });
+      assert.deepEqual(listed.map((event) => event.id).sort(), [fromPage.id, fromServer.id].sort());
+      assert.deepEqual(
+        listed.find((event) => event.id === fromServer.id),
+        fromServer,
+      );
     });
 
     test("activity is kept for 30 days, after its session has gone", async () => {

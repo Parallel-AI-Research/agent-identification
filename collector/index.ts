@@ -7,6 +7,7 @@ import {
   type ActionEvent,
   type PageViewEvent,
   type SessionStatus,
+  type SignalEvent,
 } from "../src/protocol.js";
 import {
   hashBinding,
@@ -30,7 +31,7 @@ import {
   type Site,
   type SiteDirectory,
 } from "./products.js";
-import { actionInputs, pageViewInputs } from "./collection.js";
+import { actionInputs, pageViewInputs, signalInputs } from "./collection.js";
 import { cdnVerdict, recordSignature, reference, signedRequest } from "./signatures.js";
 import type { CollectorStore, InstallSignal, StoredSession } from "./store.js";
 import { DEFAULT_SIGNERS, KeyDirectory, type Signer } from "./web-bot-auth.js";
@@ -74,6 +75,7 @@ const PUBLIC_PATHS = new Map<string, string[]>([
   ["/v1/sessions/current", ["GET", "DELETE"]],
   ["/v1/declarations", ["POST"]],
   ["/v1/page-views", ["POST"]],
+  ["/v1/browser-signals", ["POST"]],
 ]);
 
 function status(session: StoredSession): SessionStatus {
@@ -376,6 +378,44 @@ export function createCollector(
         }
         return respond({ results });
       }
+      if (url.pathname === "/v1/signals") {
+        if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
+        if (origin !== null) throw new HttpError(403, "Signals are reported server to server");
+        const data = await body(request, ["siteId", "signals"]);
+        const site = await lookup(data.siteId);
+        if (!site || !(await holdsSecret(request, site, now))) {
+          throw new HttpError(401, "Invalid site credentials");
+        }
+        const signals = signalInputs(data.signals, now, "server");
+        await limited(request, site, "actions", now);
+        const results = [];
+        for (const input of signals) {
+          const sessionId = input.sessionBinding
+            ? await store.findSessionByBinding(site.id, hashBinding(site.id, input.sessionBinding))
+            : null;
+          const event: SignalEvent = {
+            id: input.id,
+            siteId: site.id,
+            sessionId,
+            origin: null,
+            type: "signal",
+            source: "server",
+            evidence: "host_reported",
+            occurredAt: input.occurredAt,
+            receivedAt: new Date(now).toISOString(),
+            accountRef: null,
+            signal: input.signal,
+            detail: input.detail,
+          };
+          const result = await store.recordActivity(event);
+          results.push({
+            id: input.id,
+            status: result.status,
+            sessionId: result.status === "conflict" ? null : result.event.sessionId,
+          });
+        }
+        return respond({ results });
+      }
       if (url.pathname === "/v1/signatures") {
         if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
         if (origin !== null) {
@@ -531,6 +571,31 @@ export function createCollector(
         return respond(null, 204);
       }
       if (request.method === "GET") return respond(status(session));
+      if (url.pathname === "/v1/browser-signals") {
+        const data = await body(request, ["signals"]);
+        const signals = signalInputs(data.signals, now, "browser");
+        await limited(request, site, "pageViews", now);
+        const results = [];
+        for (const input of signals) {
+          const event: SignalEvent = {
+            id: input.id,
+            siteId: site.id,
+            sessionId: session.id,
+            origin: session.origin,
+            type: "signal",
+            source: "browser",
+            evidence: "browser_reported",
+            occurredAt: input.occurredAt,
+            receivedAt: new Date(now).toISOString(),
+            accountRef: null,
+            signal: input.signal,
+            detail: input.detail,
+          };
+          const result = await store.recordActivity(event);
+          results.push({ id: input.id, status: result.status });
+        }
+        return respond({ results });
+      }
       if (url.pathname === "/v1/page-views") {
         const data = await body(request, ["views"]);
         const views = pageViewInputs(data.views, now);
