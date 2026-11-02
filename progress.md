@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-02 (Africa/Lagos)
-**Active Feature:** `feat-004`, the install status, started before `feat-003` finished with the owner's approval. `feat-003` still needs one real declaration from a customer site. `feat-002` and `feat-011` are done.
+**Active Feature:** `feat-003`, which still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done. `feat-005` is next, and starting it before `feat-003` finishes needs the owner's approval, as `feat-004` had.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -19,18 +19,17 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [x] Hosted collector moved to the new code and database, and hosted smoke checks passed.
 - [x] Dashboard deployed at https://parallel-agent-dashboard.vercel.app, with Supabase redirects set.
 - [x] Removed the collector's demo page, its React copy and the local `public-demo` site, and deployed the change on 2 November. The live collector's root URL now returns 404.
+- [x] Install status (`feat-004`) and the dashboard's Dashboard tab deployed on 2 November, after the `install_activity` migration reached the production database.
 
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
-- [ ] Install status (`feat-004`): built and tested locally, not yet deployed.
 
 ### What's Next
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Deploy `feat-004`: apply the `install_activity` migration to the production database, then deploy the collector and the dashboard, then check a real install's status.
-4. Continue with activity collection, then a dashboard view of the data.
+3. Start the activity event contract (`feat-005`), then activity collection and a dashboard view of the data.
 
 ## Blockers / Risks
 
@@ -46,7 +45,6 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [ ] **Web Bot Auth coverage**: signing is voluntary and agents driving a local browser probably will not sign, so many sessions will stay unknown. This needs testing with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
-- [ ] **Deploy order for `feat-004`**: the collector's health check and the owner API read `install_activity`, so the migration must reach the production database before the collector deploys. Otherwise product pages fail.
 
 ## Decisions Made
 

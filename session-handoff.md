@@ -3,21 +3,23 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector, dashboard, public site, docs and changelog are live. `feat-004`, the install status, is built and tested locally on `feat/install-connection-check`, and isn't deployed yet.
-- Branch / commit: `feat/install-connection-check`, based on `0aeb5b3`.
+- Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`) and the Dashboard tab. `feat-003` waits on a real site recording a declaration.
+- Branch / commit: `docs/record-feat-004-deploy`, based on `0790758`.
 
 ## Completed This Session
 
 - [x] Moved the hosted collector to the dedicated Supabase project, keeping existing site IDs and secrets.
 - [x] Deployed the dashboard and set Supabase redirects.
 - [x] Fixed a production-only JSON parameter bug and added real-driver tests.
+- [x] Applied the `install_activity` migration to production and deployed the install status and the Dashboard tab.
 
 ## Verification Evidence
 
 | Check             | Command                | Result  | Notes                                        |
 | ----------------- | ---------------------- | ------- | -------------------------------------------- |
 | Hosted collector  | `npm run smoke:hosted` | Pass    | 9 checks, 7/7 sessions revoked on 2 November |
-| Collector         | `npm test`             | Pass    | 108/108                                      |
+| Collector         | `npm test`             | Pass    | 118/118                                      |
+| Dashboard journey | `npx playwright test`  | Pass    | 28/28 on merged main, Chromium and WebKit    |
 | Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                        |
 
 ## Files Changed
@@ -43,4 +45,4 @@
 
 ## Recommended Next Step
 
-- Apply the `install_activity` migration to the production database, deploy the collector and dashboard, and check a real install's status. Then mark `feat-004` done, and `feat-003` once a real site records a declaration.
+- Mark `feat-003` done once a real site records a declaration. Then start the activity event contract (`feat-005`), or earlier if the owner approves.
