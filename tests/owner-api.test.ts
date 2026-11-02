@@ -16,7 +16,14 @@ import {
 } from "../collector/products.js";
 import { importSites } from "../scripts/import-sites.js";
 import { createBindingContext, verifyDeclarationOnline } from "../src/server/index.js";
-import type { CreatedSession, RecordedDeclaration } from "../src/protocol.js";
+import type {
+  ActionEvent,
+  ActivityEvent,
+  CreatedSession,
+  DeclarationEvent,
+  PageViewEvent,
+  RecordedDeclaration,
+} from "../src/protocol.js";
 
 const cipher = new SecretCipher("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8");
 const owners = { alice: randomUUID(), bob: randomUUID() };
@@ -29,6 +36,7 @@ const MIGRATIONS = [
   "20261101130000_add_domain_claims.sql",
   "20261101140000_add_environments.sql",
   "20261102120000_add_install_activity.sql",
+  "20261102130000_add_activity_events.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -36,6 +44,7 @@ const RESET = `reset role;
   truncate agent_identification.sessions cascade;
   truncate agent_identification.rate_buckets;
   truncate agent_identification.install_activity;
+  truncate agent_identification.activity_events;
   set role agent_id_app`;
 
 async function migrated(): Promise<PGlite> {
@@ -401,6 +410,178 @@ for (const [kind, open] of stores) {
 
       now = time + 8 * 24 * 60 * 60 * 1000;
       assert.deepEqual((await install(owners.alice, a)).issues, []);
+    });
+
+    test("a declaration joins its session's timeline with the agent's own description", async () => {
+      const { handle, owner, create, visitor } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      const requestId = randomUUID();
+      const declare = (data: object) =>
+        handle(
+          new Request("https://collector.test/v1/declarations", {
+            method: "POST",
+            headers: {
+              origin,
+              authorization: `Bearer ${session.sessionToken}`,
+              "x-agent-site": session.siteId,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ choice: "ai_assistant", requestId, ...data }),
+          }),
+        );
+      assert.equal((await declare({ agent: { name: "x".repeat(101) } })).status, 400);
+      assert.equal((await declare({ agent: { model: "anything" } })).status, 400);
+      const agent = { name: "Research helper", provider: "Example AI", purpose: "Compare plans" };
+      const accepted = (await (await declare({ agent })).json()) as RecordedDeclaration;
+      // A retry is the same declaration, so its description can't be changed afterwards.
+      const retried = await declare({ agent: { name: "Someone else" } });
+      assert.equal(((await retried.json()) as RecordedDeclaration).eventId, accepted.eventId);
+
+      const timeline = async (ownerId: string, query = "") =>
+        owner(ownerId, `${path(a)}/activity${query}`);
+      const { events } = (await (await timeline(owners.alice)).json()) as {
+        events: ActivityEvent[];
+      };
+      const at = new Date(time).toISOString();
+      assert.deepEqual(events, [
+        {
+          id: accepted.eventId,
+          siteId: a.environment.siteId,
+          sessionId: session.sessionId,
+          origin,
+          type: "declaration",
+          source: "browser",
+          evidence: "self_reported",
+          occurredAt: at,
+          receivedAt: at,
+          accountRef: null,
+          choice: "ai_assistant",
+          agent,
+        },
+      ]);
+      const count = async (query: string) =>
+        ((await (await timeline(owners.alice, query)).json()) as { events: unknown[] }).events
+          .length;
+      assert.equal(await count(`?sessionId=${session.sessionId}`), 1);
+      assert.equal(await count(`?sessionId=${randomUUID()}`), 0);
+      assert.equal((await timeline(owners.alice, "?sessionId=not-a-session")).status, 400);
+      assert.equal((await timeline(owners.bob)).status, 404);
+    });
+
+    test("activity keeps every source side by side, records a retry once and refuses a changed one", async () => {
+      const { create, visitor } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const b = await create(owners.bob, "Bob's product", ["https://bob.example"]);
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      const at = (offset: number) => new Date(time + offset).toISOString();
+      const base = { siteId: a.environment.siteId, sessionId: session.sessionId };
+      const view: PageViewEvent = {
+        ...base,
+        id: randomUUID(),
+        type: "page_view",
+        source: "browser",
+        evidence: "browser_reported",
+        origin,
+        occurredAt: at(0),
+        receivedAt: at(0),
+        accountRef: null,
+        path: "/tickets/:id",
+        route: "/tickets/:ticketId",
+      };
+      const attempted: ActionEvent = {
+        ...base,
+        id: randomUUID(),
+        type: "action",
+        source: "server",
+        evidence: "host_reported",
+        origin: null,
+        occurredAt: at(1000),
+        receivedAt: at(1000),
+        accountRef: "acct_42",
+        action: "ticket.update",
+        resourceRef: "ticket_7",
+        outcome: "attempted",
+      };
+      const rejected: ActionEvent = {
+        ...attempted,
+        id: randomUUID(),
+        occurredAt: at(2000),
+        receivedAt: at(2000),
+        outcome: "rejected",
+      };
+      const person: DeclarationEvent = {
+        ...base,
+        id: randomUUID(),
+        type: "declaration",
+        source: "browser",
+        evidence: "self_reported",
+        origin,
+        occurredAt: at(3000),
+        receivedAt: at(3000),
+        accountRef: null,
+        choice: "person",
+        agent: { name: null, provider: null, purpose: null },
+      };
+      for (const event of [view, attempted, rejected, person]) {
+        assert.equal((await store.recordActivity(event)).status, "recorded");
+      }
+      // A retry repeats the event; only when it arrived differs.
+      assert.deepEqual(await store.recordActivity({ ...view, receivedAt: at(9000) }), {
+        status: "duplicate",
+        event: view,
+      });
+      assert.deepEqual(await store.recordActivity({ ...attempted, outcome: "confirmed" }), {
+        status: "conflict",
+      });
+      // IDs belong to a site, so another customer's events never collide.
+      const elsewhere = { ...view, siteId: b.environment.siteId };
+      assert.equal((await store.recordActivity(elsewhere)).status, "recorded");
+
+      // A Person answer and the host's reports of agent-like actions stay side by side.
+      const timeline = await store.listActivity(a.environment.siteId, {
+        limit: 100,
+        sessionId: session.sessionId,
+      });
+      assert.deepEqual(
+        timeline.map((event) => [event.type, event.source, event.evidence]),
+        [
+          ["declaration", "browser", "self_reported"],
+          ["action", "server", "host_reported"],
+          ["action", "server", "host_reported"],
+          ["page_view", "browser", "browser_reported"],
+        ],
+      );
+      assert.deepEqual(timeline[3], view);
+      assert.equal((await store.listActivity(a.environment.siteId, { limit: 2 })).length, 2);
+
+      for (const invalid of [
+        { ...view, id: randomUUID(), path: "/tickets/12345" },
+        { ...view, id: randomUUID(), route: "/search?q=alice" },
+        { ...attempted, id: randomUUID(), accountRef: "alice@example.com" },
+        { ...attempted, id: randomUUID(), origin },
+        { ...attempted, id: randomUUID(), action: "Update ticket" },
+        { ...person, id: randomUUID(), evidence: "host_reported" },
+        { ...view, id: randomUUID().toUpperCase() },
+      ] as ActivityEvent[]) {
+        await assert.rejects(store.recordActivity(invalid), /Invalid activity event/);
+      }
+    });
+
+    test("activity is kept for 30 days, after its session has gone", async () => {
+      const { create, visitor, declare } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      assert.equal((await declare(session)).status, 200);
+      const day = 24 * 60 * 60 * 1000;
+      const prune = (at: number) =>
+        store.prune({ sessions: at - 7 * day, activity: at - 30 * day }, at, 1000);
+      const activity = () => store.listActivity(a.environment.siteId, { limit: 100 });
+      assert.equal((await prune(time + 8 * day)).removedSessions, 1);
+      assert.equal((await store.listEvents(a.environment.siteId, 100)).length, 0);
+      assert.equal((await activity()).length, 1);
+      assert.equal((await prune(time + 31 * day)).removedActivity, 1);
+      assert.deepEqual(await activity(), []);
     });
 
     test("owner routes require a sign-in and reject browser requests", async () => {

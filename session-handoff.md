@@ -3,8 +3,8 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`) and the Dashboard tab. `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `docs/record-feat-004-deploy`, based on `0790758`.
+- Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`). The activity event contract (`feat-005`) and SDK 0.2.0 are built and tested locally, not deployed. `feat-003` waits on a real site recording a declaration.
+- Branch / commit: `feat/activity-event-contract`, stacked on `docs/scope-web-bot-auth`.
 
 ## Completed This Session
 
@@ -18,7 +18,7 @@
 | Check             | Command                | Result  | Notes                                        |
 | ----------------- | ---------------------- | ------- | -------------------------------------------- |
 | Hosted collector  | `npm run smoke:hosted` | Pass    | 9 checks, 7/7 sessions revoked on 2 November |
-| Collector         | `npm test`             | Pass    | 118/118                                      |
+| Collector         | `npm test`             | Pass    | 132/132                                      |
 | Dashboard journey | `npx playwright test`  | Pass    | 28/28 on merged main, Chromium and WebKit    |
 | Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                        |
 

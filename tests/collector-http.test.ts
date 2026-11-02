@@ -428,11 +428,14 @@ test("pruning drains expired rate-only backlogs larger than a batch", async () =
   assert.deepEqual(await response.json(), {
     removedSessions: 0,
     removedRateBuckets: 1500,
+    removedActivity: 0,
     more: false,
   });
-  assert.deepEqual(await f.store.prune(initialTime - 7 * 86400000, initialTime, 1000), {
+  const cutoffs = { sessions: initialTime - 7 * 86400000, activity: initialTime - 30 * 86400000 };
+  assert.deepEqual(await f.store.prune(cutoffs, initialTime, 1000), {
     removedSessions: 0,
     removedRateBuckets: 0,
+    removedActivity: 0,
     more: false,
   });
 });
@@ -447,7 +450,7 @@ test("health checks storage on every request and returns 503 without database de
   const f = fixture({ store });
   const healthy = await f.request("/health");
   assert.equal(healthy.status, 200);
-  assert.deepEqual(await healthy.json(), { ok: true, version: "0.1.0", storage: "memory" });
+  assert.deepEqual(await healthy.json(), { ok: true, version: "0.2.0", storage: "memory" });
   const unhealthy = await f.request("/health");
   assert.equal(checks, 2);
   assert.equal(unhealthy.status, 503);

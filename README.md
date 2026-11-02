@@ -22,7 +22,7 @@ on servers.
 <div id="visitor-choice"></div>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.1.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.2.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="optional"
@@ -40,7 +40,7 @@ To require a choice before using a section of the page:
 <form id="checkout"><!-- Your existing form --></form>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.1.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.2.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="required"
@@ -72,7 +72,7 @@ The collector serves a versioned npm tarball; npm registry publication is not
 required:
 
 ```sh
-npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.1.0.tgz
+npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.2.0.tgz
 ```
 
 ```js
@@ -177,7 +177,7 @@ For a restrictive Content Security Policy, allow the collector in `script-src`,
 `style-src` and `connect-src`. Use external integration scripts or your existing
 nonce policy. The widget uses an external stylesheet and requires no inline
 script/style exceptions. Its `styleUrl` can point to your own copy of the CSS.
-Versioned asset hashes are at `/sdk/v0.1.0/integrity.json`.
+Versioned asset hashes are at `/sdk/v0.2.0/integrity.json`.
 
 ## Development and operating the collector
 
@@ -222,10 +222,13 @@ is no default customer site. Sanitized results stay in ignored `.local/`.
 
 See [operating the collector](docs/operations.md), [API contract](docs/protocol.md)
 and [integration examples](examples/README.md). Production requires PostgreSQL
-storage and separate secrets per site. Events retain only session IDs, origin,
-choice and timestamps; token/binding values are hashed in storage. Records are
-pruned after seven days. No browsing history, screenshots or form contents are
-collected.
+storage and separate secrets per site. Declarations keep the session ID, origin,
+choice and timestamps, plus an agent's own name, provider and purpose when it
+gives them; token/binding values are hashed in storage. Sessions are pruned after
+seven days and activity events after 30. The activity contract allows page paths
+with the query removed and ID-like segments masked, though this version's widget
+doesn't send them yet. Page titles, page text, screenshots, form contents and raw
+IP addresses are never collected.
 
 The integration tests establish implementation behavior. They do not establish
 unassisted agent identification rates; measure that separately with fresh agents

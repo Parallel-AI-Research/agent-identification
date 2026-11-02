@@ -1,0 +1,18 @@
+---
+title: SDK 0.2.0 and the activity timeline
+description: Each session now has one timeline that declarations, page views and server actions will share.
+date: 2026-11-02
+---
+
+Version 0.2.0 of the SDK lays the groundwork for activity analytics. The widget behaves the same as 0.1.0, and 0.1.0 keeps working unchanged.
+
+## What's new
+
+- **One timeline per session:** every declaration is now also an event on its session's timeline, which page views and your server's reports of actions will join. Events from different sources sit side by side, even when they disagree.
+- **An agent's own description:** with a declaration, an agent can give its name, provider and purpose. They're self-reported and optional, and unknown is a valid answer.
+- **30 days of activity:** sessions are still removed after seven days, and their activity is kept for 30.
+- **Install instructions:** snippets and docs now use 0.2.0.
+
+## Coming next
+
+Page views and server actions don't arrive yet. When they do, page paths drop their query string and mask anything that looks like an ID, and page titles, text and form contents are never collected.

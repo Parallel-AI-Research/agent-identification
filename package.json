@@ -1,6 +1,6 @@
 {
   "name": "@parallel-research/agent-identification",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Website-owned, session-scoped visitor self-classification widget and server verification helpers",
   "type": "module",
   "license": "MIT",

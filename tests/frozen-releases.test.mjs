@@ -18,12 +18,26 @@ function destination(name) {
     : `public/downloads/${name}`;
 }
 
+/** A checkout as it was when this version was published: its archived source, package and build. */
 async function fixture(t, { build = false } = {}) {
   const root = await mkdtemp(join(tmpdir(), "agent-id-frozen-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  for (const path of ["src", "dist", "releases", "LICENSE", "README.md", "package.json"]) {
+  await cp(join(repository, archive, "src"), join(root, "src"), { recursive: true });
+  for (const path of ["releases", "LICENSE", "README.md"]) {
     await cp(join(repository, path), join(root, path), { recursive: true });
   }
+  const unpacked = join(root, "unpacked");
+  await mkdir(unpacked);
+  const tarball = join(
+    repository,
+    archive,
+    `parallel-research-agent-identification-${version}.tgz`,
+  );
+  const tar = spawnSync("tar", ["-xzf", tarball, "-C", unpacked], { encoding: "utf8" });
+  assert.equal(tar.status, 0, tar.stderr);
+  await cp(join(unpacked, "package", "dist"), join(root, "dist"), { recursive: true });
+  await cp(join(unpacked, "package", "package.json"), join(root, "package.json"));
+  await rm(unpacked, { recursive: true });
   await mkdir(join(root, "scripts"));
   for (const file of ["release.mjs", "frozen-releases.mjs", ...(build ? ["build.mjs"] : [])]) {
     await cp(join(repository, "scripts", file), join(root, "scripts", file));

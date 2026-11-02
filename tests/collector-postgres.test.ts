@@ -37,9 +37,11 @@ function declaration(session: StoredSession, choice: "person" | "ai_assistant" =
     requestId: randomUUID(),
     eventId: randomUUID(),
     receipt: "test-signed-receipt",
+    agent: { name: null, provider: null, purpose: null },
     now: time + 1000,
   };
 }
+const cutoff = (at: number) => ({ sessions: at, activity: at });
 
 before(async () => {
   db = new PGlite();
@@ -77,13 +79,19 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261102130000_add_activity_events.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );
 });
 beforeEach(async () => {
   await db.exec(
-    "truncate agent_identification.sessions cascade; truncate agent_identification.rate_buckets",
+    "truncate agent_identification.sessions cascade; truncate agent_identification.rate_buckets; truncate agent_identification.activity_events",
   );
 });
 after(async () => {
@@ -158,8 +166,8 @@ test("revoked/expired Postgres sessions reject writes and evidence remains until
     "invalid",
   );
   assert.equal((await store.listEvents(s.siteId, 100)).length, 1);
-  assert.equal((await store.prune(time + 1, time + 8 * 86400000, 1)).removedSessions, 1);
-  assert.equal((await store.prune(time + 1, time + 8 * 86400000, 1)).removedSessions, 1);
+  assert.equal((await store.prune(cutoff(time + 1), time + 8 * 86400000, 1)).removedSessions, 1);
+  assert.equal((await store.prune(cutoff(time + 1), time + 8 * 86400000, 1)).removedSessions, 1);
   assert.equal((await store.listEvents(s.siteId, 100)).length, 0);
 });
 
@@ -170,7 +178,7 @@ test("Postgres rate counters enforce limits atomically and expire", async () => 
   );
   assert.equal(results.filter(Boolean).length, 3);
   assert.equal(await store.consumeRate(key, 3, 1000, time + 1000), true);
-  await store.prune(time - 1000, time + 2000, 100);
+  await store.prune(cutoff(time - 1000), time + 2000, 100);
   assert.equal(
     (await db.query<{ count: string }>("select count(*) from agent_identification.rate_buckets"))
       .rows[0]?.count,
@@ -207,6 +215,7 @@ test("Postgres pruning drains rate buckets independently of retained sessions", 
   assert.deepEqual(await response.json(), {
     removedSessions: 0,
     removedRateBuckets: 1500,
+    removedActivity: 0,
     more: false,
   });
   assert.equal(
@@ -233,9 +242,9 @@ test("Postgres health checks use the actual database and detect missing storage"
 test("private tables enable forced RLS and a role with SELECT grants still cannot read rows", async () => {
   await store.createSession(makeSession());
   const flags = await db.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
-    "select relrowsecurity, relforcerowsecurity from pg_class where oid in ('agent_identification.sessions'::regclass, 'agent_identification.events'::regclass, 'agent_identification.rate_buckets'::regclass)",
+    "select relrowsecurity, relforcerowsecurity from pg_class where oid in ('agent_identification.sessions'::regclass, 'agent_identification.events'::regclass, 'agent_identification.rate_buckets'::regclass, 'agent_identification.activity_events'::regclass)",
   );
-  assert.equal(flags.rows.length, 3);
+  assert.equal(flags.rows.length, 4);
   assert(flags.rows.every((row) => row.relrowsecurity && row.relforcerowsecurity));
   await db.exec(
     "create role untrusted_collector_probe; grant usage on schema agent_identification to untrusted_collector_probe; grant select on agent_identification.sessions to untrusted_collector_probe; set role untrusted_collector_probe",
@@ -265,7 +274,7 @@ test("dedicated collector role can run the complete storage lifecycle but cannot
     assert.equal((await store.listEvents(session.siteId, 100)).length, 1);
     await store.revokeSession(session.tokenHash, time + 1000);
     assert.equal(await store.consumeRate(hashToken("role-rate"), 2, 1000, time), true);
-    assert.equal((await store.prune(time + 1, time + 2000, 100)).removedSessions, 1);
+    assert.equal((await store.prune(cutoff(time + 1), time + 2000, 100)).removedSessions, 1);
     assert.equal((await store.listEvents(session.siteId, 100)).length, 0);
     for (const forbidden of [
       "select * from unrelated_private.sensitive",
@@ -275,11 +284,106 @@ test("dedicated collector role can run the complete storage lifecycle but cannot
       "alter table agent_identification.sessions disable row level security",
       "update agent_identification.sessions set origin='https://attacker.test'",
       "update agent_identification.events set choice='person'",
+      "update agent_identification.activity_events set choice='person'",
     ]) {
       await assert.rejects(db.exec(forbidden), /permission denied|must be owner/i);
     }
   } finally {
     await db.exec("reset role");
+  }
+});
+
+const migration = (file: string) =>
+  readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8");
+
+test("the activity table refuses events that break the contract, without the collector's checks", async () => {
+  const valid = {
+    site_id: "postgres-site",
+    id: randomUUID(),
+    type: "page_view",
+    source: "browser",
+    evidence: "browser_reported",
+    origin: "https://postgres.test",
+    occurred_at: time,
+    received_at: time,
+    path: "/pricing",
+  };
+  const insert = async (row: Record<string, unknown>) => {
+    const columns = Object.keys(row);
+    await db.query(
+      `insert into agent_identification.activity_events (${columns.join(", ")})
+       values (${columns.map((_, index) => `$${index + 1}`).join(", ")})`,
+      Object.values(row),
+    );
+  };
+  await insert(valid);
+  const action = {
+    ...valid,
+    type: "action",
+    source: "server",
+    evidence: "host_reported",
+    origin: null,
+    path: null,
+    action: "ticket.update",
+    outcome: "attempted",
+  };
+  await insert({ ...action, id: randomUUID() });
+  for (const broken of [
+    { ...valid },
+    { ...valid, id: randomUUID(), choice: "person" },
+    { ...valid, id: randomUUID(), path: "pricing" },
+    { ...valid, id: randomUUID(), evidence: "self_reported" },
+    { ...valid, id: randomUUID(), origin: null },
+    { ...action, id: randomUUID(), account_ref: "alice@example.com" },
+    { ...action, id: randomUUID(), outcome: "succeeded" },
+    { ...action, id: randomUUID(), origin: "https://postgres.test" },
+  ]) {
+    await assert.rejects(insert(broken));
+  }
+});
+
+test("declarations recorded before the activity table join the timeline when it's added", async () => {
+  const earlier = new PGlite();
+  try {
+    for (const file of [
+      "20261020093721_create_agent_identification_collector.sql",
+      "20261101120000_add_customer_products.sql",
+      "20261101130000_add_domain_claims.sql",
+      "20261101140000_add_environments.sql",
+      "20261102120000_add_install_activity.sql",
+    ]) {
+      await earlier.exec(await migration(file));
+    }
+    const execute = async (sql: string, parameters: unknown[]) =>
+      (await earlier.query<Record<string, unknown>>(sql, parameters)).rows;
+    const s = makeSession();
+    await new PostgresStore(execute).createSession(s);
+    const eventId = randomUUID();
+    await execute(
+      `insert into agent_identification.events (id, site_id, origin, session_id, choice, created_at)
+       values ($1, $2, $3, $4, 'person', $5)`,
+      [eventId, s.siteId, s.origin, s.id, time],
+    );
+    await earlier.exec(await migration("20261102130000_add_activity_events.sql"));
+    const at = new Date(time).toISOString();
+    assert.deepEqual(await new PostgresStore(execute).listActivity(s.siteId, { limit: 10 }), [
+      {
+        id: eventId,
+        siteId: s.siteId,
+        sessionId: s.id,
+        origin: s.origin,
+        type: "declaration",
+        source: "browser",
+        evidence: "self_reported",
+        occurredAt: at,
+        receivedAt: at,
+        accountRef: null,
+        choice: "person",
+        agent: { name: null, provider: null, purpose: null },
+      },
+    ]);
+  } finally {
+    await earlier.close();
   }
 });
 

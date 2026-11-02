@@ -93,7 +93,8 @@ Database errors return a generic service error; they never become a successful
 recording. The widget exposes failures and offers retry.
 
 The Vercel cron runs daily at 03:00 UTC. `/internal/prune` requires the prune
-secret as bearer authentication and deletes records older than seven days.
+secret as bearer authentication and deletes sessions older than seven days and
+activity events older than 30.
 Requests also trigger bounded opportunistic pruning. A finite batch cannot erase
 an arbitrary backlog in one pass; monitor/export as needed and run repeated
 authenticated prune requests until the backlog is clear.
@@ -146,6 +147,12 @@ package metadata changes under the frozen version fail the build/release; bump
 the SDK version for those changes. Repository README and build/test script edits
 can ship without replacing the published package. Package checks install the
 preserved tarball that deployment actually serves.
+
+The archive also keeps the release's source in `releases/v0.1.0/src/`, matching
+the hashes in `frozen.json`, so tests can rebuild the published bytes after the
+working source has moved on. Freeze a new version the same way once it is
+deployed: retrieve its published files, archive its source, record the hashes and
+add the version to `frozenVersions` in `scripts/frozen-releases.mjs`.
 
 Keep each frozen version in `scripts/frozen-releases.mjs` and retain its archive
 when publishing a newer version. Missing or corrupt archives fail instead of
