@@ -186,6 +186,23 @@ export class MemoryStore implements CollectorStore, ProductStore {
     row.updatedAt = now;
     return this.withEnvironments(row);
   }
+  async deleteProduct(ownerId: string, id: string): Promise<string[] | null> {
+    const row = this.products.get(id);
+    if (!row || row.ownerId !== ownerId) return null;
+    const sites = [...this.environments.values()]
+      .filter((environment) => environment.productId === id)
+      .map((environment) => environment.siteId);
+    this.products.delete(id);
+    for (const [key, environment] of this.environments) {
+      if (environment.productId === id) this.environments.delete(key);
+    }
+    const gone = (siteId: string) => sites.includes(siteId);
+    for (const [key, session] of this.sessions) if (gone(session.siteId)) this.sessions.delete(key);
+    for (const [key, event] of this.events) if (gone(event.siteId)) this.events.delete(key);
+    for (const [key, event] of this.activity) if (gone(event.siteId)) this.activity.delete(key);
+    for (const [key, note] of this.installs) if (gone(note.siteId)) this.installs.delete(key);
+    return sites;
+  }
   async createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean> {
     if (this.products.get(environment.productId)?.ownerId !== ownerId) return false;
     const taken = [...this.environments.values()].some(

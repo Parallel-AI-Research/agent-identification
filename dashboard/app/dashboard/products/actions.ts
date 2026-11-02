@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   collector,
   CollectorError,
@@ -121,4 +122,22 @@ export async function verifyDomain(
     revalidatePath(`/dashboard/products/${productId}`);
     return { success: `${domain} is verified.` };
   });
+}
+
+export async function deleteProduct(
+  productId: string,
+  name: string,
+  _: ProductState,
+  form: FormData,
+): Promise<ProductState> {
+  if (String(form.get("confirm") ?? "").trim() !== name) {
+    return { error: `Type ${name} exactly to confirm.` };
+  }
+  const result = await attempt(async () => {
+    await collector(`/products/${productId}`, { method: "DELETE" });
+    return {};
+  });
+  if (result.error) return result;
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
 }

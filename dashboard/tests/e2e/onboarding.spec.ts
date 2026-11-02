@@ -402,3 +402,19 @@ test("an environment is added from the dashboard, with its own snippet and analy
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator("p[role=alert]")).toContainText("Enter a session ID");
 });
+
+test("deleting a product needs its name and removes it", async ({ page }, info) => {
+  const email = address(info, "delete");
+  await signUp(page, email);
+  await confirm(page, email);
+  await addProduct(page, "Short-lived", ["https://short-lived.example"]);
+  await page.getByRole("link", { name: "Continue to install" }).click();
+  const confirmation = page.getByLabel("Type Short-lived to confirm");
+  await confirmation.fill("Short lived");
+  await page.getByRole("button", { name: "Delete product" }).click();
+  await expect(page.locator("p[role=alert]")).toContainText("Type Short-lived exactly");
+  await confirmation.fill("Short-lived");
+  await page.getByRole("button", { name: "Delete product" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByText("No products yet")).toBeVisible();
+});

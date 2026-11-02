@@ -274,7 +274,7 @@
       "name": "External-test release",
       "description": "Prepare a documented pilot: run package, HTTP, database, tenant-isolation, browser and hosted checks, then verify onboarding with a new account and a new product.",
       "dependencies": ["feat-009"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "All checks pass against the deployed target, not only local builds.",
         "The onboarding journey is verified with a new account and a new product.",
@@ -282,9 +282,13 @@
         "Retention is defined, and deletion and cleanup are tested.",
         "Release claims stay limited to a documented pilot, not enterprise procurement, compliance, universal detection or verified delegation."
       ],
-      "decisions": [],
+      "decisions": [
+        "Started after feat-008 at the owner's request to build the remaining features in order.",
+        "Deleting a product removes its environments and everything its sites recorded in one SQL statement, so a product is never gone while its data stays. The app role gains delete on products and environments for it.",
+        "The owner runs the hosted onboarding check with a new account, because agents don't create accounts on the hosted app."
+      ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 169/169 collector, contract and SDK unit tests, 5/5 dashboard unit, 56/56 SDK browser and 32/32 dashboard journey tests in Chromium and WebKit. Deleting a product, on memory, Postgres under the restricted role and the production driver, removes it and its staging environment, every session, declaration, activity event and install note their sites recorded, and refuses new sessions on both sites, while the owner's other product keeps its data; another customer gets 404 and a second delete 404. In the browser journey, deleting needs the product's exact name and returns to an empty product list. Install, troubleshooting and uninstall instructions, the retention rules and what the pilot may and may not claim are in the docs and docs/pilot.md. Not yet done: every acceptance item that needs the deployed target, including the hosted checks and a new-account onboarding, which the owner runs after a deploy."
     }
   ]
 }

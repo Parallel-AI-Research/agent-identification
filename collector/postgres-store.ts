@@ -272,6 +272,33 @@ export class PostgresStore implements CollectorStore, ProductStore {
     );
     return rows[0] ? this.getProduct(ownerId, id) : null;
   }
+  async deleteProduct(ownerId: string, id: string): Promise<string[] | null> {
+    // One statement, so a product is never gone while its data stays, or the reverse.
+    const rows = await this.execute(
+      `with owned as (
+         select e.site_id from ${OWNED_ENVIRONMENTS} where p.id=$1 and p.owner_id=$2
+       ), activity as (
+         delete from agent_identification.activity_events
+         where site_id in (select site_id from owned) returning 1
+       ), sessions as (
+         delete from agent_identification.sessions
+         where site_id in (select site_id from owned) returning 1
+       ), installs as (
+         delete from agent_identification.install_activity
+         where site_id in (select site_id from owned) returning 1
+       ), product as (
+         delete from agent_identification.products where id=$1 and owner_id=$2 returning id
+       )
+       select (select count(*) from product) as deleted,
+         coalesce((select jsonb_agg(site_id) from owned), '[]'::jsonb) as sites,
+         (select count(*) from activity) + (select count(*) from sessions)
+           + (select count(*) from installs) as removed`,
+      [id, ownerId],
+    );
+    if (!Number(rows[0]?.deleted)) return null;
+    const sites = rows[0]!.sites;
+    return (typeof sites === "string" ? JSON.parse(sites) : sites) as string[];
+  }
   async createEnvironment(ownerId: string, e: EnvironmentRecord): Promise<boolean> {
     const rows = await this.execute(
       `with allowed as (

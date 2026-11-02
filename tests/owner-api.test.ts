@@ -42,6 +42,7 @@ const MIGRATIONS = [
   "20261102140000_add_signature_events.sql",
   "20261102150000_add_session_binding_index.sql",
   "20261102160000_add_signal_events.sql",
+  "20261102170000_allow_product_deletion.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -779,6 +780,46 @@ for (const [kind, open] of stores) {
       assert.deepEqual(
         listed.find((event) => event.id === fromServer.id),
         fromServer,
+      );
+    });
+
+    test("deleting a product removes its environments and everything its sites recorded", async () => {
+      const { owner, create, addEnvironment, visitor, declare } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const kept = await create(owners.alice, "Kept product", ["https://kept.example"]);
+      const staging = await addEnvironment(owners.alice, a, {
+        type: "staging",
+        origins: ["https://staging.alice.example"],
+      });
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      assert.equal((await declare(session)).status, 200);
+      const other = (await (
+        await visitor(kept.environment.siteId, "https://kept.example")
+      ).json()) as CreatedSession;
+      assert.equal((await declare(other, "https://kept.example")).status, 200);
+      const remove = (ownerId: string) =>
+        owner(ownerId, `/products/${a.product.id}`, { method: "DELETE" });
+
+      assert.equal((await remove(owners.bob)).status, 404);
+      assert.equal((await remove(owners.alice)).status, 204);
+      assert.equal((await owner(owners.alice, `/products/${a.product.id}`)).status, 404);
+      assert.equal((await remove(owners.alice)).status, 404);
+      for (const [siteId, siteOrigin] of [
+        [a.environment.siteId, origin],
+        [staging.environment.siteId, "https://staging.alice.example"],
+      ] as const) {
+        assert.deepEqual(await store.listActivity(siteId, { limit: 10 }), []);
+        assert.deepEqual(await store.listEvents(siteId, 10), []);
+        assert.deepEqual(await store.listInstallActivity([siteId]), []);
+        assert.equal((await visitor(siteId, siteOrigin)).status, 403);
+      }
+      assert.equal((await store.listActivity(kept.environment.siteId, { limit: 10 })).length, 1);
+      const { products } = (await (await owner(owners.alice, "/products")).json()) as {
+        products: { id: string }[];
+      };
+      assert.deepEqual(
+        products.map((item) => item.id),
+        [kept.product.id],
       );
     });
 

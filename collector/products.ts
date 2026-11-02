@@ -58,6 +58,11 @@ export interface ProductStore {
     name: string,
     now: number,
   ): Promise<ProductWithEnvironments | null>;
+  /**
+   * Deletes a product, its environments and everything its sites recorded. Returns the deleted
+   * site IDs, or null when this owner has no such product.
+   */
+  deleteProduct(ownerId: string, id: string): Promise<string[] | null>;
   /** Returns false when the product already has an environment of this type. */
   createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean>;
   updateEnvironment(

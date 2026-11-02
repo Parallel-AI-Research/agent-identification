@@ -294,6 +294,15 @@ export async function handleOwnerRequest(
         product: productView(product, now, await activityFor(product.environments)),
       });
     }
+    if (request.method === "DELETE") {
+      if (!(await owners.products.deleteProduct(ownerId, productId))) {
+        throw new HttpError(404, "Not found");
+      }
+      for (const environment of product.environments) {
+        directory.invalidate(environment.siteId, environment.origins);
+      }
+      return respond(null, 204);
+    }
     if (request.method !== "PATCH") throw new HttpError(405, "Method not allowed");
     const data = await body(request, ["name"]);
     const renamed = await owners.products.renameProduct(
