@@ -5,6 +5,7 @@ import {
   isOutcome,
   isReference,
   isRoutePattern,
+  isSignatureResult,
   MAX_PATH,
   routePath,
   type ActivityEvent,
@@ -61,6 +62,21 @@ export function assertActivity(event: ActivityEvent): void {
             isActionName(event.action) &&
             (event.resourceRef === null || isReference(event.resourceRef)) &&
             isOutcome(event.outcome)
+          );
+        case "signature":
+          return (
+            event.source === "server" &&
+            event.origin === null &&
+            isSignatureResult(event.result) &&
+            (event.path === null || routePath(event.path) === event.path) &&
+            (event.signer === null || (event.signer.length >= 1 && event.signer.length <= 100)) &&
+            (event.signatureAgent === null ||
+              (/^https?:\/\//.test(event.signatureAgent) && event.signatureAgent.length <= 512)) &&
+            (event.evidence === "signature_claimed") === (event.result !== "verified") &&
+            (event.evidence !== "signature_verified" || event.signer !== null) &&
+            (event.evidence === "cdn_reported") ===
+              (event.verifier !== null &&
+                ["cloudflare", "akamai", "vercel"].includes(event.verifier))
           );
         default:
           return false;

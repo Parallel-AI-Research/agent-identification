@@ -6,6 +6,7 @@ import {
   type Domain,
   type Environment,
   type Product,
+  type SignedVisit,
 } from "@/lib/collector";
 import { AgentSetup } from "./agent-setup";
 import { DomainList } from "./domain-list";
@@ -13,19 +14,24 @@ import { InstallStatusPanel, StatusBadges } from "./install-status";
 import { InstallTabs } from "./install-tabs";
 import { OriginsForm } from "./origins-form";
 import { SecretPanel } from "./secret-panel";
+import { SignedAgents } from "./signed-agents";
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   let product: Product;
   let environment: Environment;
   let domains: Domain[];
+  let signed: SignedVisit[];
   try {
     ({ product } = await collector<{ product: Product }>(`/products/${id}`));
     // Environment switching arrives with the dashboard views, so this shows production.
     environment = product.environments[0]!;
-    ({ domains } = await collector<{ domains: Domain[] }>(
-      `/products/${id}/environments/${environment.id}/domains`,
-    ));
+    [{ domains }, { events: signed }] = await Promise.all([
+      collector<{ domains: Domain[] }>(`/products/${id}/environments/${environment.id}/domains`),
+      collector<{ events: SignedVisit[] }>(
+        `/products/${id}/environments/${environment.id}/activity?type=signature&limit=20`,
+      ),
+    ]);
   } catch (error) {
     if (error instanceof CollectorError && error.status === 404) notFound();
     throw error;
@@ -46,6 +52,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <StatusBadges install={environment.install} />
         </div>
         <InstallStatusPanel install={environment.install} />
+      </Card>
+      <Card>
+        <h2 className="font-semibold">Signed agents</h2>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+          Agents that sign their requests with Web Bot Auth, checked against the signer&apos;s
+          published keys. A signature identifies the agent&apos;s operator, not who it acts for.
+        </p>
+        <SignedAgents visits={signed} now={Date.parse(environment.install.checkedAt)} />
       </Card>
       <Card>
         <h2 className="font-semibold">Install</h2>

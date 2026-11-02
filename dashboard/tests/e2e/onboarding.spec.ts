@@ -1,3 +1,4 @@
+import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { createServer } from "node:http";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
@@ -5,6 +6,9 @@ const MAIL = "http://127.0.0.1:54324";
 const PASSWORD = "correct-horse-battery";
 const SITE = "http://127.0.0.1:4555";
 const UNLISTED = "http://127.0.0.1:4556";
+const COLLECTOR = "http://127.0.0.1:4310";
+// The local collector trusts this signer only in its memory demo.
+const SIGNER = "http://127.0.0.1:4557";
 
 function address(info: TestInfo, name: string): string {
   return `${name}-${info.project.name}-${Date.now()}@example.com`;
@@ -136,6 +140,49 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
     await Promise.all(websites.map((website) => new Promise((resolve) => website.close(resolve))));
   }
 
+  // An agent that signs its request with Web Bot Auth, reported by the customer's server. The
+  // key is fixed, so runs in each browser publish the same key to the collector's cache.
+  const privateKey = createPrivateKey({
+    key: Buffer.from(`302e020100300506032b657004220420${"11".repeat(32)}`, "hex"),
+    format: "der",
+    type: "pkcs8",
+  });
+  const jwk = createPublicKey(privateKey).export({ format: "jwk" });
+  const keyid = createHash("sha256")
+    .update(JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x }))
+    .digest("base64url");
+  const directory = createServer((_, response) => {
+    response.writeHead(200, {
+      "content-type": "application/http-message-signatures-directory+json",
+    });
+    response.end(JSON.stringify({ keys: [jwk] }));
+  });
+  await new Promise<void>((resolve) => directory.listen(4557, "127.0.0.1", resolve));
+  try {
+    const created = Math.floor(Date.now() / 1000);
+    const params = `("@authority" "signature-agent";key="sig1");created=${created};keyid="${keyid}";alg="ed25519";expires=${created + 300};tag="web-bot-auth"`;
+    const base = `"@authority": ${new URL(SITE).host}\n"signature-agent";key="sig1": "${SIGNER}"\n"@signature-params": ${params}`;
+    const signature = sign(null, Buffer.from(base), privateKey).toString("base64");
+    const report = await page.request.post(`${COLLECTOR}/v1/signatures`, {
+      headers: { authorization: `Bearer ${secret}` },
+      data: {
+        siteId,
+        request: {
+          method: "GET",
+          url: `${SITE}/pricing`,
+          headers: {
+            "signature-agent": `sig1="${SIGNER}"`,
+            "signature-input": `sig1=${params}`,
+            signature: `sig1=:${signature}:`,
+          },
+        },
+      },
+    });
+    expect(report.ok()).toBe(true);
+  } finally {
+    await new Promise((resolve) => directory.close(resolve));
+  }
+
   await page.goto("/dashboard");
   await expect(page.getByText("Receiving events")).toBeVisible();
   await page.getByRole("link", { name: /Storefront/ }).click();
@@ -147,6 +194,10 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
       timeout: 1000,
     });
   }).toPass({ timeout: 10_000 });
+
+  const signed = page.locator("section", { hasText: "Signed agents" });
+  await expect(signed).toContainText("Local test signer on /pricing");
+  await expect(signed.getByText("Verified", { exact: true })).toBeVisible();
 
   await expect(page.getByText("Unverified", { exact: true })).toBeVisible();
   await expect(page.getByText("_agent-identification.www.onboarding.example")).toBeVisible();

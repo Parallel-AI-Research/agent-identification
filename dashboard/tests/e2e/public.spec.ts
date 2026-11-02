@@ -22,6 +22,7 @@ const DOCS = [
   ["/docs/install", "Install"],
   ["/docs/coding-agents", "Set up with a coding agent"],
   ["/docs/server-verification", "Server verification"],
+  ["/docs/signed-agents", "Signed agents"],
   ["/docs/limits", "What it can't do"],
 ];
 

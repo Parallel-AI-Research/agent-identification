@@ -142,7 +142,7 @@
       "name": "Web Bot Auth verification",
       "description": "Verify requests that AI agents sign with Web Bot Auth (HTTP Message Signatures with a Signature-Agent key directory), so signing agents are identified by cryptographic evidence and visitors see nothing. The collector checks signatures reported by the customer's server or edge, and a customer whose CDN already checks them can report that verdict instead. It replaces the invisible widget the owner shelved.",
       "dependencies": ["feat-005"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "A customer's server or edge can report a request's signature headers with a plain HTTP call, and a Node helper does it in one line. Reporting never blocks or slows the visitor's response.",
         "Signatures are checked against RFC 9421 and the current Web Bot Auth draft: the covered components include an @authority matching one of the product's origins and the Signature-Agent header, creation and expiry times are enforced, and keys come only from allowlisted key directories, cached for no longer than they are valid.",
@@ -158,10 +158,14 @@
         "The collector verifies signatures, so one tested implementation serves every backend. The customer's server forwards the headers, because browser code can't read them.",
         "Key directories come from an allowlist of known signers. An unknown Signature-Agent is recorded as an unverified claim, never as verified.",
         "A valid signature never blocks or admits a visitor; it only labels the visit.",
-        "The collector's own check ships first. CDN verdicts follow in this feature, because large customers often sit behind a CDN that already checks signatures."
+        "The collector's own check ships first. CDN verdicts follow in this feature, because large customers often sit behind a CDN that already checks signatures.",
+        "Started straight after feat-005 at the owner's request to build the remaining features in order.",
+        "The verifier follows draft-ietf-webbotauth-httpsig-protocol-01 with Node's own crypto, no new dependency: Ed25519 and RSA-PSS-SHA512, keys matched by thumbprint, no redirects, and a key ID the cache doesn't know triggers one refetch at most every 10 seconds, for key rotation.",
+        "The local memory demo trusts a test signer on 127.0.0.1:4557 so the dashboard journey can show a real verified signature. The demo never runs in production.",
+        "This is SDK 0.3.0, and install instructions move to it."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 143/143 collector and contract tests, 5/5 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests in Chromium and WebKit. The draft's own Ed25519 test vector (draft-ietf-webbotauth-httpsig-protocol-01, appendix E.2.1) verifies, and its key ID is the key's RFC 8037 thumbprint. Tests with generated Ed25519 and RSA keys verify the dictionary and legacy Signature-Agent forms, and reject a signature for another allowed host, a wrong authority, expired, future and over-long windows, an unknown signer, an unpublished key, a different key under a published key ID, forged bytes, an uncovered Signature-Agent, another tag, a header that only names a provider, and an unreachable directory, each with its reason. The key directory honours Cache-Control, refuses redirects, wrong media types and non-200 answers, keeps keys through a failed refresh, drops keys outside nbf/exp, and refetches once for a rotated key at most every 10 seconds. The endpoint needs the site's secret, refuses browser requests and bad input, records a verified visit once per signature and a reused signature as a separate replay, and records a CDN verdict as cdn_reported. Signature events round-trip on memory, Postgres under the restricted role and the production driver, and the database refuses inconsistent ones. The Node helper skips unsigned requests without a network call, forwards only covered headers, works with Fetch and Node requests, and reports failures without throwing. In the dashboard journey, a request signed by a local test signer shows as Verified on the product page. Not yet done: no real signer or CDN has been verified on the hosted collector, and SDK 0.3.0 isn't deployed."
     },
     {
       "id": "feat-006",

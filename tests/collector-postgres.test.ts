@@ -85,6 +85,12 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261102140000_add_signature_events.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );
@@ -337,6 +343,29 @@ test("the activity table refuses events that break the contract, without the col
     { ...action, id: randomUUID(), account_ref: "alice@example.com" },
     { ...action, id: randomUUID(), outcome: "succeeded" },
     { ...action, id: randomUUID(), origin: "https://postgres.test" },
+    { ...valid, id: randomUUID(), signer: "Test agent" },
+  ]) {
+    await assert.rejects(insert(broken));
+  }
+  const signature = {
+    ...valid,
+    type: "signature",
+    source: "server",
+    evidence: "signature_verified",
+    origin: null,
+    signer: "Test agent",
+    signature_agent: "https://agent.test",
+    signature_result: "verified",
+  };
+  await insert({ ...signature, id: randomUUID() });
+  for (const broken of [
+    { ...signature, id: randomUUID(), signer: null },
+    { ...signature, id: randomUUID(), signature_result: "expired" },
+    { ...signature, id: randomUUID(), evidence: "signature_claimed" },
+    { ...signature, id: randomUUID(), evidence: "cdn_reported" },
+    { ...signature, id: randomUUID(), verifier: "akamai" },
+    { ...signature, id: randomUUID(), signature_result: null },
+    { ...signature, id: randomUUID(), signature_agent: "ftp://agent.test" },
   ]) {
     await assert.rejects(insert(broken));
   }
@@ -365,6 +394,7 @@ test("declarations recorded before the activity table join the timeline when it'
       [eventId, s.siteId, s.origin, s.id, time],
     );
     await earlier.exec(await migration("20261102130000_add_activity_events.sql"));
+    await earlier.exec(await migration("20261102140000_add_signature_events.sql"));
     const at = new Date(time).toISOString();
     assert.deepEqual(await new PostgresStore(execute).listActivity(s.siteId, { limit: 10 }), [
       {

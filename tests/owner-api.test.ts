@@ -23,6 +23,7 @@ import type {
   DeclarationEvent,
   PageViewEvent,
   RecordedDeclaration,
+  SignatureEvent,
 } from "../src/protocol.js";
 
 const cipher = new SecretCipher("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8");
@@ -37,6 +38,7 @@ const MIGRATIONS = [
   "20261101140000_add_environments.sql",
   "20261102120000_add_install_activity.sql",
   "20261102130000_add_activity_events.sql",
+  "20261102140000_add_signature_events.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -566,6 +568,67 @@ for (const [kind, open] of stores) {
       ] as ActivityEvent[]) {
         await assert.rejects(store.recordActivity(invalid), /Invalid activity event/);
       }
+    });
+
+    test("signature events keep how they were checked, and the timeline filters by type", async () => {
+      const { owner, create } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const at = new Date(time).toISOString();
+      const verified: SignatureEvent = {
+        id: randomUUID(),
+        siteId: a.environment.siteId,
+        sessionId: null,
+        origin: null,
+        type: "signature",
+        source: "server",
+        evidence: "signature_verified",
+        occurredAt: at,
+        receivedAt: at,
+        accountRef: "acct_42",
+        signer: "Test agent",
+        signatureAgent: "https://agent.test",
+        result: "verified",
+        verifier: null,
+        path: "/pricing",
+      };
+      const claimed: SignatureEvent = {
+        ...verified,
+        id: randomUUID(),
+        evidence: "signature_claimed",
+        signer: null,
+        signatureAgent: "https://unknown.test",
+        result: "unknown_signer",
+      };
+      const viaCdn: SignatureEvent = {
+        ...verified,
+        id: randomUUID(),
+        evidence: "cdn_reported",
+        signatureAgent: null,
+        verifier: "akamai",
+      };
+      for (const event of [verified, claimed, viaCdn]) {
+        assert.equal((await store.recordActivity(event)).status, "recorded");
+      }
+      for (const invalid of [
+        { ...claimed, id: randomUUID(), result: "verified" },
+        { ...verified, id: randomUUID(), signer: null },
+        { ...verified, id: randomUUID(), result: "expired" },
+        { ...viaCdn, id: randomUUID(), verifier: null },
+        { ...verified, id: randomUUID(), origin },
+      ] as SignatureEvent[]) {
+        await assert.rejects(store.recordActivity(invalid), /Invalid activity event/);
+      }
+      const response = await owner(owners.alice, `${path(a)}/activity?type=signature`);
+      const { events } = (await response.json()) as { events: SignatureEvent[] };
+      assert.deepEqual(
+        events.map((event) => event.id).sort(),
+        [verified.id, claimed.id, viaCdn.id].sort(),
+      );
+      assert.deepEqual(
+        events.find((event) => event.id === verified.id),
+        verified,
+      );
+      assert.equal((await owner(owners.alice, `${path(a)}/activity?type=nope`)).status, 400);
     });
 
     test("activity is kept for 30 days, after its session has gone", async () => {

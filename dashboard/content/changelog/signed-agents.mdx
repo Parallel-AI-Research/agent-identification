@@ -1,0 +1,20 @@
+---
+title: Signed agents with Web Bot Auth
+description: Identify agents that sign their requests, with nothing on the page.
+date: 2026-11-02
+---
+
+Agents that sign their requests with Web Bot Auth can now be identified from the signature itself. Visitors see nothing, and it works whether or not the widget is installed.
+
+## What's new
+
+- **Signature checks:** your server passes each signed request on to the collector, which checks it against the signer's published key. A verified signature names the agent's operator, never who it acts for.
+- **Signed agents card:** each product page lists recent signed requests, with **Verified** or the reason a signature couldn't be verified.
+- **One line for Node.js:** `reportSignedRequest()` in SDK 0.3.0 skips unsigned requests, sends only the signed headers and never slows your response. Any other server can use a plain HTTP request.
+- **CDN verdicts:** if Cloudflare, Akamai or Vercel already checks signatures for you, your server can pass on its verdict instead.
+
+See [Signed agents](/docs/signed-agents) to set it up.
+
+## Limits
+
+No signer is listed as supported until a real signed request from it has been verified on the hosted collector. Agents that don't sign, including ones working through a person's own browser, aren't identified this way.

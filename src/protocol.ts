@@ -1,5 +1,5 @@
 /** Shared wire protocol. Classifications are always self-reported. */
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export const CHOICES = ["ai_assistant", "person", "prefer_not_to_say"] as const;
 export type Choice = (typeof CHOICES)[number];
 export type Mode = "optional" | "required";
@@ -32,12 +32,21 @@ export function isChoice(value: unknown): value is Choice {
  * Activity events. Each session has one timeline that is appended to and never rewritten,
  * so signals from different sources sit side by side, even when they disagree.
  */
-export const EVENT_TYPES = ["declaration", "page_view", "action"] as const;
+export const EVENT_TYPES = ["declaration", "page_view", "action", "signature"] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 /** A browser report can come from any client that copies the public site ID. */
 export type EventSource = "browser" | "server";
-/** Who vouches for an event: the visitor, the page's script, or the host's own server. */
-export type Evidence = "self_reported" | "browser_reported" | "host_reported";
+/**
+ * Who vouches for an event: the visitor, the page's script, the host's own server, the
+ * collector's own check of a Web Bot Auth signature, or the host's CDN.
+ */
+export type Evidence =
+  | "self_reported"
+  | "browser_reported"
+  | "host_reported"
+  | "signature_verified"
+  | "signature_claimed"
+  | "cdn_reported";
 export const OUTCOMES = ["attempted", "rejected", "confirmed"] as const;
 /** `confirmed` means the host's application says the action succeeded. */
 export type Outcome = (typeof OUTCOMES)[number];
@@ -93,7 +102,39 @@ export interface ActionEvent extends EventBase {
   resourceRef: string | null;
   outcome: Outcome;
 }
-export type ActivityEvent = DeclarationEvent | PageViewEvent | ActionEvent;
+/** Why a Web Bot Auth signature was or wasn't verified. */
+export const SIGNATURE_RESULTS = [
+  "verified",
+  "unknown_signer",
+  "bad_signature",
+  "expired",
+  "replayed",
+  "wrong_authority",
+  "malformed",
+  "key_unavailable",
+] as const;
+export type SignatureResult = (typeof SIGNATURE_RESULTS)[number];
+/**
+ * A request that named a Web Bot Auth signer. `signature_verified` means the collector checked
+ * the signature against an allowlisted signer's published key; `signature_claimed` means it
+ * couldn't, and `result` says why; `cdn_reported` means the host passed on its CDN's verdict.
+ * A signature identifies the operator only, never the person or account it acts for.
+ */
+export interface SignatureEvent extends EventBase {
+  type: "signature";
+  source: "server";
+  evidence: "signature_verified" | "signature_claimed" | "cdn_reported";
+  /** The allowlisted signer's name, such as ChatGPT agent, when known. */
+  signer: string | null;
+  /** The key directory the request named in Signature-Agent. */
+  signatureAgent: string | null;
+  result: SignatureResult;
+  /** The CDN that vouched for a cdn_reported event. */
+  verifier: string | null;
+  /** The signed request's path, masked like a page view's. */
+  path: string | null;
+}
+export type ActivityEvent = DeclarationEvent | PageViewEvent | ActionEvent | SignatureEvent;
 
 export const MAX_PATH = 512;
 const MAX_CLAIM = 100;
@@ -136,6 +177,9 @@ export function isReference(value: unknown): value is string {
 }
 export function isActionName(value: unknown): value is string {
   return typeof value === "string" && /^[a-z][a-z0-9_.:-]{0,63}$/.test(value);
+}
+export function isSignatureResult(value: unknown): value is SignatureResult {
+  return typeof value === "string" && (SIGNATURE_RESULTS as readonly string[]).includes(value);
 }
 export function isOutcome(value: unknown): value is Outcome {
   return typeof value === "string" && (OUTCOMES as readonly string[]).includes(value);

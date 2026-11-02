@@ -21,7 +21,9 @@ import {
   type Site,
   type SiteDirectory,
 } from "./products.js";
+import { cdnVerdict, recordSignature, reference, signedRequest } from "./signatures.js";
 import type { CollectorStore, InstallSignal, StoredSession } from "./store.js";
+import { DEFAULT_SIGNERS, KeyDirectory, type Signer } from "./web-bot-auth.js";
 
 export type { SiteConfig } from "../src/server/tokens.js";
 export interface CollectorOptions {
@@ -44,7 +46,13 @@ export interface CollectorOptions {
     windowSeconds: number;
     maxSessions: number;
     maxDeclarations: number;
+    /** Signed-request reports from a customer's server; defaults to 600 a window. */
+    maxSignatures?: number;
   };
+  /** Web Bot Auth signers whose key directories are trusted. Defaults to DEFAULT_SIGNERS. */
+  signers?: Signer[];
+  /** Fetches signers' key directories; tests supply their own. */
+  keyFetch?: typeof fetch;
 }
 const SESSION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const PUBLIC_PATHS = new Map<string, string[]>([
@@ -105,6 +113,10 @@ export function createCollector(
   boundedInteger(rate.windowSeconds, 1, 3600, "rate window");
   boundedInteger(rate.maxSessions, 1, 10000, "session rate limit");
   boundedInteger(rate.maxDeclarations, 1, 10000, "declaration rate limit");
+  const maxSignatures = rate.maxSignatures ?? 600;
+  boundedInteger(maxSignatures, 1, 100000, "signature rate limit");
+  const signers = options.signers ?? DEFAULT_SIGNERS;
+  const keys = new KeyDirectory(options.keyFetch ?? fetch, () => clock().getTime());
   let nextPruneAt = 0;
   const cutoffs = (now: number) => ({
     sessions: now - retentionDays * 86400000,
@@ -128,7 +140,7 @@ export function createCollector(
   async function limited(
     request: Request,
     site: Site,
-    category: "sessions" | "declarations",
+    category: "sessions" | "declarations" | "signatures",
     now: number,
   ): Promise<void> {
     const clientKey = options.trustedClientKey?.(request) ?? "shared-site";
@@ -141,7 +153,9 @@ export function createCollector(
       .digest("hex");
     const allowed = await store.consumeRate(
       key,
-      category === "sessions" ? rate.maxSessions : rate.maxDeclarations,
+      { sessions: rate.maxSessions, declarations: rate.maxDeclarations, signatures: maxSignatures }[
+        category
+      ],
       rate.windowSeconds * 1000,
       now,
     );
@@ -276,6 +290,34 @@ export function createCollector(
           choice: session.choice,
           evidence: "self_reported",
         });
+      }
+      if (url.pathname === "/v1/signatures") {
+        if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
+        if (origin !== null) {
+          throw new HttpError(403, "Signed requests are reported server to server");
+        }
+        const data = await body(request, ["siteId", "request", "cdn", "sessionId", "accountRef"]);
+        const site = await lookup(data.siteId);
+        if (!site || !(await holdsSecret(request, site, now))) {
+          throw new HttpError(401, "Invalid site credentials");
+        }
+        const cdn = data.cdn === undefined ? null : cdnVerdict(data.cdn);
+        const reported = signedRequest(data.request, cdn === null);
+        const sessionId = reference(data.sessionId, "sessionId");
+        const accountRef = reference(data.accountRef, "accountRef");
+        await limited(request, site, "signatures", now);
+        const event = await recordSignature({
+          store,
+          site,
+          request: reported,
+          cdn,
+          sessionId,
+          accountRef,
+          signers,
+          keys,
+          now,
+        });
+        return respond({ event });
       }
       if (url.pathname === "/internal/prune") {
         if (!["GET", "POST"].includes(request.method))

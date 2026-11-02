@@ -42,6 +42,27 @@ export interface Domain {
   status: "unverified" | "verified" | "not_applicable";
   record: { type: string; name: string; value: string } | null;
 }
+/** A request that named a Web Bot Auth signer, as the collector recorded it. */
+export interface SignedVisit {
+  id: string;
+  type: "signature";
+  evidence: "signature_verified" | "signature_claimed" | "cdn_reported";
+  signer: string | null;
+  signatureAgent: string | null;
+  result:
+    | "verified"
+    | "unknown_signer"
+    | "bad_signature"
+    | "expired"
+    | "replayed"
+    | "wrong_authority"
+    | "malformed"
+    | "key_unavailable";
+  verifier: string | null;
+  path: string | null;
+  occurredAt: string;
+  receivedAt: string;
+}
 
 export class CollectorError extends Error {
   constructor(
