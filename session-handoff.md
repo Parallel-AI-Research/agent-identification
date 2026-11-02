@@ -45,4 +45,4 @@
 
 ## Recommended Next Step
 
-- Mark `feat-003` done once a real site records a declaration. Then start the activity event contract (`feat-005`), or earlier if the owner approves.
+- Mark `feat-003` done once a real site records a declaration. Then start the activity event contract (`feat-005`), or earlier if the owner approves, followed by Web Bot Auth verification (`feat-012`). `docs/web-bot-auth.md` has the research behind it.
