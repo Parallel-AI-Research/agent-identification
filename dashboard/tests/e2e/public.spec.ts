@@ -68,9 +68,17 @@ test("the light and dark toggle applies across the site and is remembered", asyn
   expect(background).toBe("rgb(15, 17, 23)");
 });
 
-test("phones can reach the dashboard from the home page and the docs", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 760 });
+test("phones and tablets can reach the dashboard from the home page and the docs", async ({
+  page,
+}) => {
+  // Tablets show Docs and Changelog in the navbar, and the menu hides its own list of them.
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Toggle Menu" }).click();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
 
+  await page.setViewportSize({ width: 390, height: 760 });
   await page.goto("/");
   await page.getByRole("button", { name: "Toggle Menu" }).click();
   await expect(page.getByRole("link", { name: "Dashboard", exact: true })).toBeVisible();
