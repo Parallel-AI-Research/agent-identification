@@ -93,7 +93,7 @@
       "name": "Installation connection check",
       "description": "Show real setup states driven by received events: waiting for installation, receiving events, or an actionable error.",
       "dependencies": ["feat-003"],
-      "status": "in-progress",
+      "status": "done",
       "acceptance": [
         "A real first event moves a product to receiving events.",
         "Copying a snippet never shows a product as connected.",
@@ -106,7 +106,7 @@
         "Refusals show for a week. Requests can claim any origin or secret, so the dashboard says what reached the collector, not who sent it."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-02, local: ./init.sh --full passed with 118/118 collector, 5/5 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests. Owner API tests run on memory, Postgres under the restricted app role and the production driver: a new product waits, reading it changes nothing, a widget load moves it to receiving events, a declaration is noted, refusals for an unlisted origin, a wrong secret and a bad binding context show only to their owner, a refused origin clears once allowed, and refusals are capped at 20 per site, noted once a minute and gone after a week. The browser journey shows Waiting for installation after copying the snippet, Receiving events after a real page load, and the refusal from a page on an unlisted origin. Not yet deployed: the install_activity migration must reach the production database before the collector."
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 118/118 collector, 5/5 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests. Owner API tests run on memory, Postgres under the restricted app role and the production driver: a new product waits, reading it changes nothing, a widget load moves it to receiving events, a declaration is noted, refusals for an unlisted origin, a wrong secret and a bad binding context show only to their owner, a refused origin clears once allowed, and refusals are capped at 20 per site, noted once a minute and gone after a week. The browser journey shows Waiting for installation after copying the snippet, Receiving events after a real page load, and the refusal from a page on an unlisted origin. 2026-11-02, hosted: applied the install_activity migration to the production database after a dry run listed only that migration; the table has row-level security on and forced, and the app role has only its grants. Then deployed the collector and dashboard from main at 0790758. /health reports postgres, and a session preflight from an unlisted origin is answered while the session itself stays refused. npm run smoke:hosted passed 9 checks with 7/7 sessions revoked, and the production install_activity table then held loaded and declared rows for the operator test sites the smoke run used. The live dashboard shows Waiting for installation on a real customer product, which is correct: its site doesn't carry the snippet yet, so no customer product has been seen moving to Receiving events on the hosted site. Merged main passed 28/28 dashboard journey tests in Chromium and WebKit before the deploy."
     },
     {
       "id": "feat-005",
