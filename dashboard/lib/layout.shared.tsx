@@ -1,5 +1,6 @@
 import type { BaseLayoutProps, LinkItemType } from "fumadocs-ui/layouts/shared";
 import { DashboardButton } from "@/components/dashboard-button";
+import { DashboardMenuLink } from "@/components/dashboard-links";
 import { appName } from "./shared";
 
 const TABS: LinkItemType[] = [
@@ -18,8 +19,15 @@ export function publicOptions(): BaseLayoutProps {
     links: [
       ...TABS,
       { type: "custom", secondary: true, on: "nav", children: <DashboardButton /> },
-      // The navbar button is hidden on small screens, so the menu needs its own way in.
+      // The navbar button is hidden below full width, so the menu needs its own way in: in the
+      // list on phones, and beside the theme toggle on tablets, which hide that list.
       { text: "Dashboard", url: "/dashboard", on: "menu" },
+      {
+        type: "custom",
+        secondary: true,
+        on: "menu",
+        children: <DashboardMenuLink className="block max-sm:hidden" />,
+      },
     ],
   };
 }

@@ -69,7 +69,9 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await expect(page.getByText("No products yet")).toBeVisible();
   const navbar = page.locator("header").first();
   await expect(navbar.getByRole("link", { name: "Docs" })).toBeVisible();
-  await expect(navbar.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
+  const tab = await navbar.getByRole("link", { name: "Dashboard" }).boundingBox();
+  const avatar = await navbar.getByRole("button", { name: "Account menu" }).boundingBox();
+  expect(tab!.x).toBeLessThan(avatar!.x);
   await navbar.getByRole("button", { name: "Account menu" }).click();
   await expect(page.getByText(email)).toBeVisible();
   await page.keyboard.press("Escape");
@@ -163,6 +165,18 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await expect(page.locator("body")).not.toContainText(rotated);
   await page.getByRole("button", { name: "Revoke old secret now" }).click();
   await expect(page.getByText("The old secret has been revoked")).toBeVisible();
+
+  // The Dashboard tab leads from a product back to the product list, on a phone too.
+  await navbar.getByRole("link", { name: "Dashboard" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("link", { name: /Storefront/ }).click();
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 760 });
+  await navbar.getByRole("button", { name: "Toggle Menu" }).click();
+  await navbar.getByRole("link", { name: "Dashboard" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(navbar.getByRole("link", { name: "Dashboard" })).toBeHidden();
+  await page.setViewportSize(size);
 
   await signOut(page);
   await expect(page).toHaveURL(/\/sign-in$/);
