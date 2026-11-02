@@ -6,12 +6,21 @@ import {
   type DeclarationResult,
   type InstallActivity,
   type InstallSignal,
+  type ActivityQuery,
   type PruneCutoffs,
   type PruneResult,
   type StoredEvent,
   type StoredSession,
 } from "./store.js";
-import type { ActivityEvent, Choice, EventSource, Evidence, Outcome } from "../src/protocol.js";
+import type {
+  ActivityEvent,
+  Choice,
+  EventSource,
+  Evidence,
+  Outcome,
+  SignatureEvent,
+  SignatureResult,
+} from "../src/protocol.js";
 import { assertActivity, sameActivity, type ActivityResult } from "./activity.js";
 import type {
   DomainClaim,
@@ -108,6 +117,18 @@ function activity(row: Record<string, unknown>): ActivityEvent {
           purpose: text(row.agent_purpose),
         },
       };
+    case "signature":
+      return {
+        ...base,
+        type: "signature",
+        source: "server",
+        evidence: row.evidence as SignatureEvent["evidence"],
+        signer: text(row.signer),
+        signatureAgent: text(row.signature_agent),
+        result: row.signature_result as SignatureResult,
+        verifier: text(row.verifier),
+        path: text(row.path),
+      };
     case "page_view":
       return {
         ...base,
@@ -131,7 +152,7 @@ function activity(row: Record<string, unknown>): ActivityEvent {
 }
 const ACTIVITY_COLUMNS = `site_id, id, session_id, type, source, evidence, origin, occurred_at,
   received_at, account_ref, choice, agent_name, agent_provider, agent_purpose, path, route,
-  action, resource_ref, outcome`;
+  action, resource_ref, outcome, signer, signature_agent, signature_result, verifier`;
 
 const ENVIRONMENT_COLUMNS = `e.*, coalesce((
   select jsonb_agg(o.origin order by o.origin)
@@ -510,9 +531,10 @@ export class PostgresStore implements CollectorStore, ProductStore {
     const declaration = event.type === "declaration" ? event : null;
     const pageView = event.type === "page_view" ? event : null;
     const action = event.type === "action" ? event : null;
+    const signed = event.type === "signature" ? event : null;
     const inserted = await this.execute(
       `insert into agent_identification.activity_events (${ACTIVITY_COLUMNS})
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        on conflict (site_id, id) do nothing
        returning ${ACTIVITY_COLUMNS}`,
       [
@@ -530,11 +552,15 @@ export class PostgresStore implements CollectorStore, ProductStore {
         declaration?.agent.name ?? null,
         declaration?.agent.provider ?? null,
         declaration?.agent.purpose ?? null,
-        pageView?.path ?? null,
+        pageView?.path ?? signed?.path ?? null,
         pageView?.route ?? null,
         action?.action ?? null,
         action?.resourceRef ?? null,
         action?.outcome ?? null,
+        signed?.signer ?? null,
+        signed?.signatureAgent ?? null,
+        signed?.result ?? null,
+        signed?.verifier ?? null,
       ],
     );
     if (inserted[0]) return { status: "recorded", event: activity(inserted[0]) };
@@ -550,15 +576,13 @@ export class PostgresStore implements CollectorStore, ProductStore {
       ? { status: "duplicate", event: stored }
       : { status: "conflict" };
   }
-  async listActivity(
-    siteId: string,
-    options: { limit: number; sessionId?: string },
-  ): Promise<ActivityEvent[]> {
+  async listActivity(siteId: string, options: ActivityQuery): Promise<ActivityEvent[]> {
     const rows = await this.execute(
       `select ${ACTIVITY_COLUMNS} from agent_identification.activity_events
        where site_id=$1 and ($2::uuid is null or session_id=$2::uuid)
-       order by received_at desc, id desc limit $3`,
-      [siteId, options.sessionId ?? null, options.limit],
+         and ($3::text is null or type=$3::text)
+       order by received_at desc, id desc limit $4`,
+      [siteId, options.sessionId ?? null, options.type ?? null, options.limit],
     );
     return rows.map(activity);
   }

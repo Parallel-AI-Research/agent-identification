@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Resolver } from "node:dns/promises";
+import { EVENT_TYPES } from "../src/protocol.js";
 import { hashToken, isAllowedOrigin, isUuid } from "../src/server/tokens.js";
 import { body, eventLimit, HttpError } from "./http.js";
 import {
@@ -348,9 +349,14 @@ export async function handleOwnerRequest(
     if (sessionId !== undefined && !isUuid(sessionId)) {
       throw new HttpError(400, "sessionId must be a UUID");
     }
+    const type = url.searchParams.get("type") ?? undefined;
+    if (type !== undefined && !(EVENT_TYPES as readonly string[]).includes(type)) {
+      throw new HttpError(400, `type must be one of ${EVENT_TYPES.join(", ")}`);
+    }
     const events = await store.listActivity(environment.siteId, {
       limit: eventLimit(url),
       sessionId: sessionId?.toLowerCase(),
+      type: type as (typeof EVENT_TYPES)[number] | undefined,
     });
     return respond({ events });
   }

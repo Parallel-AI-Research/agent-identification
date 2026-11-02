@@ -8,7 +8,7 @@ import {
   verifyDeclaration,
   verifyDeclarationOnline,
 } from "../src/server/index.js";
-import type { CreatedSession, RecordedDeclaration } from "../src/protocol.js";
+import { VERSION, type CreatedSession, type RecordedDeclaration } from "../src/protocol.js";
 
 const origin = "https://first.test";
 const otherOrigin = "https://second.test";
@@ -450,7 +450,7 @@ test("health checks storage on every request and returns 503 without database de
   const f = fixture({ store });
   const healthy = await f.request("/health");
   assert.equal(healthy.status, 200);
-  assert.deepEqual(await healthy.json(), { ok: true, version: "0.2.0", storage: "memory" });
+  assert.deepEqual(await healthy.json(), { ok: true, version: VERSION, storage: "memory" });
   const unhealthy = await f.request("/health");
   assert.equal(checks, 2);
   assert.equal(unhealthy.status, 503);

@@ -1,12 +1,12 @@
 # Web Bot Auth
 
-Research note from 2 November 2026 for `feat-012`. Nothing here is built yet.
+Research note from 2 November 2026 for `feat-012`, which builds on it. `docs/protocol.md` has the exact rules the collector applies.
 
 ## What it is
 
 An agent signs each HTTP request with [HTTP Message Signatures (RFC 9421)](https://www.rfc-editor.org/rfc/rfc9421) and sends three headers: `Signature`, `Signature-Input` and `Signature-Agent`. `Signature-Agent` names the signer's key directory, a JWKS document served at `/.well-known/http-message-signatures-directory`. The website fetches the key and checks the signature, which covers the website's own host (`@authority`) and the `Signature-Agent` header and carries creation and expiry times.
 
-The IETF Web Bot Auth working group adopted the core protocol as [draft-ietf-webbotauth-httpsig-protocol-00](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/) on 1 September 2026. It's still a draft, so details can change.
+The IETF Web Bot Auth working group adopted the core protocol as [draft-ietf-webbotauth-httpsig-protocol-00](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/) on 1 September 2026, and -01 followed on 29 October. It's still a draft, so details can change. In -01, `Signature-Agent` is a dictionary keyed by signature label, such as `sig1="https://chatgpt.com"`, and a URL with a path points straight at a key set. The older single-string form may still be accepted, and the collector accepts both. The draft's own Ed25519 test vector is one of the collector's tests.
 
 ## Who signs
 

@@ -1,0 +1,64 @@
+---
+title: Signed agents
+description: Identify agents that sign their requests with Web Bot Auth, with nothing on the page.
+---
+
+Some agents sign every request they make with [Web Bot Auth](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/), an IETF draft built on HTTP Message Signatures. The signature names the agent's operator and can be checked against the keys that operator publishes. Visitors see nothing, and it works whether or not the widget is installed.
+
+Your server passes each signed request on to the collector, which checks the signature and adds the result to the **Signed agents** card on your product page.
+
+## What a result means
+
+- **Verified:** the collector checked the signature against the signer's published key. It identifies the agent's operator, such as the company running it, never the person or account it acts for.
+- **Verified by your CDN:** your server passed on your CDN's own verdict instead.
+- **Anything else** says why the signature couldn't be verified, such as an unknown signer, an expired signature, or one signed for another site. It's recorded, but never counted as verified.
+
+A signature never blocks or admits anyone. Your own permissions stay in charge.
+
+No signer is listed as supported until a real signed request from it has been verified on the hosted collector. Signing is voluntary, so agents that don't sign, including ones working through a person's own browser, aren't identified this way.
+
+## Node.js
+
+Add one line wherever your server handles a request. It skips requests without a signature, sends only the signed headers, and never throws, so don't wait for it:
+
+```ts
+import { reportSignedRequest } from "@parallel-research/agent-identification/server";
+
+const options = {
+  apiUrl: "https://parallel-agent-identification.vercel.app",
+  siteId: "YOUR-SITE-ID",
+  secret: process.env.AGENT_ID_SITE_SECRET!,
+};
+
+// Next.js middleware, or any handler that receives a Fetch Request:
+export function middleware(request: Request, event: { waitUntil(p: Promise<unknown>): void }) {
+  event.waitUntil(reportSignedRequest(request, options));
+}
+
+// Express:
+app.use((req, res, next) => {
+  void reportSignedRequest(req, options);
+  next();
+});
+```
+
+Pass `sessionId` or `accountRef` in the options when your server knows them. `accountRef` is your own opaque ID for the account, never a name or email address.
+
+## Any other server
+
+Send a server-to-server request when a request arrives with `Signature` and `Signature-Input` headers. Include those two, `Signature-Agent`, and any other header named in `Signature-Input`:
+
+```sh
+curl https://parallel-agent-identification.vercel.app/v1/signatures \
+  -H "Authorization: Bearer $AGENT_ID_SITE_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"siteId":"YOUR-SITE-ID","request":{"method":"GET","url":"https://your-site.example/pricing","headers":{"signature":"…","signature-input":"…","signature-agent":"…"}}}'
+```
+
+## Your CDN's verdict
+
+If Cloudflare, Akamai or Vercel already checks signatures for your site, you can pass on its verdict instead with `"cdn": {"verifier": "cloudflare", "signer": "ChatGPT agent"}` in place of the headers. Only do this when your CDN sets the value itself and removes any copy a visitor sends, or anyone could claim to be verified.
+
+## What's sent and kept
+
+The request's method, URL and signed headers go to the collector so it can rebuild what was signed. It keeps the result, the signer, and the path with its query removed and anything that looks like an ID masked. Like other activity, it's kept for 30 days.

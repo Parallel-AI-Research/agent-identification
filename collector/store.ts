@@ -83,10 +83,7 @@ export interface CollectorStore {
   /** Appends one event. A retry with the same ID and content is a duplicate, not a change. */
   recordActivity(event: ActivityEvent): Promise<ActivityResult>;
   /** Newest first by when the collector received them. */
-  listActivity(
-    siteId: string,
-    options: { limit: number; sessionId?: string },
-  ): Promise<ActivityEvent[]>;
+  listActivity(siteId: string, options: ActivityQuery): Promise<ActivityEvent[]>;
   consumeRate(key: string, limit: number, windowMs: number, now: number): Promise<boolean>;
   noteInstall(activity: {
     siteId: string;
@@ -97,6 +94,11 @@ export interface CollectorStore {
   listInstallActivity(siteIds: string[]): Promise<InstallActivity[]>;
   /** Also removes refusals older than the session cutoff. Loads and declarations stay as history. */
   prune(cutoffs: PruneCutoffs, now: number, limit: number): Promise<PruneResult>;
+}
+export interface ActivityQuery {
+  limit: number;
+  sessionId?: string;
+  type?: ActivityEvent["type"];
 }
 export interface DeclarationInput {
   tokenHash: string;
@@ -307,15 +309,13 @@ export class MemoryStore implements CollectorStore, ProductStore {
     this.activity.set(key, structuredClone(event));
     return { status: "recorded", event: structuredClone(event) };
   }
-  async listActivity(
-    siteId: string,
-    options: { limit: number; sessionId?: string },
-  ): Promise<ActivityEvent[]> {
+  async listActivity(siteId: string, options: ActivityQuery): Promise<ActivityEvent[]> {
     return [...this.activity.values()]
       .filter(
         (event) =>
           event.siteId === siteId &&
-          (options.sessionId === undefined || event.sessionId === options.sessionId),
+          (options.sessionId === undefined || event.sessionId === options.sessionId) &&
+          (options.type === undefined || event.type === options.type),
       )
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id.localeCompare(a.id))
       .slice(0, options.limit)
