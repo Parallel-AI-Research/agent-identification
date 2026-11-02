@@ -19,7 +19,7 @@ No signer is listed as supported until a real signed request from it has been ve
 
 ## Node.js
 
-Add one line wherever your server handles a request. It skips requests without a signature, sends only the signed headers, and never throws, so don't wait for it:
+Add one line wherever your server handles a request. It skips requests without a signature, and scripts, styles and images unless you pass `includeAssets: true`, so a page load counts once. It sends only the signed headers and never throws, so don't wait for it:
 
 ```ts
 import { reportSignedRequest } from "@parallel-research/agent-identification/server";

@@ -1,6 +1,15 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import { agentClaim, isChoice, VERSION, type SessionStatus } from "../src/protocol.js";
 import {
+  agentClaim,
+  EVENT_TYPES,
+  isChoice,
+  VERSION,
+  type ActionEvent,
+  type PageViewEvent,
+  type SessionStatus,
+} from "../src/protocol.js";
+import {
+  hashBinding,
   hashToken,
   isAllowedOrigin,
   isSiteId,
@@ -21,6 +30,7 @@ import {
   type Site,
   type SiteDirectory,
 } from "./products.js";
+import { actionInputs, pageViewInputs } from "./collection.js";
 import { cdnVerdict, recordSignature, reference, signedRequest } from "./signatures.js";
 import type { CollectorStore, InstallSignal, StoredSession } from "./store.js";
 import { DEFAULT_SIGNERS, KeyDirectory, type Signer } from "./web-bot-auth.js";
@@ -48,6 +58,10 @@ export interface CollectorOptions {
     maxDeclarations: number;
     /** Signed-request reports from a customer's server; defaults to 600 a window. */
     maxSignatures?: number;
+    /** Page-view reports per browser client; defaults to 600 a window. */
+    maxPageViews?: number;
+    /** Action reports from a customer's server; defaults to 6000 a window. */
+    maxActions?: number;
   };
   /** Web Bot Auth signers whose key directories are trusted. Defaults to DEFAULT_SIGNERS. */
   signers?: Signer[];
@@ -59,6 +73,7 @@ const PUBLIC_PATHS = new Map<string, string[]>([
   ["/v1/sessions", ["POST"]],
   ["/v1/sessions/current", ["GET", "DELETE"]],
   ["/v1/declarations", ["POST"]],
+  ["/v1/page-views", ["POST"]],
 ]);
 
 function status(session: StoredSession): SessionStatus {
@@ -114,7 +129,11 @@ export function createCollector(
   boundedInteger(rate.maxSessions, 1, 10000, "session rate limit");
   boundedInteger(rate.maxDeclarations, 1, 10000, "declaration rate limit");
   const maxSignatures = rate.maxSignatures ?? 600;
+  const maxPageViews = rate.maxPageViews ?? 600;
+  const maxActions = rate.maxActions ?? 6000;
   boundedInteger(maxSignatures, 1, 100000, "signature rate limit");
+  boundedInteger(maxPageViews, 1, 100000, "page view rate limit");
+  boundedInteger(maxActions, 1, 100000, "action rate limit");
   const signers = options.signers ?? DEFAULT_SIGNERS;
   const keys = new KeyDirectory(options.keyFetch ?? fetch, () => clock().getTime());
   let nextPruneAt = 0;
@@ -140,7 +159,7 @@ export function createCollector(
   async function limited(
     request: Request,
     site: Site,
-    category: "sessions" | "declarations" | "signatures",
+    category: "sessions" | "declarations" | "signatures" | "pageViews" | "actions",
     now: number,
   ): Promise<void> {
     const clientKey = options.trustedClientKey?.(request) ?? "shared-site";
@@ -153,9 +172,13 @@ export function createCollector(
       .digest("hex");
     const allowed = await store.consumeRate(
       key,
-      { sessions: rate.maxSessions, declarations: rate.maxDeclarations, signatures: maxSignatures }[
-        category
-      ],
+      {
+        sessions: rate.maxSessions,
+        declarations: rate.maxDeclarations,
+        signatures: maxSignatures,
+        pageViews: maxPageViews,
+        actions: maxActions,
+      }[category],
       rate.windowSeconds * 1000,
       now,
     );
@@ -290,6 +313,68 @@ export function createCollector(
           choice: session.choice,
           evidence: "self_reported",
         });
+      }
+      if (url.pathname === "/v1/activity") {
+        if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
+        if (origin !== null)
+          throw new HttpError(403, "Activity requires a server-to-server request");
+        const site = await lookup(url.searchParams.get("siteId"));
+        if (!site || !(await holdsSecret(request, site, now))) {
+          throw new HttpError(401, "Invalid site credentials");
+        }
+        const sessionId = url.searchParams.get("sessionId") ?? undefined;
+        const type = url.searchParams.get("type") ?? undefined;
+        if (sessionId !== undefined && !isUuid(sessionId)) {
+          throw new HttpError(400, "sessionId must be a UUID");
+        }
+        if (type !== undefined && !(EVENT_TYPES as readonly string[]).includes(type)) {
+          throw new HttpError(400, `type must be one of ${EVENT_TYPES.join(", ")}`);
+        }
+        const events = await store.listActivity(site.id, {
+          limit: eventLimit(url),
+          sessionId: sessionId?.toLowerCase(),
+          type: type as (typeof EVENT_TYPES)[number] | undefined,
+        });
+        return respond({ events });
+      }
+      if (url.pathname === "/v1/actions") {
+        if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
+        if (origin !== null) throw new HttpError(403, "Actions are reported server to server");
+        const data = await body(request, ["siteId", "actions"]);
+        const site = await lookup(data.siteId);
+        if (!site || !(await holdsSecret(request, site, now))) {
+          throw new HttpError(401, "Invalid site credentials");
+        }
+        const actions = actionInputs(data.actions, now);
+        await limited(request, site, "actions", now);
+        const results = [];
+        for (const input of actions) {
+          const sessionId = input.sessionBinding
+            ? await store.findSessionByBinding(site.id, hashBinding(site.id, input.sessionBinding))
+            : null;
+          const event: ActionEvent = {
+            id: input.id,
+            siteId: site.id,
+            sessionId,
+            origin: null,
+            type: "action",
+            source: "server",
+            evidence: "host_reported",
+            occurredAt: input.occurredAt,
+            receivedAt: new Date(now).toISOString(),
+            accountRef: input.accountRef,
+            action: input.action,
+            resourceRef: input.resourceRef,
+            outcome: input.outcome,
+          };
+          const result = await store.recordActivity(event);
+          results.push({
+            id: input.id,
+            status: result.status,
+            sessionId: result.status === "conflict" ? null : result.event.sessionId,
+          });
+        }
+        return respond({ results });
       }
       if (url.pathname === "/v1/signatures") {
         if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
@@ -446,6 +531,32 @@ export function createCollector(
         return respond(null, 204);
       }
       if (request.method === "GET") return respond(status(session));
+      if (url.pathname === "/v1/page-views") {
+        const data = await body(request, ["views"]);
+        const views = pageViewInputs(data.views, now);
+        await limited(request, site, "pageViews", now);
+        const results = [];
+        for (const view of views) {
+          // Session, origin and account come from the authenticated session, never the body.
+          const event: PageViewEvent = {
+            id: view.id,
+            siteId: site.id,
+            sessionId: session.id,
+            origin: session.origin,
+            type: "page_view",
+            source: "browser",
+            evidence: "browser_reported",
+            occurredAt: view.occurredAt,
+            receivedAt: new Date(now).toISOString(),
+            accountRef: null,
+            path: view.path,
+            route: view.route,
+          };
+          const result = await store.recordActivity(event);
+          results.push({ id: view.id, status: result.status });
+        }
+        return respond({ results });
+      }
       const data = await body(request, ["choice", "requestId", "agent"]);
       if (!isChoice(data.choice) || !isUuid(data.requestId)) {
         throw new HttpError(400, "Valid choice and UUID requestId are required");

@@ -15,10 +15,10 @@ const disposables: (() => void)[] = [];
 let sequence = 0;
 const token = "a".repeat(43);
 
-function environment() {
+function environment(url = "http://localhost:4200/") {
   const dom = new JSDOM(
     '<main><div id="identify"></div><section id="gate"><button>Edit</button></section></main>',
-    { url: "http://localhost:4200/" },
+    { url },
   );
   const names = ["window", "document", "HTMLElement", "sessionStorage"] as const;
   for (const name of names) {
@@ -38,6 +38,8 @@ function environment() {
     siteId: `site-${++sequence}`,
     apiUrl: "http://localhost:4310",
     mode: "required",
+    // These tests count every request a declaration makes; page views have their own tests.
+    pageViews: false,
   };
   return { options, gate, dom };
 }
@@ -473,4 +475,48 @@ test("host callback errors do not turn a confirmed response into a network failu
   assert.equal(gate.inert, false);
   assert.equal(button("Retry").hidden, true);
   assert.match(shadow().textContent!, /Response recorded: Person/);
+});
+
+test("a page load sends one page view with only its masked path, and waits for confirmation", async () => {
+  const { options } = environment("http://localhost:4200/tickets/123?tab=history#notes");
+  const initial = status(options);
+  const views: { id: string; path: string; route?: string }[] = [];
+  globalThis.fetch = async (url, request) => {
+    if (String(url).endsWith("/v1/sessions")) return json({ ...initial, sessionToken: token }, 201);
+    const view = (JSON.parse(String(request!.body)) as { views: (typeof views)[number][] })
+      .views[0]!;
+    views.push(view);
+    return json({ results: [{ id: view.id, status: "recorded" }] });
+  };
+  const widget = mount({ ...options, pageViews: true, route: "/tickets/:id" });
+  await widget.ready;
+  await until(() => views.length === 1);
+  assert.equal(views[0]!.path, "/tickets/:id");
+  assert.equal(views[0]!.route, "/tickets/:id");
+  await widget.pageView();
+  assert.equal(views.length, 2);
+  assert.notEqual(views[1]!.id, views[0]!.id);
+  await assert.rejects(widget.pageView({ route: "/search?q=alice" }), /route must be/);
+});
+
+test("an unconfirmed page view retries with the same ID, then reports and rejects", async () => {
+  const { options } = environment();
+  const initial = status(options);
+  const ids: string[] = [];
+  const errors: Error[] = [];
+  globalThis.fetch = async (url, request) => {
+    if (String(url).endsWith("/v1/sessions")) return json({ ...initial, sessionToken: token }, 201);
+    ids.push((JSON.parse(String(request!.body)) as { views: { id: string }[] }).views[0]!.id);
+    return json({ error: "busy" }, 503);
+  };
+  const widget = mount({ ...options, onError: (error) => errors.push(error) });
+  await widget.ready;
+  await assert.rejects(widget.pageView(), /HTTP 503/);
+  assert.equal(ids.length, 3);
+  assert.equal(new Set(ids).size, 1);
+  assert.equal(errors.length, 1);
+  // A success that doesn't confirm this view isn't treated as recorded.
+  globalThis.fetch = async (url) =>
+    String(url).endsWith("/v1/page-views") ? json({ results: [] }) : json({}, 500);
+  await assert.rejects(widget.pageView(), /did not confirm/);
 });

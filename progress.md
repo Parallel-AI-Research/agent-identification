@@ -5,9 +5,9 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-02 (Africa/Lagos)
-**Active Feature:** `feat-012`, Web Bot Auth verification, built on `feat-005` in a stack of branches at the owner's request. `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
+**Active Feature:** `feat-006`, activity collection, built on `feat-012` in a stack of branches at the owner's request. `feat-005` and `feat-012` are merged but not deployed. `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
 
-The package is `0.3.0` on the `feat-012` branch and `0.2.0` on `feat-005`; published `0.1.0` assets are unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
+The package is `0.4.0` on the `feat-006` branch; `main` has `0.3.0`, which isn't deployed, and published `0.1.0` assets are unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
 ## Status
 
@@ -25,6 +25,7 @@ The package is `0.3.0` on the `feat-012` branch and `0.2.0` on `feat-005`; publi
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
 - [ ] Activity event contract (`feat-005`): built and tested locally, not yet deployed. It adds the `activity_events` migration, which must reach the production database before the collector deploys.
+- [ ] Activity collection (`feat-006`): built and tested locally, not deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for 0.4.0 to be published.
 - [ ] Web Bot Auth verification (`feat-012`): built and tested locally, not yet deployed. Its `add_signature_events` migration follows feat-005's. No signer or CDN is supported until a real request through it is verified on the hosted collector.
 
 ### What's Next

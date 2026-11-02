@@ -386,6 +386,19 @@ test("the Node helper sends only what the signature covers, skips unsigned reque
     "signature-input",
   ]);
 
+  // Assets would inflate counts, so only documents are reported unless asked.
+  for (const asset of [
+    new Request("https://shop.test/pricing", {
+      headers: { ...request.headers, "sec-fetch-dest": "image" },
+    }),
+    new Request("https://shop.test/logo.png", { headers: request.headers }),
+  ]) {
+    assert.deepEqual(await reportSignedRequest(asset, { ...options, fetch: through }), {
+      status: "skipped",
+    });
+  }
+  assert.equal(sent.length, 1);
+
   const node = {
     method: "get",
     originalUrl: "/tickets/123?tab=history",

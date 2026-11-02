@@ -39,6 +39,7 @@ const MIGRATIONS = [
   "20261102120000_add_install_activity.sql",
   "20261102130000_add_activity_events.sql",
   "20261102140000_add_signature_events.sql",
+  "20261102150000_add_session_binding_index.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -629,6 +630,59 @@ for (const [kind, open] of stores) {
         verified,
       );
       assert.equal((await owner(owners.alice, `${path(a)}/activity?type=nope`)).status, 400);
+    });
+
+    test("a server action joins the session its host's own binding started", async () => {
+      const { handle, create } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const siteId = a.environment.siteId;
+      const visit = async (sessionBinding: string) => {
+        const bindingContext = createBindingContext({
+          siteId,
+          origin,
+          secret: a.serverSecret,
+          sessionBinding,
+          now: new Date(time),
+        });
+        const response = await handle(
+          new Request("https://collector.test/v1/sessions", {
+            method: "POST",
+            headers: { origin, "content-type": "application/json" },
+            body: JSON.stringify({ siteId, bindingContext }),
+          }),
+        );
+        return (await response.json()) as CreatedSession;
+      };
+      const first = await visit("login-1");
+      const second = await visit("login-2");
+      const report = async (sessionBinding: string) => {
+        const response = await handle(
+          new Request("https://collector.test/v1/actions", {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${a.serverSecret}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              siteId,
+              actions: [
+                {
+                  id: randomUUID(),
+                  action: "ticket.update",
+                  outcome: "confirmed",
+                  sessionBinding,
+                  occurredAt: new Date(time).toISOString(),
+                },
+              ],
+            }),
+          }),
+        );
+        return ((await response.json()) as { results: { sessionId: string | null }[] }).results[0]!
+          .sessionId;
+      };
+      assert.equal(await report("login-1"), first.sessionId);
+      assert.equal(await report("login-2"), second.sessionId);
+      assert.equal(await report("login-3"), null);
     });
 
     test("activity is kept for 30 days, after its session has gone", async () => {

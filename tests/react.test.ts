@@ -86,6 +86,8 @@ test("React updates host callbacks without resetting the visitor session and res
     apiUrl: "http://localhost:4310",
     gate,
     mode: "required" as const,
+    // This test counts the declaration's own requests; page views have their own tests.
+    pageViews: false,
   };
   try {
     await act(async () => {

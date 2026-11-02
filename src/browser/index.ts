@@ -1,6 +1,8 @@
 import {
   VERSION,
   isChoice,
+  isRoutePattern,
+  routePath,
   type Choice,
   type CreatedSession,
   type Mode,
@@ -21,12 +23,22 @@ export interface WidgetOptions {
   storage?: "session" | "memory";
   onRecorded?: (declaration: RecordedDeclaration) => void;
   onError?: (error: Error) => void;
+  /**
+   * Records a page view once the session is ready, and again after reset. Only the path is
+   * sent, without its query or fragment and with parts that look like IDs masked. Defaults to
+   * true.
+   */
+  pageViews?: boolean;
+  /** Your route pattern for this page, such as /tickets/:id, for parts masking can't catch. */
+  route?: string;
 }
 
 export interface Widget {
   readonly ready: Promise<SessionStatus>;
   getState(): SessionStatus | null;
   reset(): Promise<SessionStatus>;
+  /** Records a page view, for apps that change pages without reloading. */
+  pageView(options?: { route?: string }): Promise<void>;
   destroy(): void;
 }
 
@@ -42,6 +54,8 @@ interface Configuration {
   storage: "session" | "memory";
   onRecorded?: WidgetOptions["onRecorded"];
   onError?: WidgetOptions["onError"];
+  pageViews: boolean;
+  route?: string;
 }
 
 interface StoredSession {
@@ -114,6 +128,9 @@ function configure(options: WidgetOptions): Configuration {
   if (window.location.origin === "null") {
     throw new Error("Serve this website over HTTPS (or localhost HTTP) to use identification.");
   }
+  if (options.route !== undefined && !isRoutePattern(options.route)) {
+    throw new Error("route must be a path pattern such as /tickets/:id.");
+  }
   return {
     container,
     gate,
@@ -126,6 +143,8 @@ function configure(options: WidgetOptions): Configuration {
     bindingContext: options.bindingContext,
     onRecorded: options.onRecorded,
     onError: options.onError,
+    pageViews: options.pageViews ?? true,
+    route: options.route,
   };
 }
 
@@ -245,6 +264,8 @@ class Controller implements Widget {
   private pending: { choice: Choice; requestId: string } | null = null;
   private retryAction: (() => Promise<unknown>) | null = null;
   private expiry: ReturnType<typeof setTimeout> | undefined;
+  /** The session this page load has recorded its automatic page view in. */
+  private viewed: string | null = null;
 
   constructor(readonly config: Configuration) {
     this.originalInert = config.gate?.inert ?? false;
@@ -482,7 +503,7 @@ class Controller implements Widget {
           const status = validateStatus(body, this.config, this.session.sessionId);
           this.session.expiresAt = status.expiresAt;
           this.persist(this.session);
-          return this.accepted(status);
+          return this.view(this.accepted(status));
         } catch (error) {
           this.active(version);
           if (!(error instanceof HttpError) || ![401, 404, 410].includes(error.status)) throw error;
@@ -505,7 +526,7 @@ class Controller implements Widget {
         expiresAt: status.expiresAt,
       };
       this.persist(this.session);
-      return this.accepted(status);
+      return this.view(this.accepted(status));
     } catch (error) {
       this.fail(error, version, () => this.restart(), "Could not load identification.");
       throw error;
@@ -528,6 +549,61 @@ class Controller implements Widget {
     } catch (error) {
       this.fail(error, version, () => this.submit(this.version), "Could not record your response.");
       throw error;
+    }
+  }
+
+  /** Records this page load's automatic view once per session; failures reach onError. */
+  private view(status: SessionStatus): SessionStatus {
+    if (this.config.pageViews && this.viewed !== status.sessionId) {
+      this.viewed = status.sessionId;
+      void this.pageView({ route: this.config.route }).catch(() => {});
+    }
+    return status;
+  }
+
+  async pageView(options: { route?: string } = {}): Promise<void> {
+    this.active(this.version);
+    if (options.route !== undefined && !isRoutePattern(options.route)) {
+      throw new Error("route must be a path pattern such as /tickets/:id.");
+    }
+    const view = {
+      // The same ID on every attempt, so a retry is recorded once.
+      id: crypto.randomUUID(),
+      path: routePath(window.location.pathname),
+      ...(options.route ? { route: options.route } : {}),
+      occurredAt: new Date().toISOString(),
+    };
+    const operation = this.controller.signal;
+    for (let attempt = 0; ; attempt++) {
+      const session = this.session;
+      try {
+        if (!session) throw new Error("Identification session is not ready.");
+        const body = await this.request("/v1/page-views", "POST", { views: [view] }, session.token);
+        const confirmed =
+          record(body) &&
+          Array.isArray(body.results) &&
+          body.results.some(
+            (result: unknown) =>
+              record(result) &&
+              result.id === view.id &&
+              (result.status === "recorded" || result.status === "duplicate"),
+          );
+        if (!confirmed) throw new Error("Identification service did not confirm the page view.");
+        return;
+      } catch (error) {
+        // A reset or destroy supersedes the view; it belongs to the session that ended.
+        if (operation.aborted || this.destroyed) throw error;
+        const retryable =
+          session !== null &&
+          (!(error instanceof HttpError) || error.status === 429 || error.status >= 500);
+        if (!retryable || attempt >= 2) {
+          const failure = asError(error);
+          this.notifyError(failure);
+          throw failure;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300 * 3 ** attempt));
+        if (operation.aborted || this.destroyed) throw error;
+      }
     }
   }
 

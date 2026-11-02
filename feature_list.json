@@ -172,7 +172,7 @@
       "name": "Browser and server activity collection",
       "description": "Collect access and activity evidence independently of whether a visitor answers the widget, through a browser integration and a server or edge integration.",
       "dependencies": ["feat-005"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Visits and relevant actions are recorded for both answered and unanswered prompts.",
         "Retries are idempotent.",
@@ -184,10 +184,16 @@
       ],
       "decisions": [
         "The first server integration is a plain HTTP events endpoint, so any backend can report actions without our package.",
-        "A Node helper sits on top of that endpoint. No paid dependency is required."
+        "A Node helper sits on top of that endpoint. No paid dependency is required.",
+        "Started after feat-012 at the owner's request to build the remaining features in order.",
+        "Browser page views go to POST /v1/page-views with the visitor's own session token; the collector takes the session, origin and site from that session, masks the path again, and refuses any other field, so a browser can't attribute anything.",
+        "Server actions go to POST /v1/actions with the site's secret. An action joins a session only through the host's own session binding, hashed like a binding context, never a session ID a browser could have supplied.",
+        "The widget records one page view per page load once its session is ready, and again after reset; pageView() covers apps that change pages without reloading, and data-page-views=\"off\" turns it off.",
+        "GET /v1/activity lets a site's server export its activity with its secret, like the declaration export.",
+        "This is SDK 0.4.0, and install instructions move to it."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 153/153 collector, contract and SDK unit tests, 5/5 dashboard unit, 54/54 SDK browser and 28/28 dashboard journey tests in Chromium and WebKit. In real browsers each page load records one page view before any answer, a reload adds another to the same session, a reset starts the new session with its own, a failed page view retries with the same ID and is recorded once, and data-page-views=\"off\" sends none. Collector tests show the path is masked by the collector, a retry is a duplicate and a changed retry a conflict, a browser can't send accountRef, a session ID or any other field, a revoked or foreign-origin session is refused, and preflight works. Server actions need the site's secret, refuse browser requests and bad input, link to a session only through the host's binding (including after signing out and in as someone else), are recorded once on retry, and work from a plain HTTP request. The binding lookup passes on memory, Postgres under the restricted role and the production driver. reportAction() retries with the same ID, never throws, and only reports recorded when confirmed; the widget's pageView() rejects and reports unless the collector confirms that view. Not yet done: the ticket app still installs SDK 0.1.0 from the hosted tarball, so the integration fixture waits for 0.4.0 to be deployed."
     },
     {
       "id": "feat-007",

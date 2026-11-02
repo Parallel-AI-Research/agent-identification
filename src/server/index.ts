@@ -2,6 +2,8 @@ export { createBindingContext, verifyDeclaration } from "./tokens.js";
 export type { BindingOptions, DeclarationClaims } from "./tokens.js";
 export { verifyDeclarationOnline } from "./online.js";
 export type { OnlineVerificationOptions } from "./online.js";
+export { reportAction } from "./activity.js";
+export type { ActionReport, ActionReportOptions, ReportedAction } from "./activity.js";
 export { reportSignedRequest } from "./web-bot-auth.js";
 export type { ReportableRequest, SignatureReport, SignatureReportOptions } from "./web-bot-auth.js";
 export { routePath } from "../protocol.js";

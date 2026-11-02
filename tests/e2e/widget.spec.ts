@@ -34,6 +34,15 @@ async function events(request: APIRequestContext, sessionId: string) {
   return body.events.filter((event) => event.sessionId === sessionId);
 }
 
+async function pageViews(request: APIRequestContext, sessionId: string) {
+  const response = await request.get(
+    `${api}/v1/activity?siteId=${siteId}&type=page_view&sessionId=${sessionId}&limit=100`,
+    { headers: { Authorization: `Bearer ${siteSecret}` } },
+  );
+  expect(response.status()).toBe(200);
+  return ((await response.json()) as { events: Array<{ path: string; evidence: string }> }).events;
+}
+
 async function isGated(page: Page) {
   return page.locator("#publish-form").evaluate((element) => (element as HTMLElement).inert);
 }
@@ -353,4 +362,56 @@ test("React package works under Strict Mode and cleans up on unmount", async ({ 
   expect(await isGated(page)).toBe(false);
   await page.getByRole("button", { name: "Mount widget", exact: true }).click();
   await expect(page.getByText("Response recorded: AI assistant.", { exact: true })).toBeVisible();
+});
+
+test("each load records one page view before any answer, and a reset starts its own", async ({
+  page,
+  request,
+}) => {
+  const sessionId = await load(page, "/plain/?ref=newsletter");
+  await expect.poll(async () => (await pageViews(request, sessionId)).length).toBe(1);
+  expect(await pageViews(request, sessionId)).toEqual([
+    expect.objectContaining({ path: "/plain/", evidence: "browser_reported" }),
+  ]);
+  expect(await events(request, sessionId)).toHaveLength(0);
+  await page.reload();
+  await expect.poll(async () => (await pageViews(request, sessionId)).length).toBe(2);
+  const created = page.waitForResponse(
+    (response) => response.url() === `${api}/v1/sessions` && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Reset declaration", exact: true }).click();
+  const fresh = (await (await created).json()) as { sessionId: string };
+  await expect.poll(async () => (await pageViews(request, fresh.sessionId)).length).toBe(1);
+});
+
+test("a page view that fails retries with the same ID and is recorded once", async ({
+  page,
+  request,
+}) => {
+  const ids: string[] = [];
+  let failures = 1;
+  await page.route(`${api}/v1/page-views`, async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    ids.push(
+      (JSON.parse(route.request().postData() ?? "{}") as { views: { id: string }[] }).views[0]!.id,
+    );
+    if (failures-- > 0) await route.abort("failed");
+    else await route.continue();
+  });
+  const sessionId = await load(page);
+  await expect.poll(async () => (await pageViews(request, sessionId)).length).toBe(1);
+  expect(ids).toHaveLength(2);
+  expect(ids[0]).toBe(ids[1]);
+});
+
+test("page views can be turned off", async ({ page, request }) => {
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (request.url() === `${api}/v1/page-views`) sent.push(request.method());
+  });
+  const sessionId = await load(page, "/plain/?pageViews=off");
+  await page.getByRole("button", { name: "Person", exact: true }).click();
+  await expect(page.getByText("Response recorded: Person.", { exact: true })).toBeVisible();
+  expect(sent).toEqual([]);
+  expect(await pageViews(request, sessionId)).toEqual([]);
 });
