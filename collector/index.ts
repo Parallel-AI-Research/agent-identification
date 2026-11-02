@@ -2,6 +2,7 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { isChoice, VERSION, type SessionStatus } from "../src/protocol.js";
 import {
   hashToken,
+  isAllowedOrigin,
   isSiteId,
   isUuid,
   mintDeclaration,
@@ -20,7 +21,7 @@ import {
   type Site,
   type SiteDirectory,
 } from "./products.js";
-import type { CollectorStore, StoredSession } from "./store.js";
+import type { CollectorStore, InstallSignal, StoredSession } from "./store.js";
 
 export type { SiteConfig } from "../src/server/tokens.js";
 export interface CollectorOptions {
@@ -101,7 +102,21 @@ export function createCollector(
   boundedInteger(rate.maxSessions, 1, 10000, "session rate limit");
   boundedInteger(rate.maxDeclarations, 1, 10000, "declaration rate limit");
   let nextPruneAt = 0;
+  // Install activity only feeds the owner's status view, so one note a minute per site,
+  // signal and origin is enough, and a busy site doesn't write on every request.
+  const noted = new Map<string, number>();
 
+  async function note(siteId: string, signal: InstallSignal, origin: string, now: number) {
+    const key = JSON.stringify([siteId, signal, origin]);
+    if ((noted.get(key) ?? -Infinity) > now - 60000) return;
+    if (noted.size >= 5000) noted.clear();
+    noted.set(key, now);
+    try {
+      await store.noteInstall({ siteId, signal, origin, now });
+    } catch {
+      // A status note must never cost a visitor or a customer's server its request.
+    }
+  }
   async function limited(
     request: Request,
     site: Site,
@@ -127,24 +142,31 @@ export function createCollector(
   async function lookup(id: unknown): Promise<Site | null> {
     return isSiteId(id) ? directory.find(id) : null;
   }
-  async function siteFor(id: unknown, origin: string | null): Promise<Site> {
+  async function siteFor(id: unknown, origin: string | null, now: number): Promise<Site> {
     const site = await lookup(id);
     if (!site || !origin || !site.origins.includes(origin)) {
+      if (site && isAllowedOrigin(origin)) await note(site.id, "origin_refused", origin, now);
       throw new HttpError(403, "Site or origin is not allowed");
     }
     return site;
   }
-  function holdsSecret(request: Request, site: Site | null, now: number): site is Site {
+  async function holdsSecret(request: Request, site: Site | null, now: number): Promise<boolean> {
     if (!site) return false;
     const token = bearer(request);
-    return activeSecrets(site, now).some((secret) => secretEquals(token, secret));
+    if (activeSecrets(site, now).some((secret) => secretEquals(token, secret))) return true;
+    await note(site.id, "secret_refused", "", now);
+    return false;
   }
   async function authenticated(
     request: Request,
     now: number,
     allowRevoked = false,
   ): Promise<{ site: Site; session: StoredSession }> {
-    const site = await siteFor(request.headers.get("x-agent-site"), request.headers.get("origin"));
+    const site = await siteFor(
+      request.headers.get("x-agent-site"),
+      request.headers.get("origin"),
+      now,
+    );
     const token = bearer(request);
     if (!SESSION_TOKEN.test(token)) throw new HttpError(401, "Invalid or expired session");
     const session = await store.getSession(hashToken(token));
@@ -189,7 +211,7 @@ export function createCollector(
         if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
         if (origin !== null) throw new HttpError(403, "Events require a server-to-server request");
         const site = await lookup(url.searchParams.get("siteId"));
-        if (!holdsSecret(request, site, now)) {
+        if (!site || !(await holdsSecret(request, site, now))) {
           throw new HttpError(401, "Invalid site credentials");
         }
         return respond({ events: await store.listEvents(site.id, eventLimit(url)) });
@@ -200,7 +222,7 @@ export function createCollector(
           throw new HttpError(403, "Verification requires a server-to-server request");
         const data = await body(request, ["siteId", "origin", "sessionBinding", "receipt"]);
         const site = await lookup(data.siteId);
-        if (!holdsSecret(request, site, now)) {
+        if (!site || !(await holdsSecret(request, site, now))) {
           throw new HttpError(401, "Invalid site credentials");
         }
         if (
@@ -277,7 +299,10 @@ export function createCollector(
         });
       }
       if (!publicRoute) throw new HttpError(404, "Not found");
-      if (!origin || !knownOrigin) throw new HttpError(403, "Origin is not allowed");
+      // A session request from an origin no site allows still reaches the site check, so the
+      // site's owner can see why an install isn't working. The request itself is refused.
+      const traced = url.pathname === "/v1/sessions" && isAllowedOrigin(origin);
+      if (!origin || (!knownOrigin && !traced)) throw new HttpError(403, "Origin is not allowed");
       if (request.method === "OPTIONS") {
         const intended = request.headers.get("access-control-request-method");
         const requestedHeaders = (request.headers.get("access-control-request-headers") ?? "")
@@ -292,6 +317,7 @@ export function createCollector(
           )
         )
           throw new HttpError(403, "Preflight request is not allowed");
+        headers.set("access-control-allow-origin", origin);
         headers.set("access-control-allow-methods", [...publicRoute, "OPTIONS"].join(", "));
         headers.set("access-control-allow-headers", "Authorization, Content-Type, X-Agent-Site");
         headers.set(
@@ -307,7 +333,7 @@ export function createCollector(
       }
       if (url.pathname === "/v1/sessions") {
         const data = await body(request, ["siteId", "bindingContext"]);
-        const site = await siteFor(data.siteId, origin);
+        const site = await siteFor(data.siteId, origin, now);
         await limited(request, site, "sessions", now);
         let bindingHash: string | null = null;
         let signingSecretHash: string | null = null;
@@ -330,7 +356,10 @@ export function createCollector(
               // During a rotation the context may use the other active secret.
             }
           }
-          if (!claims) throw new HttpError(400, "Invalid or expired binding context");
+          if (!claims) {
+            await note(site.id, "binding_refused", origin, now);
+            throw new HttpError(400, "Invalid or expired binding context");
+          }
           bindingHash = claims.bindingHash;
           expiresAt = Math.min(expiresAt, claims.exp * 1000);
         }
@@ -351,6 +380,7 @@ export function createCollector(
           requestId: null,
         };
         await store.createSession(session);
+        await note(site.id, "loaded", origin, now);
         return respond({ ...status(session), sessionToken }, 201);
       }
       const { site, session } = await authenticated(request, now, request.method === "DELETE");
@@ -396,6 +426,7 @@ export function createCollector(
         if (outcome.status === "invalid") throw new HttpError(401, "Invalid or expired session");
         throw new HttpError(409, "This session already has a different choice");
       }
+      await note(site.id, "declared", outcome.session.origin, now);
       return respond(status(outcome.session));
     } catch (error) {
       if (error instanceof HttpError) {

@@ -3,8 +3,8 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector, dashboard, public site, docs and changelog are live, and the first real account has created a product.
-- Branch / commit: `docs/feat-011-done`, based on `4a9f31b`.
+- Current status: The hosted collector, dashboard, public site, docs and changelog are live. `feat-004`, the install status, is built and tested locally on `feat/install-connection-check`, and isn't deployed yet.
+- Branch / commit: `feat/install-connection-check`, based on `0aeb5b3`.
 
 ## Completed This Session
 
@@ -43,4 +43,4 @@
 
 ## Recommended Next Step
 
-- Confirm a declaration from a real site, mark `feat-003` done, then start `feat-004`.
+- Apply the `install_activity` migration to the production database, deploy the collector and dashboard, and check a real install's status. Then mark `feat-004` done, and `feat-003` once a real site records a declaration.

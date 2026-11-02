@@ -15,7 +15,7 @@ import {
   type SecretCipher,
   type SiteDirectory,
 } from "./products.js";
-import type { CollectorStore } from "./store.js";
+import { INSTALL_REFUSALS, type CollectorStore, type InstallActivity } from "./store.js";
 
 export interface OwnerApiOptions {
   /** Returns the verified owner ID, or null for a rejected credential. */
@@ -39,6 +39,7 @@ const OVERLAP_MS = 24 * 60 * 60 * 1000;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z][a-z0-9-]+$/;
 const TXT_PREFIX = "_agent-identification";
 const TXT_VALUE = "agent-identification-verification";
+const ISSUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Asks public resolvers, so the answer doesn't depend on a host's DNS setup and can't
@@ -54,7 +55,51 @@ export async function publicTxtLookup(name: string): Promise<string[][]> {
     clearTimeout(deadline);
   }
 }
-function environmentView(environment: EnvironmentRecord, now: number) {
+/**
+ * Only traffic the collector received changes this, so copying a snippet never makes an
+ * install look connected. Refusals show for a week, and a refused origin disappears once
+ * the owner allows it.
+ */
+function installView(environment: EnvironmentRecord, activity: InstallActivity[], now: number) {
+  const own = activity.filter((row) => row.siteId === environment.siteId);
+  const time = (value: number) => new Date(value).toISOString();
+  const loaded = own
+    .filter((row) => row.signal === "loaded" && environment.origins.includes(row.origin))
+    .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  const declared = own
+    .filter((row) => row.signal === "declared")
+    .reduce<number | null>((latest, row) => Math.max(latest ?? 0, row.lastSeenAt), null);
+  const issues = own
+    .filter(
+      (row) =>
+        INSTALL_REFUSALS.includes(row.signal) &&
+        row.lastSeenAt > now - ISSUE_WINDOW_MS &&
+        !(row.signal === "origin_refused" && environment.origins.includes(row.origin)),
+    )
+    .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  return {
+    status: loaded.length ? ("receiving" as const) : ("waiting" as const),
+    loaded: loaded.map((row) => ({
+      origin: row.origin,
+      firstSeenAt: time(row.firstSeenAt),
+      lastSeenAt: time(row.lastSeenAt),
+    })),
+    lastDeclarationAt: declared === null ? null : time(declared),
+    /** The collector's clock, so relative times don't depend on the caller's. */
+    checkedAt: time(now),
+    issues: issues.map((row) => ({
+      signal: row.signal,
+      origin: row.origin || null,
+      firstSeenAt: time(row.firstSeenAt),
+      lastSeenAt: time(row.lastSeenAt),
+    })),
+  };
+}
+function environmentView(
+  environment: EnvironmentRecord,
+  now: number,
+  activity: InstallActivity[] = [],
+) {
   const overlap = (environment.previousSecretExpiresAt ?? 0) > now;
   return {
     id: environment.id,
@@ -66,15 +111,20 @@ function environmentView(environment: EnvironmentRecord, now: number) {
     previousSecretExpiresAt: overlap
       ? new Date(environment.previousSecretExpiresAt!).toISOString()
       : null,
+    install: installView(environment, activity, now),
     createdAt: new Date(environment.createdAt).toISOString(),
     updatedAt: new Date(environment.updatedAt).toISOString(),
   };
 }
-function productView(product: ProductWithEnvironments, now: number) {
+function productView(
+  product: ProductWithEnvironments,
+  now: number,
+  activity: InstallActivity[] = [],
+) {
   return {
     id: product.id,
     name: product.name,
-    environments: product.environments.map((item) => environmentView(item, now)),
+    environments: product.environments.map((item) => environmentView(item, now, activity)),
     createdAt: new Date(product.createdAt).toISOString(),
     updatedAt: new Date(product.updatedAt).toISOString(),
   };
@@ -167,6 +217,8 @@ export async function handleOwnerRequest(
   },
 ): Promise<Response> {
   const { owners, store, directory, now, respond } = options;
+  const activityFor = (environments: EnvironmentRecord[]) =>
+    store.listInstallActivity(environments.map((item) => item.siteId));
   const route = ROUTE.exec(url.pathname);
   if (!route) throw new HttpError(404, "Not found");
   if (request.headers.get("origin") !== null) {
@@ -191,7 +243,10 @@ export async function handleOwnerRequest(
   if (productId === undefined) {
     if (request.method === "GET") {
       const products = await owners.products.listProducts(ownerId);
-      return respond({ products: products.map((product) => productView(product, now)) });
+      const activity = await activityFor(products.flatMap((product) => product.environments));
+      return respond({
+        products: products.map((product) => productView(product, now, activity)),
+      });
     }
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
     const data = await body(request, ["name", "origins"]);
@@ -229,7 +284,11 @@ export async function handleOwnerRequest(
   if (!product) throw new HttpError(404, "Not found");
 
   if (!environmentsPath) {
-    if (request.method === "GET") return respond({ product: productView(product, now) });
+    if (request.method === "GET") {
+      return respond({
+        product: productView(product, now, await activityFor(product.environments)),
+      });
+    }
     if (request.method !== "PATCH") throw new HttpError(405, "Method not allowed");
     const data = await body(request, ["name"]);
     const renamed = await owners.products.renameProduct(
@@ -239,13 +298,16 @@ export async function handleOwnerRequest(
       now,
     );
     if (!renamed) throw new HttpError(404, "Not found");
-    return respond({ product: productView(renamed, now) });
+    return respond({
+      product: productView(renamed, now, await activityFor(renamed.environments)),
+    });
   }
 
   if (environmentId === undefined) {
     if (request.method === "GET") {
+      const activity = await activityFor(product.environments);
       return respond({
-        environments: product.environments.map((item) => environmentView(item, now)),
+        environments: product.environments.map((item) => environmentView(item, now, activity)),
       });
     }
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
@@ -273,6 +335,8 @@ export async function handleOwnerRequest(
 
   const environment = product.environments.find((item) => item.id === environmentId);
   if (!environment) throw new HttpError(404, "Not found");
+  const view = async (changed: EnvironmentRecord) =>
+    environmentView(changed, now, await activityFor([changed]));
 
   if (section === "events") {
     if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
@@ -292,7 +356,7 @@ export async function handleOwnerRequest(
     });
     if (!rotated) throw new HttpError(409, "Revoke the old secret before rotating again");
     directory.invalidate(environment.siteId);
-    return respond({ environment: environmentView(rotated, now), serverSecret });
+    return respond({ environment: await view(rotated), serverSecret });
   }
   if (section === "secret/previous") {
     if (request.method !== "DELETE") throw new HttpError(405, "Method not allowed");
@@ -304,7 +368,7 @@ export async function handleOwnerRequest(
     );
     if (!revoked) throw new HttpError(404, "Not found");
     directory.invalidate(environment.siteId);
-    return respond({ environment: environmentView(revoked, now) });
+    return respond({ environment: await view(revoked) });
   }
   if (section === "domains") {
     if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
@@ -346,7 +410,7 @@ export async function handleOwnerRequest(
     return respond({ domain: domainView({ ...claim!, verifiedAt: now }) });
   }
 
-  if (request.method === "GET") return respond({ environment: environmentView(environment, now) });
+  if (request.method === "GET") return respond({ environment: await view(environment) });
   if (request.method !== "PATCH") throw new HttpError(405, "Method not allowed");
   // The type is deliberately not editable, so it is rejected as an unexpected field.
   const data = await body(request, ["name", "origins"]);
@@ -360,5 +424,5 @@ export async function handleOwnerRequest(
   });
   if (!updated) throw new HttpError(404, "Not found");
   directory.invalidate(environment.siteId, [...environment.origins, ...updated.origins]);
-  return respond({ environment: environmentView(updated, now) });
+  return respond({ environment: await view(updated) });
 }

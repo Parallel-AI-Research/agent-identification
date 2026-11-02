@@ -93,15 +93,20 @@
       "name": "Installation connection check",
       "description": "Show real setup states driven by received events: waiting for installation, receiving events, or an actionable error.",
       "dependencies": ["feat-003"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "A real first event moves a product to receiving events.",
         "Copying a snippet never shows a product as connected.",
         "A failing installation shows an error the owner can act on."
       ],
-      "decisions": [],
+      "decisions": [
+        "Started before feat-003 was done, with the owner's approval, because it shows whether a real install works.",
+        "Status comes only from traffic the collector received: a widget load from an allowed origin, a declaration, or a refusal. Copying a snippet changes nothing.",
+        "The collector answers session preflights from any HTTPS or local origin, so a page on an unlisted origin can be traced to its site. The session request itself is still refused.",
+        "Refusals show for a week. Requests can claim any origin or secret, so the dashboard says what reached the collector, not who sent it."
+      ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 118/118 collector, 5/5 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests. Owner API tests run on memory, Postgres under the restricted app role and the production driver: a new product waits, reading it changes nothing, a widget load moves it to receiving events, a declaration is noted, refusals for an unlisted origin, a wrong secret and a bad binding context show only to their owner, a refused origin clears once allowed, and refusals are capped at 20 per site, noted once a minute and gone after a week. The browser journey shows Waiting for installation after copying the snippet, Receiving events after a real page load, and the refusal from a page on an unlisted origin. Not yet deployed: the install_activity migration must reach the production database before the collector."
     },
     {
       "id": "feat-005",

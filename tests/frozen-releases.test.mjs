@@ -41,7 +41,8 @@ function run(root, script) {
   return spawnSync(process.execPath, [`scripts/${script}.mjs`], {
     cwd: root,
     encoding: "utf8",
-    timeout: 15_000,
+    // Only guards against a hung build; a loaded machine can take well over 15 seconds.
+    timeout: 60_000,
   });
 }
 

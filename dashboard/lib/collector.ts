@@ -2,6 +2,21 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "./supabase/server";
 
+export interface InstallIssue {
+  signal: "origin_refused" | "secret_refused" | "binding_refused";
+  origin: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+/** Only traffic the collector received changes this. */
+export interface InstallStatus {
+  status: "waiting" | "receiving";
+  loaded: { origin: string; firstSeenAt: string; lastSeenAt: string }[];
+  lastDeclarationAt: string | null;
+  /** The collector's time, which relative times are measured from. */
+  checkedAt: string;
+  issues: InstallIssue[];
+}
 export interface Environment {
   id: string;
   productId: string;
@@ -10,6 +25,7 @@ export interface Environment {
   siteId: string;
   origins: string[];
   previousSecretExpiresAt: string | null;
+  install: InstallStatus;
   createdAt: string;
   updatedAt: string;
 }

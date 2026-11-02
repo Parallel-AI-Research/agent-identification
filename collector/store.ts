@@ -35,6 +35,24 @@ export interface StoredEvent {
   evidence: "self_reported";
   createdAt: string;
 }
+/** What an install has done, kept per site so its owner can see whether it works. */
+export type InstallSignal =
+  "loaded" | "declared" | "origin_refused" | "secret_refused" | "binding_refused";
+export interface InstallActivity {
+  siteId: string;
+  signal: InstallSignal;
+  /** Empty for server requests, which have no origin. */
+  origin: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+}
+/** Requests can claim any origin, so a site keeps only this many per signal. */
+export const MAX_INSTALL_ORIGINS = 20;
+export const INSTALL_REFUSALS: InstallSignal[] = [
+  "origin_refused",
+  "secret_refused",
+  "binding_refused",
+];
 export type DeclarationResult =
   { status: "recorded"; session: StoredSession } | { status: "conflict" | "invalid" };
 export interface PruneResult {
@@ -60,6 +78,14 @@ export interface CollectorStore {
   revokeSession(tokenHash: string, now: number): Promise<void>;
   listEvents(siteId: string, limit: number): Promise<StoredEvent[]>;
   consumeRate(key: string, limit: number, windowMs: number, now: number): Promise<boolean>;
+  noteInstall(activity: {
+    siteId: string;
+    signal: InstallSignal;
+    origin: string;
+    now: number;
+  }): Promise<void>;
+  listInstallActivity(siteIds: string[]): Promise<InstallActivity[]>;
+  /** Also removes refusals older than the cutoff. Loads and declarations stay as history. */
   prune(cutoff: number, now: number, limit: number): Promise<PruneResult>;
 }
 
@@ -72,6 +98,7 @@ export class MemoryStore implements CollectorStore, ProductStore {
   private sessions = new Map<string, StoredSession>();
   private events = new Map<string, StoredEvent>();
   private rates = new Map<string, { count: number; expiresAt: number }>();
+  private installs = new Map<string, InstallActivity>();
   async checkHealth(): Promise<void> {}
   /** Synchronous so a local fixture can register its sites during startup. */
   seedProduct(product: ProductRecord, production: EnvironmentRecord): void {
@@ -272,7 +299,36 @@ export class MemoryStore implements CollectorStore, ProductStore {
     rate.count++;
     return rate.count <= limit;
   }
+  async noteInstall(activity: {
+    siteId: string;
+    signal: InstallSignal;
+    origin: string;
+    now: number;
+  }): Promise<void> {
+    const { siteId, signal, origin, now } = activity;
+    const key = JSON.stringify([siteId, signal, origin]);
+    const row = this.installs.get(key);
+    if (row) {
+      row.lastSeenAt = Math.max(row.lastSeenAt, now);
+      return;
+    }
+    const kept = [...this.installs.values()].filter(
+      (value) => value.siteId === siteId && value.signal === signal,
+    ).length;
+    if (kept >= MAX_INSTALL_ORIGINS) return;
+    this.installs.set(key, { siteId, signal, origin, firstSeenAt: now, lastSeenAt: now });
+  }
+  async listInstallActivity(siteIds: string[]): Promise<InstallActivity[]> {
+    return [...this.installs.values()]
+      .filter((row) => siteIds.includes(row.siteId))
+      .map((row) => ({ ...row }));
+  }
   async prune(cutoff: number, now: number, limit: number): Promise<PruneResult> {
+    for (const [key, row] of this.installs) {
+      if (INSTALL_REFUSALS.includes(row.signal) && row.lastSeenAt < cutoff) {
+        this.installs.delete(key);
+      }
+    }
     let removed = 0;
     for (const [key, session] of this.sessions) {
       if (removed >= limit) break;
