@@ -26,7 +26,7 @@ export interface OwnerApiOptions {
   resolveTxt?: (name: string) => Promise<string[][]>;
 }
 const ROUTE =
-  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
+  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|activity|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
 const MAX_ORIGINS = 20;
 const MAX_PRODUCTS = 25;
 const DEFAULT_NAMES: Record<EnvironmentType, string> = {
@@ -341,6 +341,18 @@ export async function handleOwnerRequest(
   if (section === "events") {
     if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
     return respond({ events: await store.listEvents(environment.siteId, eventLimit(url)) });
+  }
+  if (section === "activity") {
+    if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
+    const sessionId = url.searchParams.get("sessionId") ?? undefined;
+    if (sessionId !== undefined && !isUuid(sessionId)) {
+      throw new HttpError(400, "sessionId must be a UUID");
+    }
+    const events = await store.listActivity(environment.siteId, {
+      limit: eventLimit(url),
+      sessionId: sessionId?.toLowerCase(),
+    });
+    return respond({ events });
   }
   if (section === "secret") {
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");

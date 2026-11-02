@@ -26,6 +26,6 @@ A declaration is not an authorization decision. Your existing permissions stay i
 
 ## What's collected today
 
-Events keep the session ID, origin, answer and timestamps. Tokens and session bindings are stored only as hashes, and raw IP addresses aren't stored. Records are removed after seven days. No browsing history, screenshots or form contents are collected.
+Declarations keep the session ID, origin, answer and timestamps, plus an agent's own name, provider and purpose if it gives them. Tokens and session bindings are stored only as hashes, and raw IP addresses aren't stored. Sessions are removed after seven days, and each session's activity after 30.
 
-This will change when activity tracking arrives, and any change will be in the [changelog](/changelog).
+Page paths aren't collected yet. When page views arrive, a path keeps no query string, and parts that look like IDs or email addresses are replaced with `:id`. Page titles, page text, screenshots and form contents are never collected. Any change will be in the [changelog](/changelog).

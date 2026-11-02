@@ -1,4 +1,5 @@
-import type { Choice } from "../src/protocol.js";
+import type { ActivityEvent, AgentClaim, Choice } from "../src/protocol.js";
+import { assertActivity, declarationEvent, sameActivity, type ActivityResult } from "./activity.js";
 import {
   ENVIRONMENT_TYPES,
   type DomainClaim,
@@ -58,8 +59,15 @@ export type DeclarationResult =
 export interface PruneResult {
   removedSessions: number;
   removedRateBuckets: number;
+  removedActivity: number;
   /** A full batch warrants another pass; this may conservatively overestimate. */
   more: boolean;
+}
+export interface PruneCutoffs {
+  /** Sessions, and their legacy declaration events, created before this go. */
+  sessions: number;
+  /** Activity events received before this go. They are kept longer than sessions. */
+  activity: number;
 }
 export interface CollectorStore {
   readonly kind: "memory" | "postgres";
@@ -67,16 +75,18 @@ export interface CollectorStore {
   createSession(session: StoredSession): Promise<void>;
   getSession(tokenHash: string): Promise<StoredSession | null>;
   getSessionById(id: string): Promise<StoredSession | null>;
-  recordDeclaration(input: {
-    tokenHash: string;
-    choice: Choice;
-    requestId: string;
-    eventId: string;
-    receipt: string;
-    now: number;
-  }): Promise<DeclarationResult>;
+  /** Also adds the declaration to the session's activity timeline, in the same write. */
+  recordDeclaration(input: DeclarationInput): Promise<DeclarationResult>;
   revokeSession(tokenHash: string, now: number): Promise<void>;
+  /** The v0.1.0 declaration export. */
   listEvents(siteId: string, limit: number): Promise<StoredEvent[]>;
+  /** Appends one event. A retry with the same ID and content is a duplicate, not a change. */
+  recordActivity(event: ActivityEvent): Promise<ActivityResult>;
+  /** Newest first by when the collector received them. */
+  listActivity(
+    siteId: string,
+    options: { limit: number; sessionId?: string },
+  ): Promise<ActivityEvent[]>;
   consumeRate(key: string, limit: number, windowMs: number, now: number): Promise<boolean>;
   noteInstall(activity: {
     siteId: string;
@@ -85,8 +95,18 @@ export interface CollectorStore {
     now: number;
   }): Promise<void>;
   listInstallActivity(siteIds: string[]): Promise<InstallActivity[]>;
-  /** Also removes refusals older than the cutoff. Loads and declarations stay as history. */
-  prune(cutoff: number, now: number, limit: number): Promise<PruneResult>;
+  /** Also removes refusals older than the session cutoff. Loads and declarations stay as history. */
+  prune(cutoffs: PruneCutoffs, now: number, limit: number): Promise<PruneResult>;
+}
+export interface DeclarationInput {
+  tokenHash: string;
+  choice: Choice;
+  requestId: string;
+  eventId: string;
+  receipt: string;
+  /** Kept from the first accepted request; a retry can't change it. */
+  agent: AgentClaim;
+  now: number;
 }
 
 /** Development/test storage. Production must use shared persistent storage. */
@@ -99,6 +119,7 @@ export class MemoryStore implements CollectorStore, ProductStore {
   private events = new Map<string, StoredEvent>();
   private rates = new Map<string, { count: number; expiresAt: number }>();
   private installs = new Map<string, InstallActivity>();
+  private activity = new Map<string, ActivityEvent>();
   async checkHealth(): Promise<void> {}
   /** Synchronous so a local fixture can register its sites during startup. */
   seedProduct(product: ProductRecord, production: EnvironmentRecord): void {
@@ -245,14 +266,7 @@ export class MemoryStore implements CollectorStore, ProductStore {
     const row = [...this.sessions.values()].find((value) => value.id === id);
     return row ? { ...row } : null;
   }
-  async recordDeclaration(input: {
-    tokenHash: string;
-    choice: Choice;
-    requestId: string;
-    eventId: string;
-    receipt: string;
-    now: number;
-  }): Promise<DeclarationResult> {
+  async recordDeclaration(input: DeclarationInput): Promise<DeclarationResult> {
     const row = this.sessions.get(input.tokenHash);
     if (!row || row.revokedAt !== null || row.expiresAt <= input.now) {
       return { status: "invalid" };
@@ -277,7 +291,35 @@ export class MemoryStore implements CollectorStore, ProductStore {
       evidence: "self_reported",
       createdAt: new Date(input.now).toISOString(),
     });
+    const event = declarationEvent(row, input);
+    this.activity.set(JSON.stringify([event.siteId, event.id]), event);
     return { status: "recorded", session: { ...row } };
+  }
+  async recordActivity(event: ActivityEvent): Promise<ActivityResult> {
+    assertActivity(event);
+    const key = JSON.stringify([event.siteId, event.id]);
+    const existing = this.activity.get(key);
+    if (existing) {
+      return sameActivity(existing, event)
+        ? { status: "duplicate", event: structuredClone(existing) }
+        : { status: "conflict" };
+    }
+    this.activity.set(key, structuredClone(event));
+    return { status: "recorded", event: structuredClone(event) };
+  }
+  async listActivity(
+    siteId: string,
+    options: { limit: number; sessionId?: string },
+  ): Promise<ActivityEvent[]> {
+    return [...this.activity.values()]
+      .filter(
+        (event) =>
+          event.siteId === siteId &&
+          (options.sessionId === undefined || event.sessionId === options.sessionId),
+      )
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id.localeCompare(a.id))
+      .slice(0, options.limit)
+      .map((event) => structuredClone(event));
   }
   async revokeSession(hash: string, now: number): Promise<void> {
     const row = this.sessions.get(hash);
@@ -323,16 +365,24 @@ export class MemoryStore implements CollectorStore, ProductStore {
       .filter((row) => siteIds.includes(row.siteId))
       .map((row) => ({ ...row }));
   }
-  async prune(cutoff: number, now: number, limit: number): Promise<PruneResult> {
+  async prune(cutoffs: PruneCutoffs, now: number, limit: number): Promise<PruneResult> {
     for (const [key, row] of this.installs) {
-      if (INSTALL_REFUSALS.includes(row.signal) && row.lastSeenAt < cutoff) {
+      if (INSTALL_REFUSALS.includes(row.signal) && row.lastSeenAt < cutoffs.sessions) {
         this.installs.delete(key);
+      }
+    }
+    let activityRemoved = 0;
+    for (const [key, event] of this.activity) {
+      if (activityRemoved >= limit) break;
+      if (Date.parse(event.receivedAt) < cutoffs.activity) {
+        this.activity.delete(key);
+        activityRemoved++;
       }
     }
     let removed = 0;
     for (const [key, session] of this.sessions) {
       if (removed >= limit) break;
-      if (session.createdAt < cutoff) {
+      if (session.createdAt < cutoffs.sessions) {
         this.sessions.delete(key);
         if (session.eventId) this.events.delete(session.eventId);
         removed++;
@@ -349,7 +399,8 @@ export class MemoryStore implements CollectorStore, ProductStore {
     return {
       removedSessions: removed,
       removedRateBuckets: ratesRemoved,
-      more: removed === limit || ratesRemoved === limit,
+      removedActivity: activityRemoved,
+      more: removed === limit || ratesRemoved === limit || activityRemoved === limit,
     };
   }
 }

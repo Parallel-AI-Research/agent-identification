@@ -113,7 +113,7 @@
       "name": "Activity event contract",
       "description": "Extend the declaration model with repeatable activity events, so a declaration is one event type rather than the whole session timeline.",
       "dependencies": ["feat-004"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "The contract covers product, session, event ID and timestamp, with duplicate handling.",
         "Independent signals keep their sources, and conflicting signals stay inspectable.",
@@ -128,10 +128,14 @@
         "Browser events carry the route path with query strings removed and ID-like segments masked. Hosts can supply their own route pattern, because masking only catches segments that look like IDs.",
         "Server events carry a host-named action, opaque resource and account references, and an outcome.",
         "Page titles, page text, form contents and raw IP addresses are never collected.",
-        "Customer activity data is kept for 30 days."
+        "Customer activity data is kept for 30 days.",
+        "Started before feat-003 finished, with the owner's approval on 2 November 2026.",
+        "This feature defines the contract and stores it: the types, the path masking rule, an activity table kept 30 days with duplicate handling, declarations recorded as one event type, and an owner API to read a timeline. The browser and server producers of page views and actions are feat-006.",
+        "The v0.1.0 declaration export (GET /v1/events) is unchanged, and every declaration is also written to the timeline in the same statement.",
+        "Each feature that changes the SDK gets its own version, so a published version never changes whenever it is deployed. This one is 0.2.0, and install instructions move to it."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 132/132 collector and contract tests, 5/5 dashboard unit, 48/48 SDK browser and 28/28 dashboard journey tests in Chromium and WebKit. Activity tests run on memory, Postgres under the restricted app role and the production driver: a declaration joins its session's timeline with the agent's own description, a retry with the same ID records once and a changed one conflicts, IDs are unique per site, a Person answer and host-reported actions stay side by side, events that break the contract are refused by both the collector and the database, and activity outlives its session's 7-day pruning until 30 days. The migration test shows declarations recorded before it join the timeline. Path masking, references, action names, outcomes and agent descriptions have unit tests. The 0.2.0 tarball passed the packed consumer check, and the frozen-release tests rebuild the exact published 0.1.0 bytes from its archived source. Not yet deployed: the activity_events migration must reach the production database before the collector, and 0.2.0 is only published once deployed."
     },
     {
       "id": "feat-012",

@@ -5,9 +5,9 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-02 (Africa/Lagos)
-**Active Feature:** `feat-003`, which still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done. `feat-005` is next, and starting it before `feat-003` finishes needs the owner's approval, as `feat-004` had.
+**Active Feature:** `feat-005`, the activity event contract, started before `feat-003` finished with the owner's approval. `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
 
-The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
+The package is `0.2.0` on the `feat-005` branch; published `0.1.0` assets are unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
 ## Status
 
@@ -24,6 +24,7 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
+- [ ] Activity event contract (`feat-005`): built and tested locally, not yet deployed. It adds the `activity_events` migration, which must reach the production database before the collector deploys.
 
 ### What's Next
 

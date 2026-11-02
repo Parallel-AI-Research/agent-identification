@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import { isChoice, VERSION, type SessionStatus } from "../src/protocol.js";
+import { agentClaim, isChoice, VERSION, type SessionStatus } from "../src/protocol.js";
 import {
   hashToken,
   isAllowedOrigin,
@@ -38,6 +38,8 @@ export interface CollectorOptions {
   trustedClientKey?: (request: Request) => string;
   sessionTtlSeconds?: number;
   retentionDays?: number;
+  /** Activity events outlive sessions, so a customer can look back over a month. */
+  activityRetentionDays?: number;
   rateLimit?: {
     windowSeconds: number;
     maxSessions: number;
@@ -91,6 +93,7 @@ export function createCollector(
   const clock = options.now ?? (() => new Date());
   const ttl = options.sessionTtlSeconds ?? 1800;
   const retentionDays = options.retentionDays ?? 7;
+  const activityRetentionDays = options.activityRetentionDays ?? 30;
   const rate = options.rateLimit ?? {
     windowSeconds: 60,
     maxSessions: 30,
@@ -98,10 +101,15 @@ export function createCollector(
   };
   boundedInteger(ttl, 1, 1800, "session lifetime");
   boundedInteger(retentionDays, 1, 30, "retention");
+  boundedInteger(activityRetentionDays, 1, 30, "activity retention");
   boundedInteger(rate.windowSeconds, 1, 3600, "rate window");
   boundedInteger(rate.maxSessions, 1, 10000, "session rate limit");
   boundedInteger(rate.maxDeclarations, 1, 10000, "declaration rate limit");
   let nextPruneAt = 0;
+  const cutoffs = (now: number) => ({
+    sessions: now - retentionDays * 86400000,
+    activity: now - activityRetentionDays * 86400000,
+  });
   // Install activity only feeds the owner's status view, so one note a minute per site,
   // signal and origin is enough, and a busy site doesn't write on every request.
   const noted = new Map<string, number>();
@@ -279,15 +287,22 @@ export function createCollector(
         }
         let total = 0;
         let totalRateBuckets = 0;
+        let totalActivity = 0;
         let more = false;
         for (let batch = 0; batch < 100; batch++) {
-          const result = await store.prune(now - retentionDays * 86400000, now, 1000);
+          const result = await store.prune(cutoffs(now), now, 1000);
           total += result.removedSessions;
           totalRateBuckets += result.removedRateBuckets;
+          totalActivity += result.removedActivity;
           more = result.more;
           if (!more) break;
         }
-        return respond({ removedSessions: total, removedRateBuckets: totalRateBuckets, more });
+        return respond({
+          removedSessions: total,
+          removedRateBuckets: totalRateBuckets,
+          removedActivity: totalActivity,
+          more,
+        });
       }
       if (options.owners && url.pathname.startsWith("/v1/owner/")) {
         return await handleOwnerRequest(request, url, {
@@ -328,7 +343,7 @@ export function createCollector(
       }
       if (!publicRoute.includes(request.method)) throw new HttpError(405, "Method not allowed");
       if (now >= nextPruneAt) {
-        await store.prune(now - retentionDays * 86400000, now, 100);
+        await store.prune(cutoffs(now), now, 100);
         nextPruneAt = now + 60000;
       }
       if (url.pathname === "/v1/sessions") {
@@ -389,9 +404,16 @@ export function createCollector(
         return respond(null, 204);
       }
       if (request.method === "GET") return respond(status(session));
-      const data = await body(request, ["choice", "requestId"]);
+      const data = await body(request, ["choice", "requestId", "agent"]);
       if (!isChoice(data.choice) || !isUuid(data.requestId)) {
         throw new HttpError(400, "Valid choice and UUID requestId are required");
+      }
+      const agent = agentClaim(data.agent);
+      if (!agent) {
+        throw new HttpError(
+          400,
+          "Agent details must be name, provider and purpose, 100 characters each at most",
+        );
       }
       await limited(request, site, "declarations", now);
       const eventId = randomUUID();
@@ -420,6 +442,7 @@ export function createCollector(
         requestId: data.requestId,
         eventId,
         receipt,
+        agent,
         now,
       });
       if (outcome.status !== "recorded") {

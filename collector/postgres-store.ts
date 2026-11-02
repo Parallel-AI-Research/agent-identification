@@ -2,14 +2,17 @@ import {
   INSTALL_REFUSALS,
   MAX_INSTALL_ORIGINS,
   type CollectorStore,
+  type DeclarationInput,
   type DeclarationResult,
   type InstallActivity,
   type InstallSignal,
+  type PruneCutoffs,
   type PruneResult,
   type StoredEvent,
   type StoredSession,
 } from "./store.js";
-import type { Choice } from "../src/protocol.js";
+import type { ActivityEvent, Choice, EventSource, Evidence, Outcome } from "../src/protocol.js";
+import { assertActivity, sameActivity, type ActivityResult } from "./activity.js";
 import type {
   DomainClaim,
   EnvironmentChanges,
@@ -78,6 +81,58 @@ function environment(row: Record<string, unknown>): EnvironmentRecord {
     updatedAt: Number(row.updated_at),
   };
 }
+const text = (value: unknown) => (value === null ? null : String(value));
+function activity(row: Record<string, unknown>): ActivityEvent {
+  const base = {
+    id: String(row.id),
+    siteId: String(row.site_id),
+    sessionId: text(row.session_id),
+    origin: text(row.origin),
+    occurredAt: new Date(Number(row.occurred_at)).toISOString(),
+    receivedAt: new Date(Number(row.received_at)).toISOString(),
+    accountRef: text(row.account_ref),
+    source: row.source as EventSource,
+    evidence: row.evidence as Evidence,
+  };
+  switch (row.type) {
+    case "declaration":
+      return {
+        ...base,
+        type: "declaration",
+        source: "browser",
+        evidence: "self_reported",
+        choice: row.choice as Choice,
+        agent: {
+          name: text(row.agent_name),
+          provider: text(row.agent_provider),
+          purpose: text(row.agent_purpose),
+        },
+      };
+    case "page_view":
+      return {
+        ...base,
+        type: "page_view",
+        source: "browser",
+        evidence: "browser_reported",
+        path: String(row.path),
+        route: text(row.route),
+      };
+    default:
+      return {
+        ...base,
+        type: "action",
+        source: "server",
+        evidence: "host_reported",
+        action: String(row.action),
+        resourceRef: text(row.resource_ref),
+        outcome: row.outcome as Outcome,
+      };
+  }
+}
+const ACTIVITY_COLUMNS = `site_id, id, session_id, type, source, evidence, origin, occurred_at,
+  received_at, account_ref, choice, agent_name, agent_provider, agent_purpose, path, route,
+  action, resource_ref, outcome`;
+
 const ENVIRONMENT_COLUMNS = `e.*, coalesce((
   select jsonb_agg(o.origin order by o.origin)
   from agent_identification.environment_origins o where o.environment_id = e.id
@@ -98,7 +153,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
        agent_identification.events, agent_identification.rate_buckets,
        agent_identification.products, agent_identification.environments,
        agent_identification.environment_origins, agent_identification.domain_claims,
-       agent_identification.install_activity limit 0`,
+       agent_identification.install_activity, agent_identification.activity_events limit 0`,
       [],
     );
   }
@@ -384,15 +439,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
     ]);
     return rows[0] ? session(rows[0]) : null;
   }
-  async recordDeclaration(input: {
-    tokenHash: string;
-    choice: Choice;
-    requestId: string;
-    eventId: string;
-    receipt: string;
-    now: number;
-  }): Promise<DeclarationResult> {
-    // The row lock and event insertion occur atomically in one statement.
+  async recordDeclaration(input: DeclarationInput): Promise<DeclarationResult> {
+    // The row lock and both event insertions occur atomically in one statement.
     // A concurrent winner causes UPDATE's predicate to be rechecked by Postgres.
     const rows = await this.execute(
       `with changed as (
@@ -403,9 +451,27 @@ export class PostgresStore implements CollectorStore, ProductStore {
        ), logged as (
          insert into agent_identification.events (id, site_id, origin, session_id, choice, created_at)
          select event_id, site_id, origin, id, choice, $6 from changed returning id
+       ), timeline as (
+         insert into agent_identification.activity_events
+           (site_id, id, session_id, type, source, evidence, origin, occurred_at, received_at,
+            choice, agent_name, agent_provider, agent_purpose)
+         select site_id, event_id, id, 'declaration', 'browser', 'self_reported', origin, $6, $6,
+           choice, $7, $8, $9 from changed returning id
        )
-       select changed.* from changed cross join (select count(*) from logged) as inserted`,
-      [input.tokenHash, input.choice, input.requestId, input.eventId, input.receipt, input.now],
+       select changed.* from changed
+       cross join (select count(*) from logged) as inserted
+       cross join (select count(*) from timeline) as appended`,
+      [
+        input.tokenHash,
+        input.choice,
+        input.requestId,
+        input.eventId,
+        input.receipt,
+        input.now,
+        input.agent.name,
+        input.agent.provider,
+        input.agent.purpose,
+      ],
     );
     if (rows[0]) return { status: "recorded", session: session(rows[0]) };
     const current = await this.getSession(input.tokenHash);
@@ -438,6 +504,63 @@ export class PostgresStore implements CollectorStore, ProductStore {
       evidence: "self_reported",
       createdAt: new Date(Number(row.created_at)).toISOString(),
     }));
+  }
+  async recordActivity(event: ActivityEvent): Promise<ActivityResult> {
+    assertActivity(event);
+    const declaration = event.type === "declaration" ? event : null;
+    const pageView = event.type === "page_view" ? event : null;
+    const action = event.type === "action" ? event : null;
+    const inserted = await this.execute(
+      `insert into agent_identification.activity_events (${ACTIVITY_COLUMNS})
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       on conflict (site_id, id) do nothing
+       returning ${ACTIVITY_COLUMNS}`,
+      [
+        event.siteId,
+        event.id,
+        event.sessionId,
+        event.type,
+        event.source,
+        event.evidence,
+        event.origin,
+        Date.parse(event.occurredAt),
+        Date.parse(event.receivedAt),
+        event.accountRef,
+        declaration?.choice ?? null,
+        declaration?.agent.name ?? null,
+        declaration?.agent.provider ?? null,
+        declaration?.agent.purpose ?? null,
+        pageView?.path ?? null,
+        pageView?.route ?? null,
+        action?.action ?? null,
+        action?.resourceRef ?? null,
+        action?.outcome ?? null,
+      ],
+    );
+    if (inserted[0]) return { status: "recorded", event: activity(inserted[0]) };
+    const [existing] = await this.execute(
+      `select ${ACTIVITY_COLUMNS} from agent_identification.activity_events
+       where site_id=$1 and id=$2`,
+      [event.siteId, event.id],
+    );
+    // Pruned between the insert and this read, a retry no longer has anything to match.
+    if (!existing) return { status: "conflict" };
+    const stored = activity(existing);
+    return sameActivity(stored, event)
+      ? { status: "duplicate", event: stored }
+      : { status: "conflict" };
+  }
+  async listActivity(
+    siteId: string,
+    options: { limit: number; sessionId?: string },
+  ): Promise<ActivityEvent[]> {
+    const rows = await this.execute(
+      `select ${ACTIVITY_COLUMNS} from agent_identification.activity_events
+       where site_id=$1 and ($2::uuid is null or session_id=$2::uuid)
+       order by received_at desc, id desc limit $3`,
+      [siteId, options.sessionId ?? null, options.limit],
+    );
+    return rows.map(activity);
   }
   async consumeRate(key: string, limit: number, windowMs: number, now: number): Promise<boolean> {
     const rows = await this.execute(
@@ -486,18 +609,25 @@ export class PostgresStore implements CollectorStore, ProductStore {
       lastSeenAt: Number(row.last_seen_at),
     }));
   }
-  async prune(cutoff: number, now: number, limit: number): Promise<PruneResult> {
+  async prune(cutoffs: PruneCutoffs, now: number, limit: number): Promise<PruneResult> {
     await this.execute(
       `delete from agent_identification.install_activity
        where signal in (select jsonb_array_elements_text($1::text::jsonb)) and last_seen_at<$2`,
-      [JSON.stringify(INSTALL_REFUSALS), cutoff],
+      [JSON.stringify(INSTALL_REFUSALS), cutoffs.sessions],
+    );
+    const activityRows = await this.execute(
+      `delete from agent_identification.activity_events
+       where (site_id, id) in (select site_id, id from agent_identification.activity_events
+                               where received_at<$1 order by received_at limit $2)
+       returning id`,
+      [cutoffs.activity, limit],
     );
     const rows = await this.execute(
       `delete from agent_identification.sessions
        where id in (select id from agent_identification.sessions
                     where created_at<$1 order by created_at limit $2)
        returning id`,
-      [cutoff, limit],
+      [cutoffs.sessions, limit],
     );
     const rates = await this.execute(
       `delete from agent_identification.rate_buckets
@@ -509,7 +639,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
     return {
       removedSessions: rows.length,
       removedRateBuckets: rates.length,
-      more: rows.length === limit || rates.length === limit,
+      removedActivity: activityRows.length,
+      more: rows.length === limit || rates.length === limit || activityRows.length === limit,
     };
   }
 }
