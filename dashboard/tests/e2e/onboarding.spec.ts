@@ -4,6 +4,7 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 const MAIL = "http://127.0.0.1:54324";
 const PASSWORD = "correct-horse-battery";
 const SITE = "http://127.0.0.1:4555";
+const UNLISTED = "http://127.0.0.1:4556";
 
 function address(info: TestInfo, name: string): string {
   return `${name}-${info.project.name}-${Date.now()}@example.com`;
@@ -92,28 +93,58 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   expect(siteId).toBeTruthy();
   expect(snippet).not.toContain("YOUR-SITE-ID");
 
+  // Copying the snippet is not an install, so the product keeps waiting.
+  const status = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Status" }),
+  });
+  await expect(status).toContainText("Waiting for installation");
+  await page.getByRole("button", { name: "Copy", exact: true }).first().click();
+  await page.reload();
+  await expect(status).toContainText("Waiting for installation");
+  await expect(status).not.toContainText("Receiving events");
+
   await page.getByText("Set this up with your coding agent").click();
   const instructions = page.locator("details pre code");
   await expect(instructions).toContainText(siteId!);
   await expect(instructions).toContainText("Response recorded");
   await expect(instructions).not.toContainText(secret);
 
-  // The generated snippet works from a real server on the customer's own origin.
-  const website = createServer((_, response) => {
-    response.writeHead(200, { "content-type": "text/html" });
-    response.end(`<!doctype html><title>Site</title>${snippet}`);
-  });
-  await new Promise<void>((resolve) => website.listen(4555, "127.0.0.1", resolve));
+  // The generated snippet works from a real server on the customer's own origin, and is
+  // refused on an origin the product doesn't list.
+  const serve = (port: number) => {
+    const website = createServer((_, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end(`<!doctype html><title>Site</title>${snippet}`);
+    });
+    return new Promise<typeof website>((resolve) =>
+      website.listen(port, "127.0.0.1", () => resolve(website)),
+    );
+  };
+  const websites = [await serve(4555), await serve(4556)];
   try {
     await page.goto(`${SITE}/`);
     await page.getByRole("button", { name: "AI assistant" }).click();
     await expect(page.getByRole("status")).toHaveText("Response recorded: AI assistant.");
+    const refused = page.waitForRequest(
+      (request) => request.url().endsWith("/v1/sessions") && request.method() === "POST",
+    );
+    await page.goto(`${UNLISTED}/`);
+    await refused;
   } finally {
-    await new Promise((resolve) => website.close(resolve));
+    await Promise.all(websites.map((website) => new Promise((resolve) => website.close(resolve))));
   }
 
   await page.goto("/dashboard");
+  await expect(page.getByText("Receiving events")).toBeVisible();
   await page.getByRole("link", { name: /Storefront/ }).click();
+  await expect(status).toContainText(`Loaded on ${SITE}`);
+  await expect(status).toContainText("Last declaration just now");
+  await expect(async () => {
+    await page.reload();
+    await expect(status).toContainText(`A page on ${UNLISTED} tried to load the widget`, {
+      timeout: 1000,
+    });
+  }).toPass({ timeout: 10_000 });
 
   await expect(page.getByText("Unverified", { exact: true })).toBeVisible();
   await expect(page.getByText("_agent-identification.www.onboarding.example")).toBeVisible();

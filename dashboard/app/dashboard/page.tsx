@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { collector, type Product } from "@/lib/collector";
+import { StatusBadges } from "./products/[id]/install-status";
 
 export default async function ProductsPage() {
   const { products } = await collector<{ products: Product[] }>("/products");
@@ -21,7 +22,12 @@ export default async function ProductsPage() {
             <li key={product.id}>
               <Link href={`/dashboard/products/${product.id}`} className="block">
                 <Card className="transition hover:border-primary/40">
-                  <p className="font-medium">{product.name}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium">{product.name}</p>
+                    {product.environments[0] ? (
+                      <StatusBadges install={product.environments[0].install} />
+                    ) : null}
+                  </div>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
                     {product.environments[0]?.origins.join(", ")}
                   </p>

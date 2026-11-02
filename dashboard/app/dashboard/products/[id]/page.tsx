@@ -9,6 +9,7 @@ import {
 } from "@/lib/collector";
 import { AgentSetup } from "./agent-setup";
 import { DomainList } from "./domain-list";
+import { InstallStatusPanel, StatusBadges } from "./install-status";
 import { InstallTabs } from "./install-tabs";
 import { OriginsForm } from "./origins-form";
 import { SecretPanel } from "./secret-panel";
@@ -39,6 +40,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           ID is public.
         </p>
       </div>
+      <Card>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Status</h2>
+          <StatusBadges install={environment.install} />
+        </div>
+        <InstallStatusPanel install={environment.install} />
+      </Card>
       <Card>
         <h2 className="font-semibold">Install</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">

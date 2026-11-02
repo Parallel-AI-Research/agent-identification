@@ -34,9 +34,17 @@ See [Install](/docs/install) for the JavaScript and React options, or hand the j
 
 ## 4. Check it works
 
-Load a page on one of your origins and answer the prompt. It should say **Response recorded**.
+Load a page on one of your origins. On your product page, **Status** changes from **Waiting for installation** to **Receiving events** and shows where the widget loaded. Copying the snippet doesn't count. Only a real page load does.
 
-If the prompt doesn't appear, check that the page's origin exactly matches one you listed. A local address such as `http://localhost:3000` only works if you add it to your product.
+Answer the prompt, and it should say **Response recorded**. Status then shows when the last declaration arrived.
+
+If something is refused, Status says what and how to fix it:
+
+- **A page on an origin you haven't listed:** add the origin if the site is yours. Origins must match exactly, so `https://example.com` and `https://www.example.com` are different, and a local address such as `http://localhost:3000` only works once you add it.
+- **A server secret the collector doesn't accept:** check that `AGENT_ID_SITE_SECRET` matches your current secret.
+- **A binding context the collector can't verify:** check that your server signs it with the current secret.
+
+Anyone can send a request claiming any origin or secret, so a refusal shows what reached the collector, not who sent it.
 
 ## 5. Verify your domain
 
