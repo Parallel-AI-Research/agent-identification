@@ -29,7 +29,7 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Start the activity event contract (`feat-005`), then activity collection and a dashboard view of the data.
+3. Start the activity event contract (`feat-005`), then Web Bot Auth verification (`feat-012`), activity collection and a dashboard view of the data.
 
 ## Blockers / Risks
 
@@ -40,16 +40,19 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [ ] **Environments in the dashboard**: the API supports adding environments, but the dashboard shows production only until the switcher lands in `feat-007`.
 - [ ] **Dashboard e2e tests are local only**: CI runs its typecheck, lint, unit tests and build, but not the Playwright journey.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
-- [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product until `feat-012` is decided.
+- [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The target needs a defined population and a baseline run before it is frozen or shown to a customer.
-- [ ] **Web Bot Auth coverage**: signing is voluntary and agents driving a local browser probably will not sign, so many sessions will stay unknown. This needs testing with real traffic.
+- [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT agent's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
 
 ## Decisions Made
 
+- **Web Bot Auth instead of an invisible widget**
+  - Context: the owner wants agents identified without showing people anything. Web Bot Auth checks agents that sign their requests, with nothing on the page, and payment networks build on it. `feat-012` now covers it, including a CDN's signed-agent verdict, and comes straight after the event contract (`feat-005`). The collector checks signatures, because browser code can't read request headers and one implementation should serve every backend. Heuristics for unsigned traffic stay in `feat-008`.
+  - Alternatives considered: the invisible widget, which agents may still ignore and screen readers would hear; checking signatures in each customer's server, which needs a library per language; one feature for signatures and heuristics, which would hold Web Bot Auth back until activity collection is built.
 - **The widget is for agents, never people**
-  - Context: the owner wants every agent to meet it and no person to see it. The visible prompt in 0.1.0 is a research limitation: agents ignored the hidden version in the 7 October trials. `feat-012` scopes agent-only delivery, and the owner decides whether to build it.
+  - Context: the owner wants every agent to meet it and no person to see it. The visible prompt in 0.1.0 is a research limitation: agents ignored the hidden version in the 7 October trials. The owner later shelved an invisible widget in favour of Web Bot Auth.
   - Alternatives considered: keeping one visible prompt for every visitor, which the owner rejected.
 - **The collector's demo page is gone**
   - Context: the public site and docs replaced it, so the owner asked to remove it. The collector now serves the API, the SDK and `/trial/`, and its root URL returns 404.
