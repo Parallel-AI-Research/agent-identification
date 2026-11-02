@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EnvironmentSwitcher } from "@/components/environment-switcher";
 import { Card } from "@/components/ui";
 import {
   collector,
@@ -8,6 +10,8 @@ import {
   type Product,
   type SignedVisit,
 } from "@/lib/collector";
+import { pickEnvironment } from "@/lib/environments";
+import { AddEnvironment } from "./add-environment";
 import { AgentSetup } from "./agent-setup";
 import { DomainList } from "./domain-list";
 import { InstallStatusPanel, StatusBadges } from "./install-status";
@@ -16,16 +20,22 @@ import { OriginsForm } from "./origins-form";
 import { SecretPanel } from "./secret-panel";
 import { SignedAgents } from "./signed-agents";
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ env?: string }>;
+}) {
   const { id } = await params;
+  const { env } = await searchParams;
   let product: Product;
   let environment: Environment;
   let domains: Domain[];
   let signed: SignedVisit[];
   try {
     ({ product } = await collector<{ product: Product }>(`/products/${id}`));
-    // Environment switching arrives with the dashboard views, so this shows production.
-    environment = product.environments[0]!;
+    environment = pickEnvironment(product, env);
     [{ domains }, { events: signed }] = await Promise.all([
       collector<{ domains: Domain[] }>(`/products/${id}/environments/${environment.id}/domains`),
       collector<{ events: SignedVisit[] }>(
@@ -39,9 +49,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const install = { siteId: environment.siteId, collectorUrl: process.env.COLLECTOR_URL! };
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">{product.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-xl font-semibold">{product.name}</h1>
+          <Link
+            className="inline-flex h-9 items-center rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground"
+            href={`/dashboard/products/${product.id}/activity?env=${environment.id}`}
+          >
+            Activity
+          </Link>
+        </div>
+        <EnvironmentSwitcher
+          product={product}
+          current={environment}
+          base={`/dashboard/products/${product.id}`}
+        />
+        <p className="text-sm text-muted-foreground">
           {environment.name} site ID: <code className="font-mono">{environment.siteId}</code>. This
           ID is public.
         </p>
@@ -101,6 +124,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           previousExpiresAt={environment.previousSecretExpiresAt}
         />
       </Card>
+      <AddEnvironment product={product} />
     </div>
   );
 }

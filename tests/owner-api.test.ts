@@ -685,6 +685,55 @@ for (const [kind, open] of stores) {
       assert.equal(await report("login-3"), null);
     });
 
+    test("analytics summarize one environment's sessions, only for their owner", async () => {
+      const { handle, owner, create, addEnvironment, visitor, declare } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const staging = await addEnvironment(owners.alice, a, {
+        type: "staging",
+        origins: ["https://staging.alice.example"],
+      });
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      assert.equal((await declare(session)).status, 200);
+      const viewed = await handle(
+        new Request("https://collector.test/v1/page-views", {
+          method: "POST",
+          headers: {
+            origin,
+            authorization: `Bearer ${session.sessionToken}`,
+            "x-agent-site": session.siteId,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            views: [
+              { id: randomUUID(), path: "/pricing", occurredAt: new Date(time).toISOString() },
+            ],
+          }),
+        }),
+      );
+      assert.equal(viewed.status, 200);
+      const analytics = async (ownerId: string, created: Created, query = "") =>
+        owner(ownerId, `${path(created)}/analytics${query}`);
+      const body = (await (await analytics(owners.alice, a)).json()) as {
+        range: string;
+        overview: { sessions: number; pageViews: number; labels: Record<string, number> };
+        sessions: { sessionId: string; label: string; pageViews: number }[];
+      };
+      assert.equal(body.range, "7d");
+      assert.equal(body.overview.sessions, 1);
+      assert.equal(body.overview.pageViews, 1);
+      assert.equal(body.overview.labels.declared_ai, 1);
+      assert.deepEqual(
+        body.sessions.map((item) => [item.sessionId, item.label, item.pageViews]),
+        [[session.sessionId, "declared_ai", 1]],
+      );
+      const other = (await (await analytics(owners.alice, staging)).json()) as {
+        overview: { sessions: number };
+      };
+      assert.equal(other.overview.sessions, 0);
+      assert.equal((await analytics(owners.alice, a, "?range=1y")).status, 400);
+      assert.equal((await analytics(owners.bob, a)).status, 404);
+    });
+
     test("activity is kept for 30 days, after its session has gone", async () => {
       const { create, visitor, declare } = fixture(store);
       const a = await create(owners.alice, "Alice's product");

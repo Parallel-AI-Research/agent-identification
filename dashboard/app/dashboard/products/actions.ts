@@ -1,13 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { collector, CollectorError, type Domain, type Product } from "@/lib/collector";
+import {
+  collector,
+  CollectorError,
+  type Domain,
+  type Environment,
+  type Product,
+} from "@/lib/collector";
 import { parseOrigins } from "@/lib/snippets";
 
 export interface ProductState {
   error?: string;
   success?: string;
   product?: Product;
+  environment?: Environment;
   serverSecret?: string;
 }
 
@@ -30,6 +37,27 @@ export async function createProduct(_: ProductState, form: FormData): Promise<Pr
       }),
     });
     revalidatePath("/dashboard");
+    return created;
+  });
+}
+
+export async function addEnvironment(
+  productId: string,
+  _: ProductState,
+  form: FormData,
+): Promise<ProductState> {
+  return attempt(async () => {
+    const created = await collector<{ environment: Environment; serverSecret: string }>(
+      `/products/${productId}/environments`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          type: String(form.get("type") ?? ""),
+          origins: parseOrigins(String(form.get("origins") ?? "")),
+        }),
+      },
+    );
+    revalidatePath(`/dashboard/products/${productId}`);
     return created;
   });
 }

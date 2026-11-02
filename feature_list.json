@@ -200,7 +200,7 @@
       "name": "Product-owner dashboard",
       "description": "Overview, recent-session list with date and product filters, and session timeline built on real collected data for one environment at a time, showing provenance and coverage limits in plain language.",
       "dependencies": ["feat-004", "feat-006"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "An external tester can install the integration and find their own test session without an operator query or private database access.",
         "Counts reconcile with event records, and requests, sessions and completed actions are counted separately.",
@@ -214,10 +214,13 @@
       ],
       "decisions": [
         "Sessions show Verified signer, Declared AI, Declared person, Suspected automation or Unknown, with no numeric score.",
-        "Side-by-side environment comparison is out of scope for the MVP."
+        "Side-by-side environment comparison is out of scope for the MVP.",
+        "Started after feat-006 at the owner's request to build the remaining features in order.",
+        "Label precedence is Verified signer, Declared AI, Suspected automation, Declared person, then Unknown: a signature outranks what a visitor says, a self-declared agent outranks heuristics, and heuristics outrank a Person answer, which never erases them. Conflicts are listed, never resolved.",
+        "Counts are computed by the collector from the event records themselves, from at most the latest 10,000 events in a period, and the page says when a period is busier than that."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 158/158 collector tests, 5/5 dashboard unit, 54/54 SDK browser and 30/30 dashboard journey tests in Chromium and WebKit. Analytics tests run real events through a store: a retried page view counts once, page views reconcile with their events, a session with both a verified signature and a Person answer counts once as Verified signer with the conflict listed, prefer-not-to-say and signal-less sessions stay Unknown, no label is ever human, and actions and signed requests without a session are counted apart. The analytics route passes on memory, Postgres under the restricted role and the production driver, keeps environments apart, refuses an unknown range, and returns 404 to another customer. In the browser journey, a customer opens Activity from the product page and sees one session, one page view and one verified signed request without a session, then the session's timeline with each event and who vouches for it. Another journey adds a staging environment from the product page, sees its secret once, opens it from a link that keeps it in the URL, copies a snippet with a different site ID, and sees Staging's own empty and not-yet-installed states, a 30-day period and a refused session lookup. Previewed locally with sample activity. Not covered by a test: the error state, which needs the collector to fail mid-request; it renders a retry."
     },
     {
       "id": "feat-008",
