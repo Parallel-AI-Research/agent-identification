@@ -1,9 +1,13 @@
-import type {
-  CollectorStore,
-  DeclarationResult,
-  PruneResult,
-  StoredEvent,
-  StoredSession,
+import {
+  INSTALL_REFUSALS,
+  MAX_INSTALL_ORIGINS,
+  type CollectorStore,
+  type DeclarationResult,
+  type InstallActivity,
+  type InstallSignal,
+  type PruneResult,
+  type StoredEvent,
+  type StoredSession,
 } from "./store.js";
 import type { Choice } from "../src/protocol.js";
 import type {
@@ -93,7 +97,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
       `select 1 from agent_identification.sessions,
        agent_identification.events, agent_identification.rate_buckets,
        agent_identification.products, agent_identification.environments,
-       agent_identification.environment_origins, agent_identification.domain_claims limit 0`,
+       agent_identification.environment_origins, agent_identification.domain_claims,
+       agent_identification.install_activity limit 0`,
       [],
     );
   }
@@ -446,7 +451,47 @@ export class PostgresStore implements CollectorStore, ProductStore {
     );
     return Number(rows[0]?.count) <= limit;
   }
+  async noteInstall(activity: {
+    siteId: string;
+    signal: InstallSignal;
+    origin: string;
+    now: number;
+  }): Promise<void> {
+    await this.execute(
+      `insert into agent_identification.install_activity as existing
+       (site_id, signal, origin, first_seen_at, last_seen_at)
+       select $1, $2, $3, $4, $4
+       where exists (select 1 from agent_identification.install_activity
+                     where site_id=$1 and signal=$2 and origin=$3)
+          or (select count(*) from agent_identification.install_activity
+              where site_id=$1 and signal=$2) < $5
+       on conflict (site_id, signal, origin) do update
+       set last_seen_at = greatest(existing.last_seen_at, excluded.last_seen_at)`,
+      [activity.siteId, activity.signal, activity.origin, activity.now, MAX_INSTALL_ORIGINS],
+    );
+  }
+  async listInstallActivity(siteIds: string[]): Promise<InstallActivity[]> {
+    if (!siteIds.length) return [];
+    const rows = await this.execute(
+      `select site_id, signal, origin, first_seen_at, last_seen_at
+       from agent_identification.install_activity
+       where site_id in (select jsonb_array_elements_text($1::text::jsonb))`,
+      [JSON.stringify(siteIds)],
+    );
+    return rows.map((row) => ({
+      siteId: String(row.site_id),
+      signal: row.signal as InstallSignal,
+      origin: String(row.origin),
+      firstSeenAt: Number(row.first_seen_at),
+      lastSeenAt: Number(row.last_seen_at),
+    }));
+  }
   async prune(cutoff: number, now: number, limit: number): Promise<PruneResult> {
+    await this.execute(
+      `delete from agent_identification.install_activity
+       where signal in (select jsonb_array_elements_text($1::text::jsonb)) and last_seen_at<$2`,
+      [JSON.stringify(INSTALL_REFUSALS), cutoff],
+    );
     const rows = await this.execute(
       `delete from agent_identification.sessions
        where id in (select id from agent_identification.sessions

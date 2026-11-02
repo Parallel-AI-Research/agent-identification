@@ -167,6 +167,39 @@ test("CORS preflight is explicit and rejects unsupported methods and headers", a
   }
 });
 
+test("a session preflight from an unlisted origin is answered, but the session is still refused", async () => {
+  const f = fixture();
+  const unlisted = "https://www.unlisted.test";
+  const preflight = await f.request("/v1/sessions", {
+    method: "OPTIONS",
+    headers: {
+      origin: unlisted,
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type",
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), unlisted);
+  const refused = await f.request("/v1/sessions", {
+    method: "POST",
+    headers: { origin: unlisted, "content-type": "application/json" },
+    body: JSON.stringify({ siteId: "first" }),
+  });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.headers.get("access-control-allow-origin"), null);
+  for (const [path, from] of [
+    ["/v1/declarations", unlisted],
+    ["/v1/sessions", "null"],
+    ["/v1/sessions", "http://plain.test"],
+  ] as const) {
+    const response = await f.request(path, {
+      method: "OPTIONS",
+      headers: { origin: from, "access-control-request-method": "POST" },
+    });
+    assert.equal(response.status, 403, `${path} from ${from}`);
+  }
+});
+
 test("concurrent identical submissions are idempotent; conflicting choices never replace the first", async () => {
   const f = fixture();
   const session = await f.create();

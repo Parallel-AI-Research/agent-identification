@@ -28,12 +28,14 @@ const MIGRATIONS = [
   "20261101120000_add_customer_products.sql",
   "20261101130000_add_domain_claims.sql",
   "20261101140000_add_environments.sql",
+  "20261102120000_add_install_activity.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
   truncate agent_identification.domain_claims;
   truncate agent_identification.sessions cascade;
   truncate agent_identification.rate_buckets;
+  truncate agent_identification.install_activity;
   set role agent_id_app`;
 
 async function migrated(): Promise<PGlite> {
@@ -85,6 +87,13 @@ interface Environment {
   siteId: string;
   origins: string[];
   previousSecretExpiresAt: string | null;
+}
+interface Install {
+  status: "waiting" | "receiving";
+  loaded: { origin: string; firstSeenAt: string; lastSeenAt: string }[];
+  lastDeclarationAt: string | null;
+  checkedAt: string;
+  issues: { signal: string; origin: string | null; firstSeenAt: string; lastSeenAt: string }[];
 }
 const path = (created: Created) =>
   `/products/${created.product.id}/environments/${created.environment.id}`;
@@ -183,7 +192,10 @@ function fixture(
         body: JSON.stringify({ choice: "ai_assistant", requestId: randomUUID() }),
       }),
     );
-  return { handle, owner, create, addEnvironment, visitor, declare };
+  const install = async (ownerId: string, created: Created): Promise<Install> =>
+    ((await (await owner(ownerId, path(created))).json()) as { environment: { install: Install } })
+      .environment.install;
+  return { handle, owner, create, addEnvironment, visitor, declare, install };
 }
 
 for (const [kind, open] of stores) {
@@ -293,6 +305,102 @@ for (const [kind, open] of stores) {
       );
       assert.equal((await visitor(a.environment.siteId, next)).status, 201);
       assert.equal((await visitor(a.environment.siteId)).status, 403);
+    });
+
+    test("an install waits until the widget loads, and copying a snippet changes nothing", async () => {
+      const { owner, create, visitor, declare, install } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      assert.deepEqual(await install(owners.alice, a), {
+        status: "waiting",
+        loaded: [],
+        lastDeclarationAt: null,
+        checkedAt: new Date(time).toISOString(),
+        issues: [],
+      });
+      // Reading the product is all that copying a snippet involves.
+      await owner(owners.alice, `/products/${a.product.id}`);
+      assert.equal((await install(owners.alice, a)).status, "waiting");
+
+      const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
+      let current = await install(owners.alice, a);
+      assert.equal(current.status, "receiving");
+      assert.deepEqual(
+        current.loaded.map((row) => row.origin),
+        [origin],
+      );
+      assert.equal(current.lastDeclarationAt, null);
+      assert.equal((await declare(session)).status, 200);
+      current = await install(owners.alice, a);
+      assert.equal(current.lastDeclarationAt, new Date(time).toISOString());
+
+      const list = (await (await owner(owners.alice, "/products")).json()) as {
+        products: { environments: { install: Install }[] }[];
+      };
+      assert.equal(list.products[0]!.environments[0]!.install.status, "receiving");
+
+      // Loads only count from origins the environment still allows.
+      await owner(owners.alice, path(a), {
+        method: "PATCH",
+        body: JSON.stringify({ origins: ["https://moved.example"] }),
+      });
+      assert.equal((await install(owners.alice, a)).status, "waiting");
+    });
+
+    test("a refused install tells its owner what to fix, and nobody else", async () => {
+      const { handle, owner, create, visitor, install } = fixture(store);
+      const a = await create(owners.alice, "Alice's product");
+      const b = await create(owners.bob, "Bob's product", ["https://bob.example"]);
+      const www = "https://www.alice.example";
+      assert.equal((await visitor(a.environment.siteId, www)).status, 403);
+      const unbound = await visitor(a.environment.siteId, origin, { bindingContext: "invalid" });
+      assert.equal(unbound.status, 400);
+      const exported = await handle(
+        new Request(`https://collector.test/v1/events?siteId=${a.environment.siteId}`, {
+          headers: { authorization: `Bearer ${b.serverSecret}` },
+        }),
+      );
+      assert.equal(exported.status, 401);
+
+      const current = await install(owners.alice, a);
+      assert.equal(current.status, "waiting");
+      assert.deepEqual(current.issues.map(({ signal, origin }) => [signal, origin]).sort(), [
+        ["binding_refused", origin],
+        ["origin_refused", www],
+        ["secret_refused", null],
+      ]);
+      assert.deepEqual((await install(owners.bob, b)).issues, []);
+
+      await owner(owners.alice, path(a), {
+        method: "PATCH",
+        body: JSON.stringify({ origins: [origin, www] }),
+      });
+      const fixed = await install(owners.alice, a);
+      assert(!fixed.issues.some((issue) => issue.signal === "origin_refused"));
+      assert.equal((await visitor(a.environment.siteId, www)).status, 201);
+      assert.equal((await install(owners.alice, a)).status, "receiving");
+    });
+
+    test("refusals are capped per site, noted once a minute, and drop off after a week", async () => {
+      let now = time;
+      const { create, visitor, install } = fixture(store, { clock: () => now });
+      const a = await create(owners.alice, "Alice's product");
+      for (let index = 0; index < 30; index++) {
+        await visitor(a.environment.siteId, `https://made-up-${index}.example`);
+      }
+      assert.equal((await install(owners.alice, a)).issues.length, 20);
+
+      const first = "https://made-up-0.example";
+      const lastSeen = async () =>
+        (await install(owners.alice, a)).issues.find((issue) => issue.origin === first)?.lastSeenAt;
+      now = time + 30_000;
+      await visitor(a.environment.siteId, first);
+      assert.equal(await lastSeen(), new Date(time).toISOString());
+      now = time + 61_000;
+      await visitor(a.environment.siteId, first);
+      assert.equal(await lastSeen(), new Date(now).toISOString());
+
+      now = time + 8 * 24 * 60 * 60 * 1000;
+      assert.deepEqual((await install(owners.alice, a)).issues, []);
     });
 
     test("owner routes require a sign-in and reject browser requests", async () => {
