@@ -4,8 +4,8 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 
 ## Current State
 
-**Last Updated:** 2026-11-01 (Africa/Lagos)
-**Active Feature:** `feat-003`, which needs one real declaration from a customer site. `feat-002` and `feat-011` are done.
+**Last Updated:** 2026-11-02 (Africa/Lagos)
+**Active Feature:** `feat-004`, the install status, started before `feat-003` finished with the owner's approval. `feat-003` still needs one real declaration from a customer site. `feat-002` and `feat-011` are done.
 
 The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -23,12 +23,14 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
+- [ ] Install status (`feat-004`): built and tested locally, not yet deployed.
 
 ### What's Next
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Continue in the order that unblocks the first real customer install: `feat-004`, then activity collection, then a dashboard view of the data.
+3. Deploy `feat-004`: apply the `install_activity` migration to the production database, then deploy the collector and the dashboard, then check a real install's status.
+4. Continue with activity collection, then a dashboard view of the data.
 
 ## Blockers / Risks
 
@@ -43,12 +45,16 @@ The package is still `0.1.0`, and `src/` is unchanged. The hosted collector now 
 - [ ] **Web Bot Auth coverage**: signing is voluntary and agents driving a local browser probably will not sign, so many sessions will stay unknown. This needs testing with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
+- [ ] **Deploy order for `feat-004`**: the collector's health check and the owner API read `install_activity`, so the migration must reach the production database before the collector deploys. Otherwise product pages fail.
 
 ## Decisions Made
 
 - **The collector's demo page is gone**
   - Context: the public site and docs replaced it, so the owner asked to remove it. The collector now serves the API, the SDK and `/trial/`, and its root URL returns 404.
   - Alternatives considered: redirecting the root URL to the public site, which nothing needs yet.
+- **Install status comes only from what the collector received**
+  - Context: an owner needs to know whether an install works. Copying a snippet proves nothing, so status changes only on a widget load from an allowed origin, a declaration, or a refusal. Session preflights from any HTTPS or local origin are answered, so a page on an unlisted origin can be traced to its site. The session itself is still refused.
+  - Alternatives considered: matching refused origins to owners by domain, which would show one customer's traffic to anyone who lists the same domain.
 - **One navbar across the public site, docs and dashboard**
   - Context: every page shares the same navigation, with Docs and Changelog on the left, a light and dark toggle, and a Dashboard button or account menu at the far right.
   - Alternatives considered: a separate dashboard header, which hid the docs and needed its own toggle.
