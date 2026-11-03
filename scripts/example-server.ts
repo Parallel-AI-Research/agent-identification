@@ -27,6 +27,12 @@ for (const port of [4311, 4312]) {
       if (url.pathname === "/plain/" && url.searchParams.get("mode") === "optional") {
         body = body.replace('data-mode="required"', 'data-mode="optional"');
       }
+      if (url.pathname === "/plain/" && url.searchParams.get("pageViews") === "off") {
+        body = body.replace(
+          'data-site="demo-site"',
+          'data-site="demo-site"\n      data-page-views="off"',
+        );
+      }
       if (url.pathname === "/plain/" && url.searchParams.get("snippet") === "minimal") {
         body = body
           .replace('data-target="#visitor-choice"', "")

@@ -28,6 +28,8 @@ if (script?.dataset.site) {
         gate: script.dataset.gate,
         storage: script.dataset.storage as WidgetOptions["storage"],
         styleUrl: script.dataset.style,
+        pageViews: script.dataset.pageViews !== "off",
+        route: script.dataset.route,
         onRecorded: (declaration) => {
           const target =
             typeof container === "string" ? document.querySelector(container)! : container;

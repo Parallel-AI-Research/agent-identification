@@ -91,6 +91,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261102150000_add_session_binding_index.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );

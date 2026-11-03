@@ -23,6 +23,11 @@ export interface SignatureReportOptions {
   accountRef?: string;
   /** The URL the visitor requested, when a proxy rewrote the request's own. */
   url?: string;
+  /**
+   * Also report scripts, styles, images and other assets. Off by default, so one page load
+   * counts as one signed request.
+   */
+  includeAssets?: boolean;
   /** Called when a report fails. Defaults to a console warning without any secret. */
   onError?: (error: Error) => void;
   fetch?: typeof globalThis.fetch;
@@ -31,6 +36,8 @@ export type SignatureReport =
   | { status: "skipped" }
   | { status: "recorded"; event: SignatureEvent }
   | { status: "failed"; error: Error };
+
+const ASSET = /\.(?:m?js|css|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp4|webm)$/i;
 
 function headerMap(request: ReportableRequest): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -74,6 +81,15 @@ export async function reportSignedRequest(
     const headers = headerMap(request);
     const input = headers["signature-input"];
     if (!input || !headers.signature) return { status: "skipped" };
+    const url = options.url ?? requestUrl(request, headers);
+    const destination = headers["sec-fetch-dest"];
+    if (
+      !options.includeAssets &&
+      ((destination !== undefined && !["document", "iframe", "frame"].includes(destination)) ||
+        ASSET.test(new URL(url, "https://placeholder.invalid").pathname))
+    ) {
+      return { status: "skipped" };
+    }
     // Send only what the signature covers, so nothing else about the visitor leaves the server.
     const covered = new Set(["signature", "signature-input", "signature-agent"]);
     for (const match of input.matchAll(/"([a-z0-9-]+)"/g)) covered.add(match[1]!);
@@ -101,7 +117,7 @@ export async function reportSignedRequest(
         siteId: options.siteId,
         request: {
           method: (request.method ?? "GET").toUpperCase(),
-          url: options.url ?? requestUrl(request, headers),
+          url,
           headers: forwarded,
         },
         ...(options.sessionId ? { sessionId: options.sessionId } : {}),

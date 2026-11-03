@@ -1,0 +1,80 @@
+---
+title: Activity
+description: Page views from the widget and actions from your server, on one timeline per session.
+---
+
+Each session has one timeline. The widget adds page views, your server adds what visitors did, and declarations and [signed agents](/docs/signed-agents) join the same timeline. Events from different sources sit side by side, even when they disagree, so you can see a visitor who answered Person next to your server's report of something only an agent would do.
+
+## Page views
+
+From SDK 0.4.0 the widget records a page view on each page load, whether or not the visitor answers. It sends the path only: no query string or fragment, and parts that look like IDs or email addresses are replaced with `:id`. The collector masks every path again itself.
+
+If your paths hold other personal details, give your own route pattern, such as `/tickets/:id`:
+
+```html
+<script
+  defer
+  src="…/sdk/v0.4.0/agent-id.js"
+  data-site="YOUR-SITE-ID"
+  data-route="/tickets/:id"
+></script>
+```
+
+To turn page views off, add `data-page-views="off"`, or pass `pageViews: false` to `init()`.
+
+An app that changes pages without reloading records each change itself:
+
+```ts
+await widget.pageView({ route: "/tickets/:id" });
+```
+
+## Actions from your server
+
+Your server reports what it did, with a name you choose, an outcome and opaque IDs:
+
+- **attempted:** a visitor tried it.
+- **rejected:** your server refused it.
+- **confirmed:** your application says it succeeded.
+
+```ts
+import { reportAction } from "@parallel-research/agent-identification/server";
+
+await reportAction(
+  {
+    action: "ticket.update",
+    outcome: "confirmed",
+    resourceRef: "ticket_7",
+    accountRef: "acct_42",
+    sessionBinding: currentSession.id,
+  },
+  {
+    apiUrl: "https://parallel-agent-identification.vercel.app",
+    siteId: "YOUR-SITE-ID",
+    secret: process.env.AGENT_ID_SITE_SECRET!,
+  },
+);
+```
+
+`sessionBinding` is your server's own session ID, the same one you put in [binding contexts](/docs/server-verification). It's how an action joins the visitor's timeline, so nothing the browser sends can attribute an action. `accountRef` and `resourceRef` are your own opaque IDs, never names or email addresses. `accountRef` says which account was used, never who asked an agent to act.
+
+`reportAction()` retries with the same ID, so a retry is recorded once, and it never throws: it resolves to `recorded` only when the collector confirms it.
+
+Any other server can send the same thing as a plain request:
+
+```sh
+curl https://parallel-agent-identification.vercel.app/v1/actions \
+  -H "Authorization: Bearer $AGENT_ID_SITE_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"siteId":"YOUR-SITE-ID","actions":[{"id":"8d4f…","action":"ticket.update","outcome":"confirmed","occurredAt":"2026-11-02T12:00:00Z"}]}'
+```
+
+## Exporting
+
+Your server can read a site's activity with its secret:
+
+```sh
+curl "https://parallel-agent-identification.vercel.app/v1/activity?siteId=YOUR-SITE-ID&limit=100" \
+  -H "Authorization: Bearer $AGENT_ID_SITE_SECRET"
+```
+
+Activity is kept for 30 days.

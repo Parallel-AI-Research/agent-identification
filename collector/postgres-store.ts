@@ -460,6 +460,15 @@ export class PostgresStore implements CollectorStore, ProductStore {
     ]);
     return rows[0] ? session(rows[0]) : null;
   }
+  async findSessionByBinding(siteId: string, bindingHash: string): Promise<string | null> {
+    const rows = await this.execute(
+      `select id from agent_identification.sessions
+       where site_id=$1 and binding_hash=$2
+       order by (revoked_at is null) desc, created_at desc, id desc limit 1`,
+      [siteId, bindingHash],
+    );
+    return rows[0] ? String(rows[0].id) : null;
+  }
   async recordDeclaration(input: DeclarationInput): Promise<DeclarationResult> {
     // The row lock and both event insertions occur atomically in one statement.
     // A concurrent winner causes UPDATE's predicate to be rechecked by Postgres.

@@ -4,7 +4,7 @@
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
 - Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`). The activity event contract (`feat-005`) and SDK 0.2.0 are built and tested locally, not deployed. `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `feat/web-bot-auth`, stacked on `feat/activity-event-contract`.
+- Branch / commit: `feat/activity-collection`, based on `feat/web-bot-auth`, which is merged.
 
 ## Completed This Session
 

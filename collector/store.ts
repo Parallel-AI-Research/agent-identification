@@ -75,6 +75,11 @@ export interface CollectorStore {
   createSession(session: StoredSession): Promise<void>;
   getSession(tokenHash: string): Promise<StoredSession | null>;
   getSessionById(id: string): Promise<StoredSession | null>;
+  /**
+   * The session a host's own binding most recently started, preferring one still open. It links
+   * a server-reported action to a session without trusting anything a browser sent.
+   */
+  findSessionByBinding(siteId: string, bindingHash: string): Promise<string | null>;
   /** Also adds the declaration to the session's activity timeline, in the same write. */
   recordDeclaration(input: DeclarationInput): Promise<DeclarationResult>;
   revokeSession(tokenHash: string, now: number): Promise<void>;
@@ -267,6 +272,17 @@ export class MemoryStore implements CollectorStore, ProductStore {
   async getSessionById(id: string): Promise<StoredSession | null> {
     const row = [...this.sessions.values()].find((value) => value.id === id);
     return row ? { ...row } : null;
+  }
+  async findSessionByBinding(siteId: string, bindingHash: string): Promise<string | null> {
+    const [match] = [...this.sessions.values()]
+      .filter((row) => row.siteId === siteId && row.bindingHash === bindingHash)
+      .sort(
+        (a, b) =>
+          Number(a.revokedAt !== null) - Number(b.revokedAt !== null) ||
+          b.createdAt - a.createdAt ||
+          b.id.localeCompare(a.id),
+      );
+    return match?.id ?? null;
   }
   async recordDeclaration(input: DeclarationInput): Promise<DeclarationResult> {
     const row = this.sessions.get(input.tokenHash);

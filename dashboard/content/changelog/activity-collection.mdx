@@ -1,0 +1,16 @@
+---
+title: Page views and server actions
+description: SDK 0.4.0 records page views, and your server can report what visitors did.
+date: 2026-11-02
+---
+
+Each session's timeline now fills with what visitors actually do, whether or not they answer the widget.
+
+## What's new
+
+- **Page views:** the widget records one on each page load, with the path only. Query strings and fragments are dropped, and anything that looks like an ID or email address is masked. Turn it off with `data-page-views="off"`.
+- **Server actions:** `reportAction()` reports what your server did, as attempted, rejected or confirmed. It joins the visitor's timeline through your own session, so nothing a browser sends can attribute an action. Any other server can send a plain HTTP request.
+- **Retries:** both retry with the same ID, so nothing is counted twice, and neither reports success without the collector's confirmation.
+- **Export:** your server can read a site's activity with its secret.
+
+See [Activity](/docs/activity) to set it up. Install snippets now use 0.4.0.
