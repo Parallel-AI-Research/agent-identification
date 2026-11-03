@@ -7,6 +7,8 @@ import {
   ENVIRONMENT_TYPES,
   newSiteId,
   newSiteSecret,
+  RESTORE_WINDOW_MS,
+  type DeletedProduct,
   type DomainClaim,
   type EnvironmentRecord,
   type EnvironmentType,
@@ -28,7 +30,7 @@ export interface OwnerApiOptions {
   resolveTxt?: (name: string) => Promise<string[][]>;
 }
 const ROUTE =
-  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|activity|analytics|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
+  /^\/v1\/owner\/products(?:\/([^/]+)(?:\/(restore)|(\/environments(?:\/([^/]+)(?:\/(events|activity|analytics|secret|secret\/previous|domains|domains\/verify))?)?))?)?$/;
 const MAX_ORIGINS = 20;
 const ANALYTICS_RANGES: Record<string, number> = { "24h": 1, "7d": 7, "30d": 30 };
 const MAX_ANALYTICS_EVENTS = 10_000;
@@ -134,6 +136,15 @@ function productView(
     updatedAt: new Date(product.updatedAt).toISOString(),
   };
 }
+function deletedView(product: DeletedProduct) {
+  return {
+    id: product.id,
+    name: product.name,
+    deletedAt: new Date(product.deletedAt).toISOString(),
+    // The prune removes it for good soon after this.
+    restorableUntil: new Date(product.deletedAt + RESTORE_WINDOW_MS).toISOString(),
+  };
+}
 function newEnvironment(
   cipher: SecretCipher,
   productId: string,
@@ -231,7 +242,7 @@ export async function handleOwnerRequest(
   }
   const ownerId = await owners.authenticate(request);
   if (!ownerId) throw new HttpError(401, "Invalid or expired sign-in");
-  const [, productId, environmentsPath, environmentId, section] = route;
+  const [, productId, restore, environmentsPath, environmentId, section] = route;
   if (
     (productId !== undefined && !isUuid(productId)) ||
     (environmentId !== undefined && !isUuid(environmentId))
@@ -249,8 +260,10 @@ export async function handleOwnerRequest(
     if (request.method === "GET") {
       const products = await owners.products.listProducts(ownerId);
       const activity = await activityFor(products.flatMap((product) => product.environments));
+      const deleted = await owners.products.listDeletedProducts(ownerId, now - RESTORE_WINDOW_MS);
       return respond({
         products: products.map((product) => productView(product, now, activity)),
+        deleted: deleted.map(deletedView),
       });
     }
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
@@ -284,6 +297,38 @@ export async function handleOwnerRequest(
     );
   }
 
+  // A deleted product is missing everywhere else, so these two come before the lookup.
+  if (restore) {
+    if (request.method !== "POST") throw new HttpError(405, "Method not allowed");
+    if ((await owners.products.countProducts(ownerId)) >= MAX_PRODUCTS) {
+      throw new HttpError(409, `An account can have up to ${MAX_PRODUCTS} products`);
+    }
+    const restored = await owners.products.restoreProduct(
+      ownerId,
+      productId,
+      now - RESTORE_WINDOW_MS,
+      now,
+    );
+    if (!restored) throw new HttpError(404, "Not found");
+    for (const environment of restored.environments) {
+      directory.invalidate(environment.siteId, environment.origins);
+    }
+    return respond({
+      product: productView(restored, now, await activityFor(restored.environments)),
+    });
+  }
+  if (
+    !environmentsPath &&
+    request.method === "DELETE" &&
+    url.searchParams.get("permanent") === "true"
+  ) {
+    // Only a deleted product, whose sites already stopped, can be removed for good.
+    if (!(await owners.products.purgeProduct(ownerId, productId))) {
+      throw new HttpError(404, "Not found");
+    }
+    return respond(null, 204);
+  }
+
   const product = await owners.products.getProduct(ownerId, productId);
   // Another owner's product is reported as missing, so IDs cannot be probed.
   if (!product) throw new HttpError(404, "Not found");
@@ -295,7 +340,7 @@ export async function handleOwnerRequest(
       });
     }
     if (request.method === "DELETE") {
-      if (!(await owners.products.deleteProduct(ownerId, productId))) {
+      if (!(await owners.products.deleteProduct(ownerId, productId, now))) {
         throw new HttpError(404, "Not found");
       }
       for (const environment of product.environments) {

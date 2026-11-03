@@ -2,6 +2,7 @@ import type { ActivityEvent, AgentClaim, Choice } from "../src/protocol.js";
 import { assertActivity, declarationEvent, sameActivity, type ActivityResult } from "./activity.js";
 import {
   ENVIRONMENT_TYPES,
+  type DeletedProduct,
   type DomainClaim,
   type EnvironmentChanges,
   type EnvironmentRecord,
@@ -60,6 +61,7 @@ export interface PruneResult {
   removedSessions: number;
   removedRateBuckets: number;
   removedActivity: number;
+  removedProducts: number;
   /** A full batch warrants another pass; this may conservatively overestimate. */
   more: boolean;
 }
@@ -68,6 +70,8 @@ export interface PruneCutoffs {
   sessions: number;
   /** Activity events received before this go. They are kept longer than sessions. */
   activity: number;
+  /** Products deleted before this go for good, with everything their sites recorded. */
+  deletedProducts: number;
 }
 export interface CollectorStore {
   readonly kind: "memory" | "postgres";
@@ -124,6 +128,8 @@ export interface DeclarationInput {
 export class MemoryStore implements CollectorStore, ProductStore {
   readonly kind = "memory" as const;
   private products = new Map<string, ProductRecord>();
+  /** When each deleted product was deleted. */
+  private deleted = new Map<string, number>();
   private environments = new Map<string, EnvironmentRecord>();
   private domains = new Map<string, DomainClaim & { ownerId: string }>();
   private sessions = new Map<string, StoredSession>();
@@ -155,8 +161,29 @@ export class MemoryStore implements CollectorStore, ProductStore {
   }
   private owned(ownerId: string, productId: string, id: string): EnvironmentRecord | undefined {
     const row = this.environments.get(id);
-    const product = this.products.get(productId);
-    return row && row.productId === productId && product?.ownerId === ownerId ? row : undefined;
+    return row && row.productId === productId && this.ownedProduct(ownerId, productId)
+      ? row
+      : undefined;
+  }
+  /** A live product of this owner; a deleted one is treated as missing. */
+  private ownedProduct(ownerId: string, id: string): ProductRecord | undefined {
+    const row = this.products.get(id);
+    return row?.ownerId === ownerId && !this.deleted.has(id) ? row : undefined;
+  }
+  private removeProduct(id: string): void {
+    const sites = [...this.environments.values()]
+      .filter((environment) => environment.productId === id)
+      .map((environment) => environment.siteId);
+    this.products.delete(id);
+    this.deleted.delete(id);
+    for (const [key, environment] of this.environments) {
+      if (environment.productId === id) this.environments.delete(key);
+    }
+    const gone = (siteId: string) => sites.includes(siteId);
+    for (const [key, session] of this.sessions) if (gone(session.siteId)) this.sessions.delete(key);
+    for (const [key, event] of this.events) if (gone(event.siteId)) this.events.delete(key);
+    for (const [key, event] of this.activity) if (gone(event.siteId)) this.activity.delete(key);
+    for (const [key, note] of this.installs) if (gone(note.siteId)) this.installs.delete(key);
   }
   async createProduct(product: ProductRecord, production: EnvironmentRecord): Promise<void> {
     this.seedProduct(product, production);
@@ -166,13 +193,13 @@ export class MemoryStore implements CollectorStore, ProductStore {
   }
   async listProducts(ownerId: string): Promise<ProductWithEnvironments[]> {
     return [...this.products.values()]
-      .filter((row) => row.ownerId === ownerId)
+      .filter((row) => row.ownerId === ownerId && !this.deleted.has(row.id))
       .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
       .map((row) => this.withEnvironments(row));
   }
   async getProduct(ownerId: string, id: string): Promise<ProductWithEnvironments | null> {
-    const row = this.products.get(id);
-    return row && row.ownerId === ownerId ? this.withEnvironments(row) : null;
+    const row = this.ownedProduct(ownerId, id);
+    return row ? this.withEnvironments(row) : null;
   }
   async renameProduct(
     ownerId: string,
@@ -180,31 +207,47 @@ export class MemoryStore implements CollectorStore, ProductStore {
     name: string,
     now: number,
   ): Promise<ProductWithEnvironments | null> {
-    const row = this.products.get(id);
-    if (!row || row.ownerId !== ownerId) return null;
+    const row = this.ownedProduct(ownerId, id);
+    if (!row) return null;
     row.name = name;
     row.updatedAt = now;
     return this.withEnvironments(row);
   }
-  async deleteProduct(ownerId: string, id: string): Promise<string[] | null> {
+  async deleteProduct(ownerId: string, id: string, now: number): Promise<boolean> {
+    const row = this.ownedProduct(ownerId, id);
+    if (!row) return false;
+    this.deleted.set(id, now);
+    row.updatedAt = now;
+    return true;
+  }
+  async listDeletedProducts(ownerId: string, since: number): Promise<DeletedProduct[]> {
+    return [...this.deleted]
+      .filter(([id, deletedAt]) => deletedAt >= since && this.products.get(id)?.ownerId === ownerId)
+      .map(([id, deletedAt]) => ({ id, name: this.products.get(id)!.name, deletedAt }))
+      .sort((a, b) => b.deletedAt - a.deletedAt || b.id.localeCompare(a.id));
+  }
+  async restoreProduct(
+    ownerId: string,
+    id: string,
+    since: number,
+    now: number,
+  ): Promise<ProductWithEnvironments | null> {
     const row = this.products.get(id);
-    if (!row || row.ownerId !== ownerId) return null;
-    const sites = [...this.environments.values()]
-      .filter((environment) => environment.productId === id)
-      .map((environment) => environment.siteId);
-    this.products.delete(id);
-    for (const [key, environment] of this.environments) {
-      if (environment.productId === id) this.environments.delete(key);
+    const deletedAt = this.deleted.get(id);
+    if (!row || row.ownerId !== ownerId || deletedAt === undefined || deletedAt < since) {
+      return null;
     }
-    const gone = (siteId: string) => sites.includes(siteId);
-    for (const [key, session] of this.sessions) if (gone(session.siteId)) this.sessions.delete(key);
-    for (const [key, event] of this.events) if (gone(event.siteId)) this.events.delete(key);
-    for (const [key, event] of this.activity) if (gone(event.siteId)) this.activity.delete(key);
-    for (const [key, note] of this.installs) if (gone(note.siteId)) this.installs.delete(key);
-    return sites;
+    this.deleted.delete(id);
+    row.updatedAt = now;
+    return this.withEnvironments(row);
+  }
+  async purgeProduct(ownerId: string, id: string): Promise<boolean> {
+    if (this.products.get(id)?.ownerId !== ownerId || !this.deleted.has(id)) return false;
+    this.removeProduct(id);
+    return true;
   }
   async createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean> {
-    if (this.products.get(environment.productId)?.ownerId !== ownerId) return false;
+    if (!this.ownedProduct(ownerId, environment.productId)) return false;
     const taken = [...this.environments.values()].some(
       (row) => row.productId === environment.productId && row.type === environment.type,
     );
@@ -276,11 +319,15 @@ export class MemoryStore implements CollectorStore, ProductStore {
     return true;
   }
   async getEnvironmentBySiteId(siteId: string): Promise<EnvironmentRecord | null> {
-    const row = [...this.environments.values()].find((value) => value.siteId === siteId);
+    const row = [...this.environments.values()].find(
+      (value) => value.siteId === siteId && !this.deleted.has(value.productId),
+    );
     return row ? { ...row, origins: [...row.origins] } : null;
   }
   async isRegisteredOrigin(origin: string): Promise<boolean> {
-    return [...this.environments.values()].some((row) => row.origins.includes(origin));
+    return [...this.environments.values()].some(
+      (row) => row.origins.includes(origin) && !this.deleted.has(row.productId),
+    );
   }
   async createSession(session: StoredSession): Promise<void> {
     if (this.sessions.has(session.tokenHash)) throw new Error("Duplicate session");
@@ -427,6 +474,14 @@ export class MemoryStore implements CollectorStore, ProductStore {
         removed++;
       }
     }
+    let productsRemoved = 0;
+    for (const [id, deletedAt] of this.deleted) {
+      if (productsRemoved >= limit) break;
+      if (deletedAt < cutoffs.deletedProducts) {
+        this.removeProduct(id);
+        productsRemoved++;
+      }
+    }
     let ratesRemoved = 0;
     for (const [key, rate] of this.rates) {
       if (ratesRemoved >= limit) break;
@@ -439,7 +494,12 @@ export class MemoryStore implements CollectorStore, ProductStore {
       removedSessions: removed,
       removedRateBuckets: ratesRemoved,
       removedActivity: activityRemoved,
-      more: removed === limit || ratesRemoved === limit || activityRemoved === limit,
+      removedProducts: productsRemoved,
+      more:
+        removed === limit ||
+        ratesRemoved === limit ||
+        activityRemoved === limit ||
+        productsRemoved === limit,
     };
   }
 }

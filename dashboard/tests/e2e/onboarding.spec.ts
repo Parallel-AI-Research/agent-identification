@@ -403,18 +403,33 @@ test("an environment is added from the dashboard, with its own snippet and analy
   await expect(page.locator("p[role=alert]")).toContainText("Enter a session ID");
 });
 
-test("deleting a product needs its name and removes it", async ({ page }, info) => {
+test("a deleted product can be restored, or removed for good", async ({ page }, info) => {
   const email = address(info, "delete");
   await signUp(page, email);
   await confirm(page, email);
   await addProduct(page, "Short-lived", ["https://short-lived.example"]);
   await page.getByRole("link", { name: "Continue to install" }).click();
-  const confirmation = page.getByLabel("Type Short-lived to confirm");
-  await confirmation.fill("Short lived");
+  const remove = async () => {
+    await page.getByLabel("Type Short-lived to confirm").fill("Short-lived");
+    await page.getByRole("button", { name: "Delete product" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  };
+  await page.getByLabel("Type Short-lived to confirm").fill("Short lived");
   await page.getByRole("button", { name: "Delete product" }).click();
   await expect(page.locator("p[role=alert]")).toContainText("Type Short-lived exactly");
-  await confirmation.fill("Short-lived");
-  await page.getByRole("button", { name: "Delete product" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await remove();
+  await expect(page.getByText("No products yet")).toBeVisible();
+  const deleted = page.getByRole("region", { name: "Recently deleted" });
+  await expect(deleted).toContainText("Short-lived");
+  await expect(deleted).toContainText("Restorable until");
+
+  await deleted.getByRole("button", { name: "Restore" }).click();
+  await expect(deleted).toBeHidden();
+  await page.getByRole("link", { name: /Short-lived/ }).click();
+  await remove();
+  await deleted.getByRole("button", { name: "Delete now" }).click();
+  await expect(deleted).toContainText("It can't be undone");
+  await deleted.getByRole("button", { name: "Delete for good" }).click();
+  await expect(deleted).toBeHidden();
   await expect(page.getByText("No products yet")).toBeVisible();
 });

@@ -93,8 +93,9 @@ Database errors return a generic service error; they never become a successful
 recording. The widget exposes failures and offers retry.
 
 The Vercel cron runs daily at 03:00 UTC. `/internal/prune` requires the prune
-secret as bearer authentication and deletes sessions older than seven days and
-activity events older than 30.
+secret as bearer authentication and deletes sessions older than seven days,
+activity events older than 30, and products deleted more than 30 days ago, with
+everything their sites recorded.
 Requests also trigger bounded opportunistic pruning. A finite batch cannot erase
 an arbitrary backlog in one pass; monitor/export as needed and run repeated
 authenticated prune requests until the backlog is clear.

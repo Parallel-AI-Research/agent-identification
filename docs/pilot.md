@@ -4,7 +4,7 @@ The checklist for putting the MVP in front of external testers (`feat-010`). A p
 
 ## Deploy
 
-1. Apply every migration in `supabase/migrations/` that the production database doesn't have, in order, with a dry run first and `--db-url` for the customer project (see `AGENTS.md`). The activity work adds `20261102130000` to `20261102170000`.
+1. Apply every migration in `supabase/migrations/` that the production database doesn't have, in order, with a dry run first and `--db-url` for the customer project (see `AGENTS.md`). The activity work adds `20261102130000` to `20261103120000`.
 2. Deploy the collector from the repository root, then the dashboard from `dashboard/`. The collector's health check reads the new tables, so it must not deploy before the migrations.
 3. Check `/health` reports the new SDK version and `postgres`, and that `/sdk/v0.1.0/` still serves the frozen files.
 4. Freeze each newly published SDK version as `docs/operations.md` describes, so it can never change.
@@ -17,7 +17,7 @@ These need the deployed target; local runs don't count.
 - A new account signs up, confirms its email, adds a product, installs the snippet on a real page, and sees **Receiving events**, a page view and its own session in **Activity**. The owner runs this: agents don't create accounts on the hosted app.
 - A second account can't reach the first account's product, through the dashboard or the owner API.
 - A signed request from a real Web Bot Auth signer is verified, before any signer is described as supported.
-- Deleting the test product removes it, and its site stops accepting sessions.
+- Deleting the test product stops its site accepting sessions, restoring it starts them again, and **Delete now** removes it for good.
 
 Record the commands, dates and results in `feat-010`'s evidence, failures included.
 
@@ -37,5 +37,5 @@ Record the commands, dates and results in `feat-010`'s evidence, failures includ
 ## Retention and deletion
 
 - Sessions are deleted after seven days and activity after 30, by the daily prune and on requests.
-- Deleting a product removes its environments, secrets and everything its sites recorded in one statement, and installs stop within 30 seconds.
+- Deleting a product hides it, and its installs stop within 30 seconds. The owner can restore it for 30 days, with whatever its sites recorded that hasn't expired. After that the prune removes it, its environments and secrets, and everything its sites recorded, in one statement; **Delete now** under **Recently deleted** does the same at once.
 - Raw IP addresses, page titles, page text and form contents are never stored.

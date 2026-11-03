@@ -10,8 +10,9 @@ export function DeleteProduct({ productId, name }: { productId: string; name: st
     <Card>
       <h2 className="font-semibold">Delete this product</h2>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        This removes every environment, its site IDs and secrets, and everything they recorded.
-        Installs stop working within 30 seconds. It can&apos;t be undone.
+        Every environment&apos;s install stops within 30 seconds. You can restore the product from
+        Your products for 30 days. After that it&apos;s removed for good, with its site IDs, secrets
+        and everything they recorded.
       </p>
       <form action={action} className="space-y-4">
         {state.error ? <Notice tone="error">{state.error}</Notice> : null}

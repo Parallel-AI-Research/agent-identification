@@ -429,13 +429,19 @@ test("pruning drains expired rate-only backlogs larger than a batch", async () =
     removedSessions: 0,
     removedRateBuckets: 1500,
     removedActivity: 0,
+    removedProducts: 0,
     more: false,
   });
-  const cutoffs = { sessions: initialTime - 7 * 86400000, activity: initialTime - 30 * 86400000 };
+  const cutoffs = {
+    sessions: initialTime - 7 * 86400000,
+    activity: initialTime - 30 * 86400000,
+    deletedProducts: initialTime - 30 * 86400000,
+  };
   assert.deepEqual(await f.store.prune(cutoffs, initialTime, 1000), {
     removedSessions: 0,
     removedRateBuckets: 0,
     removedActivity: 0,
+    removedProducts: 0,
     more: false,
   });
 });

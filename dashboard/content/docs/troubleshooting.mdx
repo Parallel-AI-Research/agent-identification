@@ -28,6 +28,7 @@ Start with **Status** on the product page. It only changes on what the collector
 
 1. Remove the snippet or `init()` call from your pages.
 2. Remove `reportAction()`, `reportSignedRequest()` and `reportRequestSignals()` from your server, and delete `AGENT_ID_SITE_SECRET`.
-3. To remove the data too, delete the product at the bottom of its page. That removes its environments, site IDs and secrets, and everything they recorded, and installs stop working within 30 seconds.
+3. To stop every install of a product at once, delete it at the bottom of its page. Installs stop within 30 seconds, and you can restore it from **Recently deleted** on **Your products** for 30 days. Restoring brings back the same secret, so rotate it if it may have leaked.
+4. To remove the data too, choose **Delete now** under **Recently deleted**, or wait 30 days. Either removes its environments, site IDs and secrets, and everything they recorded, and it can't be undone.
 
 Without deleting, sessions are removed after seven days and activity after 30.

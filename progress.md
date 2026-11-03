@@ -4,8 +4,8 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 
 ## Current State
 
-**Last Updated:** 2026-11-02 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, built on `feat-008` in a stack of branches at the owner's request. `feat-005` and `feat-012` are merged but not deployed. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
+**Last Updated:** 2026-11-03 (Africa/Lagos)
+**Active Feature:** `feat-010`, the pilot release, the last open PR of the stack. `feat-005` to `feat-008` and `feat-012` are merged but not deployed. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
 
 The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't deployed, and published `0.1.0` assets are unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
 
@@ -25,7 +25,7 @@ The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
 - [ ] Activity event contract (`feat-005`): built and tested locally, not yet deployed. It adds the `activity_events` migration, which must reach the production database before the collector deploys.
-- [ ] Pilot release (`feat-010`): deletion, troubleshooting and uninstall docs and `docs/pilot.md` built and tested locally. Its hosted checks and a new-account onboarding wait for a deploy.
+- [ ] Pilot release (`feat-010`): soft deletion with a 30-day restore, troubleshooting and uninstall docs and `docs/pilot.md` built and tested locally. Its hosted checks and a new-account onboarding wait for a deploy.
 - [ ] Heuristic automation signals (`feat-008`): built and tested locally, not deployed. What each signal contributes with real traffic is validation work for `feat-009`.
 - [ ] Owner dashboard (`feat-007`): built and tested locally, not deployed.
 - [ ] Activity collection (`feat-006`): built and tested locally, not deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for 0.4.0 to be published.
@@ -35,7 +35,7 @@ The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Merge the stacked PRs in order, then deploy following `docs/pilot.md`: migrations first, then the collector, then the dashboard.
+3. Merge the pilot release PR, then deploy following `docs/pilot.md`: migrations first, then the collector, then the dashboard.
 4. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
 5. Define what the 90–100% target is measured against, so validation (`feat-009`) can start.
 

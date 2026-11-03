@@ -37,6 +37,8 @@ before(async () => {
     [product, operatorProduct],
   );
   await database.exec(await migration("20261101140000_add_environments.sql"));
+  // The current store reads the deletion marker, which a later migration adds.
+  await database.exec(await migration("20261103120000_soft_delete_products.sql"));
 });
 after(async () => {
   await database?.close();
@@ -76,7 +78,8 @@ test("credentials no longer live on products, and the old origins table is gone"
   );
   assert.deepEqual(
     rows.map((row) => row.column_name),
-    ["created_at", "id", "name", "owner_id", "updated_at"],
+    // deleted_at comes from the later soft-delete migration, applied above for the store.
+    ["created_at", "deleted_at", "id", "name", "owner_id", "updated_at"],
   );
   await assert.rejects(database.query("select 1 from agent_identification.product_origins"));
 });

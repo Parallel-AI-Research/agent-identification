@@ -37,6 +37,13 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
+/** Restorable until `restorableUntil`, then removed for good. */
+export interface DeletedProduct {
+  id: string;
+  name: string;
+  deletedAt: string;
+  restorableUntil: string;
+}
 export interface Domain {
   domain: string;
   status: "unverified" | "verified" | "not_applicable";

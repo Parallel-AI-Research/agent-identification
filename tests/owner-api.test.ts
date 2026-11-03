@@ -43,6 +43,7 @@ const MIGRATIONS = [
   "20261102150000_add_session_binding_index.sql",
   "20261102160000_add_signal_events.sql",
   "20261102170000_allow_product_deletion.sql",
+  "20261103120000_soft_delete_products.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -783,7 +784,7 @@ for (const [kind, open] of stores) {
       );
     });
 
-    test("deleting a product removes its environments and everything its sites recorded", async () => {
+    test("deleting a product hides it and stops its sites until it's restored", async () => {
       const { owner, create, addEnvironment, visitor, declare } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
       const kept = await create(owners.alice, "Kept product", ["https://kept.example"]);
@@ -793,27 +794,130 @@ for (const [kind, open] of stores) {
       });
       const session = (await (await visitor(a.environment.siteId)).json()) as CreatedSession;
       assert.equal((await declare(session)).status, 200);
-      const other = (await (
-        await visitor(kept.environment.siteId, "https://kept.example")
-      ).json()) as CreatedSession;
-      assert.equal((await declare(other, "https://kept.example")).status, 200);
+      const sites = [
+        [a.environment.siteId, origin],
+        [staging.environment.siteId, "https://staging.alice.example"],
+      ] as const;
       const remove = (ownerId: string) =>
         owner(ownerId, `/products/${a.product.id}`, { method: "DELETE" });
+      const restore = (ownerId: string) =>
+        owner(ownerId, `/products/${a.product.id}/restore`, { method: "POST" });
+      const listed = async (ownerId: string) =>
+        (await (await owner(ownerId, "/products")).json()) as {
+          products: { id: string }[];
+          deleted: { id: string; name: string; deletedAt: string; restorableUntil: string }[];
+        };
 
       assert.equal((await remove(owners.bob)).status, 404);
       assert.equal((await remove(owners.alice)).status, 204);
-      assert.equal((await owner(owners.alice, `/products/${a.product.id}`)).status, 404);
       assert.equal((await remove(owners.alice)).status, 404);
-      for (const [siteId, siteOrigin] of [
-        [a.environment.siteId, origin],
-        [staging.environment.siteId, "https://staging.alice.example"],
-      ] as const) {
-        assert.deepEqual(await store.listActivity(siteId, { limit: 10 }), []);
-        assert.deepEqual(await store.listEvents(siteId, 10), []);
-        assert.deepEqual(await store.listInstallActivity([siteId]), []);
+      assert.equal((await owner(owners.alice, `/products/${a.product.id}`)).status, 404);
+      assert.equal((await owner(owners.alice, path(a))).status, 404);
+      for (const [siteId, siteOrigin] of sites) {
         assert.equal((await visitor(siteId, siteOrigin)).status, 403);
       }
-      assert.equal((await store.listActivity(kept.environment.siteId, { limit: 10 })).length, 1);
+      // Hidden, not removed: what the sites recorded stays until the product is purged.
+      assert.equal((await store.listActivity(a.environment.siteId, { limit: 10 })).length, 1);
+      const deleted = await listed(owners.alice);
+      assert.deepEqual(
+        deleted.products.map((item) => item.id),
+        [kept.product.id],
+      );
+      assert.deepEqual(deleted.deleted, [
+        {
+          id: a.product.id,
+          name: "Alice's product",
+          deletedAt: new Date(time).toISOString(),
+          restorableUntil: new Date(time + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ]);
+      assert.deepEqual((await listed(owners.bob)).deleted, []);
+
+      assert.equal((await restore(owners.bob)).status, 404);
+      const restored = await restore(owners.alice);
+      assert.equal(restored.status, 200);
+      const { product } = (await restored.json()) as Created;
+      assert.deepEqual(
+        product.environments.map((item) => item.siteId),
+        [a.environment.siteId, staging.environment.siteId],
+      );
+      assert.equal((await restore(owners.alice)).status, 404);
+      const after = await listed(owners.alice);
+      assert.deepEqual(
+        after.products.map((item) => item.id).sort(),
+        [a.product.id, kept.product.id].sort(),
+      );
+      assert.deepEqual(after.deleted, []);
+      for (const [siteId, siteOrigin] of sites) {
+        assert.equal((await visitor(siteId, siteOrigin)).status, 201);
+      }
+      assert.equal((await store.listActivity(a.environment.siteId, { limit: 10 })).length, 1);
+    });
+
+    test("a deleted product is removed for good by its owner, or after 30 days", async () => {
+      let now = time;
+      const { owner, create, visitor, declare } = fixture(store, { clock: () => now });
+      const day = 24 * 60 * 60 * 1000;
+      const a = await create(owners.alice, "Alice's product");
+      const b = await create(owners.alice, "Second product", ["https://second.example"]);
+      const kept = await create(owners.alice, "Kept product", ["https://kept.example"]);
+      for (const [created, siteOrigin] of [
+        [a, origin],
+        [b, "https://second.example"],
+        [kept, "https://kept.example"],
+      ] as const) {
+        const session = (await (
+          await visitor(created.environment.siteId, siteOrigin)
+        ).json()) as CreatedSession;
+        assert.equal((await declare(session, siteOrigin)).status, 200);
+      }
+      const purge = (ownerId: string, created: Created) =>
+        owner(ownerId, `/products/${created.product.id}?permanent=true`, { method: "DELETE" });
+      const recorded = async (created: Created) => {
+        const siteId = created.environment.siteId;
+        return [
+          (await store.listActivity(siteId, { limit: 10 })).length,
+          (await store.listEvents(siteId, 10)).length,
+          (await store.listInstallActivity([siteId])).length,
+        ];
+      };
+
+      // A live product has to be deleted first.
+      assert.equal((await purge(owners.alice, a)).status, 404);
+      for (const created of [a, b]) {
+        const response = await owner(owners.alice, `/products/${created.product.id}`, {
+          method: "DELETE",
+        });
+        assert.equal(response.status, 204);
+      }
+      assert.equal((await purge(owners.bob, a)).status, 404);
+      assert.notDeepEqual(await recorded(a), [0, 0, 0]);
+      assert.equal((await purge(owners.alice, a)).status, 204);
+      assert.deepEqual(await recorded(a), [0, 0, 0]);
+      assert.equal((await purge(owners.alice, a)).status, 404);
+      const restoreA = await owner(owners.alice, `/products/${a.product.id}/restore`, {
+        method: "POST",
+      });
+      assert.equal(restoreA.status, 404);
+
+      // Past the window it can't be restored, and the prune removes it.
+      now = time + 30 * day + 1;
+      const { deleted } = (await (await owner(owners.alice, "/products")).json()) as {
+        deleted: unknown[];
+      };
+      assert.deepEqual(deleted, []);
+      const restoreB = await owner(owners.alice, `/products/${b.product.id}/restore`, {
+        method: "POST",
+      });
+      assert.equal(restoreB.status, 404);
+      // Only the product cutoff applies here, so what goes with it is the purge's doing.
+      const prune = (deletedProducts: number) =>
+        store.prune({ sessions: 0, activity: 0, deletedProducts }, now, 1000);
+      assert.equal((await prune(time)).removedProducts, 0);
+      assert.notDeepEqual(await recorded(b), [0, 0, 0]);
+      assert.equal((await prune(now - 30 * day)).removedProducts, 1);
+      assert.deepEqual(await recorded(b), [0, 0, 0]);
+      assert.notDeepEqual(await recorded(kept), [0, 0, 0]);
       const { products } = (await (await owner(owners.alice, "/products")).json()) as {
         products: { id: string }[];
       };
@@ -823,6 +927,28 @@ for (const [kind, open] of stores) {
       );
     });
 
+    test("restoring a product counts toward the product limit", async () => {
+      const { owner, create } = fixture(store);
+      const products: Created[] = [];
+      for (let index = 0; index < 25; index++) {
+        products.push(
+          await create(owners.alice, `Product ${index}`, [`https://p${index}.example`]),
+        );
+      }
+      const [first, second] = products as [Created, Created];
+      const remove = (created: Created) =>
+        owner(owners.alice, `/products/${created.product.id}`, { method: "DELETE" });
+      const restore = () =>
+        owner(owners.alice, `/products/${first.product.id}/restore`, { method: "POST" });
+      assert.equal((await remove(first)).status, 204);
+      await create(owners.alice, "Replacement", ["https://replacement.example"]);
+      const full = await restore();
+      assert.equal(full.status, 409);
+      assert.match(((await full.json()) as { error: string }).error, /up to 25 products/);
+      assert.equal((await remove(second)).status, 204);
+      assert.equal((await restore()).status, 200);
+    });
+
     test("activity is kept for 30 days, after its session has gone", async () => {
       const { create, visitor, declare } = fixture(store);
       const a = await create(owners.alice, "Alice's product");
@@ -830,7 +956,11 @@ for (const [kind, open] of stores) {
       assert.equal((await declare(session)).status, 200);
       const day = 24 * 60 * 60 * 1000;
       const prune = (at: number) =>
-        store.prune({ sessions: at - 7 * day, activity: at - 30 * day }, at, 1000);
+        store.prune(
+          { sessions: at - 7 * day, activity: at - 30 * day, deletedProducts: at - 30 * day },
+          at,
+          1000,
+        );
       const activity = () => store.listActivity(a.environment.siteId, { limit: 100 });
       assert.equal((await prune(time + 8 * day)).removedSessions, 1);
       assert.equal((await store.listEvents(a.environment.siteId, 100)).length, 0);
