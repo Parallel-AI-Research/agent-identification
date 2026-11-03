@@ -6,7 +6,7 @@ The checklist for putting the MVP in front of external testers (`feat-010`). A p
 
 1. Apply every migration in `supabase/migrations/` that the production database doesn't have, in order, with a dry run first and `--db-url` for the customer project (see `AGENTS.md`). The activity work adds `20261102130000` to `20261103120000`.
 2. Deploy the collector from the repository root, then the dashboard from `dashboard/`. The collector's health check reads the new tables, so it must not deploy before the migrations.
-3. Check `/health` reports the new SDK version and `postgres`, and that `/sdk/v0.1.0/` still serves the frozen files.
+3. Check `/health` reports the new SDK version and `postgres`, and that every frozen version under `/sdk/` still serves its frozen files.
 4. Freeze each newly published SDK version as `docs/operations.md` describes, so it can never change.
 
 ## Hosted checks

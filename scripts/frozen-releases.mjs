@@ -4,7 +4,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 // Keep this list explicit: a missing archive must never fall back to repacking.
-const frozenVersions = ["0.1.0"];
+export const frozenVersions = ["0.1.0", "0.5.0"];
 const digest = (bytes, algorithm = "sha256", encoding = "hex") =>
   createHash(algorithm).update(bytes).digest(encoding);
 

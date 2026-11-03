@@ -139,17 +139,19 @@ storage/CDN before removing an older deployment.
 manifest. Installing that HTTPS URL uses normal npm package semantics; it does
 not mean the package is published to npm's registry.
 
-Published v0.1.0 is archived in `releases/v0.1.0/`. Builds validate its checksums
-and restore the exact published SDK, tarball and manifests. The archived tarball
-keeps its original README, including historical installation instructions; the
-current public docs and source documentation contain the updated instructions.
+Published v0.1.0 and v0.5.0 are archived in `releases/v0.1.0/` and
+`releases/v0.5.0/`; versions 0.2.0 to 0.4.0 were never deployed. Builds validate
+each archive's checksums and restore the exact published SDK, tarball and
+manifests. Each archived tarball keeps its original README, including historical
+installation instructions; the current public docs and source documentation
+contain the updated instructions.
 Do not edit the archive to update documentation. SDK source, compiled output or
 package metadata changes under the frozen version fail the build/release; bump
 the SDK version for those changes. Repository README and build/test script edits
 can ship without replacing the published package. Package checks install the
 preserved tarball that deployment actually serves.
 
-The archive also keeps the release's source in `releases/v0.1.0/src/`, matching
+Each archive also keeps the release's source in `releases/v<version>/src/`, matching
 the hashes in `frozen.json`, so tests can rebuild the published bytes after the
 working source has moved on. Freeze a new version the same way once it is
 deployed: retrieve its published files, archive its source, record the hashes and
@@ -157,5 +159,7 @@ add the version to `frozenVersions` in `scripts/frozen-releases.mjs`.
 
 Keep each frozen version in `scripts/frozen-releases.mjs` and retain its archive
 when publishing a newer version. Missing or corrupt archives fail instead of
-silently repacking. Before a future version changes `/downloads/release.json`,
-review its current immutable cache policy; this cleanup preserves its bytes.
+silently repacking. `/downloads/release.json` describes the current version but is
+served with the same immutable cache policy as the versioned files, so a cache can
+keep an older manifest after an upgrade, as it may for 0.1.0's after 0.5.0 was
+deployed. Install from the versioned tarball URL, which never changes.

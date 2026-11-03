@@ -1,0 +1,88 @@
+{
+  "version": "0.5.0",
+  "retrievedAt": "2026-11-03T09:57:32.000Z",
+  "source": "https://parallel-agent-identification.vercel.app",
+  "artifacts": {
+    "agent-id.js": "a136f286ff9898b05defd135b04e1a057577c5a547ef255e2f8b811605103fd5",
+    "agent-id.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "integrity.json": "d8fbf14d957aaf7a06dfb405e4c4849dc13f003ed99a98660e505dce64c082b0",
+    "parallel-research-agent-identification-0.5.0.tgz": "3a62b9074d9cde0dbbe833ea8d37c077d0777547632d1094955ed26daaf70184",
+    "release.json": "f3a2818d796e1987912425b879819bdc556bf20698e58031f57cbdd12186e49f"
+  },
+  "sources": {
+    "LICENSE": "7db02eb83073a947967066fe910af3241a175fb83b2e9af39ae1d7a3565b38bc",
+    "src/browser/index.ts": "4fc1ed584fec6510173594001bc31dc65ef51684b4534d56d43c380d0ff4eeb3",
+    "src/browser/script.ts": "0a107e0c575d611f510ad86d2176722558e4487d28222df270812b9cd26c114e",
+    "src/browser/styles.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "src/protocol.ts": "7bd22b3f19c315bc963ebf6204acd703baa7a64737329f5735e71cd9090882c6",
+    "src/react/index.tsx": "9d3fd397f5b9ad30ce849826b8822e942ffd977cb6b938eb178324563ff9212d",
+    "src/server/activity.ts": "ec18a439b4f686bcdbe7ea42a3f98b991f5ac78f19072d4ac211f2d52b770230",
+    "src/server/index.ts": "239d3f9723dc3c3cff9f1ffc19d5077f1bf46c854d9e8e154937e1cfc72b8157",
+    "src/server/online.ts": "0f1c089c464b0eaa2c7e4e606000e9c3ea0e1226c013c0ffb1ea44d1affde66f",
+    "src/server/signals.ts": "36103069d3517255f7156dc4250d675032c4ecf0e5149dd7830e60879f69dcff",
+    "src/server/tokens.ts": "478acf6716928565bab9ef748dbb19486dbfd61a781d2682f7b9752f918987f0",
+    "src/server/web-bot-auth.ts": "2168a95698fd9cb2530cfc134d005d62168352ea01118279e80707d2fa687222"
+  },
+  "dist": {
+    "dist/agent-id.css": "17ae184039649b0865ed085fea9a54a05dfd78b4165840bf6ca68ecd5a6bc9f4",
+    "dist/agent-id.js": "a136f286ff9898b05defd135b04e1a057577c5a547ef255e2f8b811605103fd5",
+    "dist/browser/index.js": "4a774038c90c46919845f5864afdc5676defebc5bf77025ce9ad7a46e7a3698d",
+    "dist/react/index.js": "489155f49b0d6df3df2040de0b06e64c2a1f827b276a88b65393babd6f36604d",
+    "dist/server/index.js": "dad03ac4f20a8a34628649f9f87e108e61baac4e789ab5a24456b7dcab4532ec",
+    "dist/types/browser/index.d.ts": "6dc85a4cdbf2855d8ebaff0574f767745bcd79213df2b47a444ff793b1fab40f",
+    "dist/types/browser/script.d.ts": "c8d791565d0e3abf8b67e01e02b3ce95fa75fed00cd2359d33cfbe579f02029a",
+    "dist/types/protocol.d.ts": "74fbbc72f9ee7559258dd48fbaf19007a3db6e9abe38609226659831e3973a9b",
+    "dist/types/react/index.d.ts": "511062e1f1af8335cd7a35e14cc4f15ceb497fea21fe7288ca5c15a9c48d118c",
+    "dist/types/server/activity.d.ts": "4b52d417b769a1466335ac3b10d798009b5887afa2ed1cb5dbbb196ce02d1880",
+    "dist/types/server/index.d.ts": "8ccbd3d240dacc2034177bc319b34f233f1e4836bcd8facdb11254d2b74a951d",
+    "dist/types/server/online.d.ts": "72b602151a383a19fbb792ce489a4ddcbcb0e98733361620c690dbbb0fbf9915",
+    "dist/types/server/signals.d.ts": "080bb7c1579e4c3505482821cbd06ba4040b2caa625434e835e3e07b729db905",
+    "dist/types/server/tokens.d.ts": "62df4baebce7cece90d9c1001eaf7481f0654cf7b76f50ee4b99a3f48ea4fa81",
+    "dist/types/server/web-bot-auth.d.ts": "4caaefaa6edba148dca21f8d525b7759667a0ca6f327d7cca5c6357af045fcf9"
+  },
+  "package": {
+    "name": "@parallel-research/agent-identification",
+    "version": "0.5.0",
+    "description": "Website-owned, session-scoped visitor self-classification widget and server verification helpers",
+    "type": "module",
+    "license": "MIT",
+    "engines": {
+      "node": "24.x"
+    },
+    "files": [
+      "dist",
+      "README.md",
+      "LICENSE"
+    ],
+    "main": "./dist/browser/index.js",
+    "types": "./dist/types/browser/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/types/browser/index.d.ts",
+        "import": "./dist/browser/index.js"
+      },
+      "./react": {
+        "types": "./dist/types/react/index.d.ts",
+        "import": "./dist/react/index.js"
+      },
+      "./server": {
+        "types": "./dist/types/server/index.d.ts",
+        "import": "./dist/server/index.js"
+      },
+      "./styles.css": "./dist/agent-id.css",
+      "./script": "./dist/agent-id.js",
+      "./package.json": "./package.json"
+    },
+    "peerDependencies": {
+      "react": ">=18 <20"
+    },
+    "peerDependenciesMeta": {
+      "react": {
+        "optional": true
+      }
+    },
+    "publishConfig": {
+      "access": "public"
+    }
+  }
+}
