@@ -25,7 +25,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
-- [ ] Pilot release (`feat-010`): deployed. Its hosted checks remain: `npm run smoke:hosted`, delete, restore and Delete now on a test product, a second account kept out, a real Web Bot Auth signer, and a new-account onboarding that the owner runs.
+- [ ] Pilot release (`feat-010`): deployed. `npm run smoke:hosted` passed 10 checks on 3 November. Its other hosted checks remain: delete, restore and Delete now on a test product, a second account kept out, a real Web Bot Auth signer, and a new-account onboarding that the owner runs.
 - [ ] Heuristic automation signals (`feat-008`): deployed. What each signal contributes with real traffic is validation work for `feat-009`.
 - [ ] Owner dashboard (`feat-007`): deployed. Its error state has no test, as recorded in its evidence.
 - [ ] Activity collection (`feat-006`): deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for it to move to 0.5.0.
@@ -110,6 +110,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] Moved sites: each secret and origin matched the previous live collector, and stored secrets are encrypted.
 - [x] A forged token was rejected with 401, which shows the collector reaches Supabase's signing keys.
 - [x] Published SDK files match the frozen `0.1.0` release.
+- [x] On 3 November, after the deploy, hosted smoke checks passed 10 checks with 7/7 sessions revoked.
 - [x] On 3 November, after the deploy, `/health` reported 0.5.0 on Postgres, the 0.1.0 files still matched `frozen.json`, and the published 0.5.0 files matched a local build byte for byte.
 - [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 24/24 dashboard journey tests.
 - [x] First real account: signed up, confirmed its email, signed in and created a product on the hosted service.
