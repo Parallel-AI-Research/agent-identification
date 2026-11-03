@@ -33,6 +33,12 @@ for (const port of [4311, 4312]) {
           'data-site="demo-site"\n      data-page-views="off"',
         );
       }
+      if (url.pathname === "/plain/" && url.searchParams.get("signals") === "on") {
+        body = body.replace(
+          'data-site="demo-site"',
+          'data-site="demo-site"\n      data-automation-signals="on"',
+        );
+      }
       if (url.pathname === "/plain/" && url.searchParams.get("snippet") === "minimal") {
         body = body
           .replace('data-target="#visitor-choice"', "")

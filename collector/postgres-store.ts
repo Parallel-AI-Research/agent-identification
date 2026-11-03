@@ -18,6 +18,7 @@ import type {
   EventSource,
   Evidence,
   Outcome,
+  Signal,
   SignatureEvent,
   SignatureResult,
 } from "../src/protocol.js";
@@ -129,6 +130,14 @@ function activity(row: Record<string, unknown>): ActivityEvent {
         verifier: text(row.verifier),
         path: text(row.path),
       };
+    case "signal":
+      return {
+        ...base,
+        type: "signal",
+        evidence: row.evidence as "browser_reported" | "host_reported",
+        signal: row.signal as Signal,
+        detail: text(row.signal_detail),
+      };
     case "page_view":
       return {
         ...base,
@@ -152,7 +161,8 @@ function activity(row: Record<string, unknown>): ActivityEvent {
 }
 const ACTIVITY_COLUMNS = `site_id, id, session_id, type, source, evidence, origin, occurred_at,
   received_at, account_ref, choice, agent_name, agent_provider, agent_purpose, path, route,
-  action, resource_ref, outcome, signer, signature_agent, signature_result, verifier`;
+  action, resource_ref, outcome, signer, signature_agent, signature_result, verifier, signal,
+  signal_detail`;
 
 const ENVIRONMENT_COLUMNS = `e.*, coalesce((
   select jsonb_agg(o.origin order by o.origin)
@@ -541,9 +551,10 @@ export class PostgresStore implements CollectorStore, ProductStore {
     const pageView = event.type === "page_view" ? event : null;
     const action = event.type === "action" ? event : null;
     const signed = event.type === "signature" ? event : null;
+    const signal = event.type === "signal" ? event : null;
     const inserted = await this.execute(
       `insert into agent_identification.activity_events (${ACTIVITY_COLUMNS})
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        on conflict (site_id, id) do nothing
        returning ${ACTIVITY_COLUMNS}`,
       [
@@ -570,6 +581,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
         signed?.signatureAgent ?? null,
         signed?.result ?? null,
         signed?.verifier ?? null,
+        signal?.signal ?? null,
+        signal?.detail ?? null,
       ],
     );
     if (inserted[0]) return { status: "recorded", event: activity(inserted[0]) };

@@ -39,7 +39,16 @@ export type SignatureReport =
 
 const ASSET = /\.(?:m?js|css|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|mp4|webm)$/i;
 
-function headerMap(request: ReportableRequest): Record<string, string> {
+/** Scripts, styles, images and the like, so one page load counts once. */
+export function isAssetRequest(url: string, headers: Record<string, string>): boolean {
+  const destination = headers["sec-fetch-dest"];
+  return (
+    (destination !== undefined && !["document", "iframe", "frame"].includes(destination)) ||
+    ASSET.test(new URL(url, "https://placeholder.invalid").pathname)
+  );
+}
+
+export function headerMap(request: ReportableRequest): Record<string, string> {
   const headers: Record<string, string> = {};
   if (typeof Headers !== "undefined" && request.headers instanceof Headers) {
     request.headers.forEach((value, name) => {
@@ -57,7 +66,7 @@ function headerMap(request: ReportableRequest): Record<string, string> {
   return headers;
 }
 
-function requestUrl(request: ReportableRequest, headers: Record<string, string>): string {
+export function requestUrl(request: ReportableRequest, headers: Record<string, string>): string {
   if (typeof Request !== "undefined" && request instanceof Request) return request.url;
   const node = request as Exclude<ReportableRequest, Request>;
   const path = node.originalUrl ?? node.url ?? "/";
@@ -82,14 +91,7 @@ export async function reportSignedRequest(
     const input = headers["signature-input"];
     if (!input || !headers.signature) return { status: "skipped" };
     const url = options.url ?? requestUrl(request, headers);
-    const destination = headers["sec-fetch-dest"];
-    if (
-      !options.includeAssets &&
-      ((destination !== undefined && !["document", "iframe", "frame"].includes(destination)) ||
-        ASSET.test(new URL(url, "https://placeholder.invalid").pathname))
-    ) {
-      return { status: "skipped" };
-    }
+    if (!options.includeAssets && isAssetRequest(url, headers)) return { status: "skipped" };
     // Send only what the signature covers, so nothing else about the visitor leaves the server.
     const covered = new Set(["signature", "signature-input", "signature-agent"]);
     for (const match of input.matchAll(/"([a-z0-9-]+)"/g)) covered.add(match[1]!);

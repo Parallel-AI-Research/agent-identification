@@ -1,0 +1,15 @@
+---
+title: Automation signals
+description: Evidence of automation for agents that neither sign nor answer, never proof of an AI agent.
+date: 2026-11-02
+---
+
+Sessions can now carry heuristic automation signals, shown as evidence and never as identity.
+
+## What's new
+
+- **From the page, opt-in:** with `data-automation-signals="on"`, SDK 0.5.0 reports whether the browser says it's automated or headless. It's off by default.
+- **From your server:** `reportRequestSignals()` reports a user agent that names an AI agent or crawler, such as `ChatGPT-User`, as the claim it is.
+- **Suspected automation:** a session whose strongest evidence is a signal gets this label. A signal never makes a session verified or Declared AI, and a Person answer next to one shows as a conflict.
+
+No score is attached. See [Activity](/docs/activity#automation-signals).

@@ -5,7 +5,9 @@ import {
   isOutcome,
   isReference,
   isRoutePattern,
+  isSignal,
   isSignatureResult,
+  BROWSER_SIGNALS,
   MAX_PATH,
   routePath,
   type ActivityEvent,
@@ -77,6 +79,18 @@ export function assertActivity(event: ActivityEvent): void {
             (event.evidence === "cdn_reported") ===
               (event.verifier !== null &&
                 ["cloudflare", "akamai", "vercel"].includes(event.verifier))
+          );
+        case "signal":
+          return (
+            isSignal(event.signal) &&
+            (event.detail === null || /^[\x20-\x7e]{1,100}$/.test(event.detail)) &&
+            ((event.source === "browser" &&
+              event.evidence === "browser_reported" &&
+              event.origin !== null &&
+              BROWSER_SIGNALS.includes(event.signal)) ||
+              (event.source === "server" &&
+                event.evidence === "host_reported" &&
+                event.origin === null))
           );
         default:
           return false;

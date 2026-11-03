@@ -227,7 +227,7 @@
       "name": "Heuristic automation signals",
       "description": "Add heuristic automation signals one at a time as evidence for traffic that doesn't sign, and test what each contributes. Signed-agent verification, including CDN verdicts, is feat-012.",
       "dependencies": ["feat-006"],
-      "status": "not-started",
+      "status": "in-progress",
       "acceptance": [
         "Ordinary automation is not labelled an AI agent.",
         "A heuristic signal is shown as evidence with its source, never as verified identity.",
@@ -237,10 +237,14 @@
       "decisions": [
         "Web Bot Auth and CDN signed-agent verdicts moved to feat-012, so verified identity can ship before the heuristics.",
         "A heuristic signal never blocks a visitor.",
-        "Labels follow the evidence in feat-007."
+        "Labels follow the evidence in feat-007.",
+        "Started after feat-007 at the owner's request to build the remaining features in order.",
+        "The first signals are a webdriver flag and a headless browser from the page, and a user agent that names an AI agent or crawler from the server. The page's signals are opt-in, because they collect something new.",
+        "A signal never makes a session verified or Declared AI. A session whose strongest evidence is a signal is Suspected automation, and a Person answer next to one is a conflict.",
+        "This is SDK 0.5.0, and install instructions move to it."
       ],
       "openDecisions": [],
-      "evidence": ""
+      "evidence": "2026-11-02, local: ./init.sh --full passed with 166/166 collector, contract and SDK unit tests, 5/5 dashboard unit, 56/56 SDK browser and 30/30 dashboard journey tests in Chromium and WebKit. User agents naming an AI agent or crawler, and HeadlessChrome, are read as signals; an ordinary Chrome user agent and a token inside another word are not. A page can report only webdriver or a headless browser from its own session, a server can also report a user agent's claim linked through its binding, and the server helper skips ordinary and asset requests without a network call and reports failures without throwing. Signals round-trip on memory, Postgres under the restricted role and the production driver, and the database refuses a page reporting a user agent claim, a signal without a kind, and signals with other events' fields. In the analytics, a webdriver flag or a user agent claim labels a session Suspected automation, never Verified signer or Declared AI; a self-declared AI still outranks a signal; and a Person answer next to a signal is labelled by the signal with the conflict listed. The widget sends no signals by default; with automationSignals on, a real automated Chromium and WebKit each report webdriver once, as browser_reported. Firefox doesn't launch locally, so its run of the new browser test is left to CI. What each signal contributes with real traffic is validation work for feat-009."
     },
     {
       "id": "feat-009",

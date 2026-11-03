@@ -100,6 +100,12 @@ before(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261102160000_add_signal_events.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   store = new PostgresStore(
     async (sql, parameters) => (await db.query<Record<string, unknown>>(sql, parameters)).rows,
   );
@@ -375,6 +381,24 @@ test("the activity table refuses events that break the contract, without the col
     { ...signature, id: randomUUID(), verifier: "akamai" },
     { ...signature, id: randomUUID(), signature_result: null },
     { ...signature, id: randomUUID(), signature_agent: "ftp://agent.test" },
+    { ...signature, id: randomUUID(), signal: "webdriver" },
+  ]) {
+    await assert.rejects(insert(broken));
+  }
+  const signal = {
+    ...valid,
+    type: "signal",
+    path: null,
+    signal: "webdriver",
+    signal_detail: "navigator.webdriver",
+  };
+  await insert({ ...signal, id: randomUUID() });
+  for (const broken of [
+    { ...signal, id: randomUUID(), signal: "agent_user_agent" },
+    { ...signal, id: randomUUID(), signal: null },
+    { ...signal, id: randomUUID(), source: "server", evidence: "host_reported" },
+    { ...signal, id: randomUUID(), choice: "person" },
+    { ...signal, id: randomUUID(), signal_detail: "x".repeat(101) },
   ]) {
     await assert.rejects(insert(broken));
   }
@@ -404,6 +428,7 @@ test("declarations recorded before the activity table join the timeline when it'
     );
     await earlier.exec(await migration("20261102130000_add_activity_events.sql"));
     await earlier.exec(await migration("20261102140000_add_signature_events.sql"));
+    await earlier.exec(await migration("20261102160000_add_signal_events.sql"));
     const at = new Date(time).toISOString();
     assert.deepEqual(await new PostgresStore(execute).listActivity(s.siteId, { limit: 10 }), [
       {

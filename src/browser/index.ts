@@ -4,6 +4,7 @@ import {
   isRoutePattern,
   routePath,
   type Choice,
+  type Signal,
   type CreatedSession,
   type Mode,
   type RecordedDeclaration,
@@ -31,6 +32,11 @@ export interface WidgetOptions {
   pageViews?: boolean;
   /** Your route pattern for this page, such as /tickets/:id, for parts masking can't catch. */
   route?: string;
+  /**
+   * Reports whether this browser is automated (navigator.webdriver) or headless, as heuristic
+   * evidence that never labels a visitor an AI agent. Off by default.
+   */
+  automationSignals?: boolean;
 }
 
 export interface Widget {
@@ -56,6 +62,7 @@ interface Configuration {
   onError?: WidgetOptions["onError"];
   pageViews: boolean;
   route?: string;
+  automationSignals: boolean;
 }
 
 interface StoredSession {
@@ -145,6 +152,7 @@ function configure(options: WidgetOptions): Configuration {
     onError: options.onError,
     pageViews: options.pageViews ?? true,
     route: options.route,
+    automationSignals: options.automationSignals ?? false,
   };
 }
 
@@ -266,6 +274,8 @@ class Controller implements Widget {
   private expiry: ReturnType<typeof setTimeout> | undefined;
   /** The session this page load has recorded its automatic page view in. */
   private viewed: string | null = null;
+  /** The session this page load has reported its automation signals in. */
+  private signalled: string | null = null;
 
   constructor(readonly config: Configuration) {
     this.originalInert = config.gate?.inert ?? false;
@@ -558,6 +568,10 @@ class Controller implements Widget {
       this.viewed = status.sessionId;
       void this.pageView({ route: this.config.route }).catch(() => {});
     }
+    if (this.config.automationSignals && this.signalled !== status.sessionId) {
+      this.signalled = status.sessionId;
+      void this.reportSignals().catch(() => {});
+    }
     return status;
   }
 
@@ -573,25 +587,33 @@ class Controller implements Widget {
       ...(options.route ? { route: options.route } : {}),
       occurredAt: new Date().toISOString(),
     };
+    await this.deliver("/v1/page-views", { views: [view] }, view.id, "page view");
+  }
+
+  /**
+   * Sends one event and waits for the collector to confirm that exact ID. It retries with the same
+   * ID, so a retry is recorded once, and reports to onError before rejecting.
+   */
+  private async deliver(path: string, payload: object, id: string, what: string): Promise<void> {
     const operation = this.controller.signal;
     for (let attempt = 0; ; attempt++) {
       const session = this.session;
       try {
         if (!session) throw new Error("Identification session is not ready.");
-        const body = await this.request("/v1/page-views", "POST", { views: [view] }, session.token);
+        const body = await this.request(path, "POST", payload, session.token);
         const confirmed =
           record(body) &&
           Array.isArray(body.results) &&
           body.results.some(
             (result: unknown) =>
               record(result) &&
-              result.id === view.id &&
+              result.id === id &&
               (result.status === "recorded" || result.status === "duplicate"),
           );
-        if (!confirmed) throw new Error("Identification service did not confirm the page view.");
+        if (!confirmed) throw new Error(`Identification service did not confirm the ${what}.`);
         return;
       } catch (error) {
-        // A reset or destroy supersedes the view; it belongs to the session that ended.
+        // A reset or destroy supersedes it; it belongs to the session that ended.
         if (operation.aborted || this.destroyed) throw error;
         const retryable =
           session !== null &&
@@ -604,6 +626,20 @@ class Controller implements Widget {
         await new Promise((resolve) => setTimeout(resolve, 300 * 3 ** attempt));
         if (operation.aborted || this.destroyed) throw error;
       }
+    }
+  }
+
+  /** Opt-in: what this browser shows of automation, as evidence and never as identity. */
+  private async reportSignals(): Promise<void> {
+    const found: { signal: Signal; detail: string }[] = [];
+    if (navigator.webdriver === true)
+      found.push({ signal: "webdriver", detail: "navigator.webdriver" });
+    if (/HeadlessChrome\//.test(navigator.userAgent)) {
+      found.push({ signal: "headless_browser", detail: "HeadlessChrome" });
+    }
+    for (const signal of found) {
+      const event = { id: crypto.randomUUID(), ...signal, occurredAt: new Date().toISOString() };
+      await this.deliver("/v1/browser-signals", { signals: [event] }, event.id, "signal");
     }
   }
 

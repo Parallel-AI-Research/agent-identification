@@ -30,6 +30,7 @@ if (script?.dataset.site) {
         styleUrl: script.dataset.style,
         pageViews: script.dataset.pageViews !== "off",
         route: script.dataset.route,
+        automationSignals: script.dataset.automationSignals === "on",
         onRecorded: (declaration) => {
           const target =
             typeof container === "string" ? document.querySelector(container)! : container;

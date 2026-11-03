@@ -38,8 +38,10 @@ export interface Overview {
   signedRequests: { verified: number; unverified: number };
   actions: Record<Outcome, number>;
   declarations: Record<Choice, number>;
+  /** Heuristic automation signals, from the page or your server. */
+  signals: number;
   /** Events your server reported without a session it could link them to. */
-  withoutSession: { actions: number; signedRequests: number };
+  withoutSession: { actions: number; signedRequests: number; signals: number };
 }
 
 const outcomes = (): Record<Outcome, number> => ({ attempted: 0, rejected: 0, confirmed: 0 });
@@ -56,13 +58,15 @@ export function summarize(events: ActivityEvent[]): {
     signedRequests: { verified: 0, unverified: 0 },
     actions: outcomes(),
     declarations: { ai_assistant: 0, person: 0, prefer_not_to_say: 0 },
-    withoutSession: { actions: 0, signedRequests: 0 },
+    signals: 0,
+    withoutSession: { actions: 0, signedRequests: 0, signals: 0 },
   };
   const sessions = new Map<string, SessionSummary>();
   for (const event of events) {
     if (event.type === "page_view") overview.pageViews++;
     if (event.type === "action") overview.actions[event.outcome]++;
     if (event.type === "declaration") overview.declarations[event.choice]++;
+    if (event.type === "signal") overview.signals++;
     const verified = event.type === "signature" && event.evidence !== "signature_claimed";
     if (event.type === "signature") {
       overview.signedRequests[verified ? "verified" : "unverified"]++;
@@ -70,6 +74,7 @@ export function summarize(events: ActivityEvent[]): {
     if (!event.sessionId) {
       if (event.type === "action") overview.withoutSession.actions++;
       if (event.type === "signature") overview.withoutSession.signedRequests++;
+      if (event.type === "signal") overview.withoutSession.signals++;
       continue;
     }
     let session = sessions.get(event.sessionId);
@@ -109,6 +114,11 @@ export function summarize(events: ActivityEvent[]): {
         }
         if (!verified) session.unverifiedSignatures++;
         break;
+      case "signal": {
+        const found = event.detail ? `${event.signal}: ${event.detail}` : event.signal;
+        if (!session.automationSignals.includes(found)) session.automationSignals.push(found);
+        break;
+      }
     }
   }
   const list = [...sessions.values()];
