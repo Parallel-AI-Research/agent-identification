@@ -9,7 +9,7 @@ Standalone website-owner SDK. Do not couple it to the ticket-management research
 - All HTTP clients fail visibly on errors; never report acceptance without a validated response.
 - Make small commits after relevant tests pass. Before release run npm run check and the cross-origin browser/package integration suite.
 - Shared contracts: src/protocol.ts and docs/protocol.md. Coordinate changes before altering them.
-- `src/` is frozen at the published 0.1.0 release, so changing it needs a version bump. Collector and dashboard code live in `collector/` and `dashboard/`.
+- `src/` is frozen at the published 0.5.0 release, so changing it needs a version bump. Collector and dashboard code live in `collector/` and `dashboard/`.
 - Public docs and changelog posts live in `dashboard/content/`. Add a changelog post for every change customers can see, and keep the docs honest about what's built.
 - The Supabase CLI link in this repository points at the research project. Pass `--db-url` for the customer project, and never run `supabase db push` without checking the target.
 

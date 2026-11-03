@@ -3,8 +3,8 @@
 ## Current Objective
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
-- Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`). The activity event contract (`feat-005`) and SDK 0.2.0 are built and tested locally, not deployed. `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `feat/pilot-release`, the last open PR; the branches below it are merged into `main`.
+- Current status: Everything through the pilot release is merged and deployed, with SDK 0.5.0 published and frozen. The pilot's hosted checks remain, and `feat-003` waits on a real site recording a declaration.
+- Branch / commit: `chore/freeze-sdk-0.5.0`, which archives the published 0.5.0 release; everything before it is merged into `main`.
 
 ## Completed This Session
 
@@ -12,12 +12,14 @@
 - [x] Deployed the dashboard and set Supabase redirects.
 - [x] Fixed a production-only JSON parameter bug and added real-driver tests.
 - [x] Applied the `install_activity` migration to production and deployed the install status and the Dashboard tab.
+- [x] Applied six more migrations on 3 November and deployed the activity, signed-agent, automation-signal and soft-deletion work, then froze SDK 0.5.0.
 
 ## Verification Evidence
 
 | Check             | Command                | Result  | Notes                                        |
 | ----------------- | ---------------------- | ------- | -------------------------------------------- |
 | Hosted collector  | `npm run smoke:hosted` | Pass    | 9 checks, 7/7 sessions revoked on 2 November |
+| Hosted deploy     | `curl /health`         | Pass    | 0.5.0 on Postgres, 0.1.0 files unchanged     |
 | Collector         | `npm test`             | Pass    | 132/132                                      |
 | Dashboard journey | `npx playwright test`  | Pass    | 28/28 on merged main, Chromium and WebKit    |
 | Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                        |
@@ -45,4 +47,4 @@
 
 ## Recommended Next Step
 
-- Merge the pilot release PR, then deploy as `docs/pilot.md` describes: every new migration first, then the collector, then the dashboard. Then run the hosted checks and record them in `feat-010`.
+- Merge the 0.5.0 freeze PR. Then run the hosted checks in `docs/pilot.md`, starting with `npm run smoke:hosted`, and record them in `feat-010`.

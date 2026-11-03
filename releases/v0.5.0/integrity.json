@@ -1,0 +1,13 @@
+{
+  "version": "0.5.0",
+  "assets": {
+    "agent-id.js": {
+      "bytes": 15039,
+      "integrity": "sha384-T88F70U4Y0Vea1arLNHTb0Qlpqv8IpTEgg5fPehkYNUluXhXCPHXmVx4npFuGLJD"
+    },
+    "agent-id.css": {
+      "bytes": 1689,
+      "integrity": "sha384-a1cuahK0ufFnc+33rQ7sinIuMxVjwUOwZP3b0ycAg0gv8kXj0vVI6pZO4tqOJT+c"
+    }
+  }
+}

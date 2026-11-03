@@ -5,9 +5,9 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-03 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, the last open PR of the stack. `feat-005` to `feat-008` and `feat-012` are merged but not deployed. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004` and `feat-011` are done.
+**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. Its hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005` and `feat-011` are done.
 
-The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't deployed, and published `0.1.0` assets are unchanged. The hosted collector now loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard is live for signup, install instructions, origins, DNS verification and secret rotation on a product's production environment.
+SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0` assets are unchanged. Versions 0.2.0 to 0.4.0 were never deployed. The hosted collector loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard covers signup, install instructions, environments, activity, signed agents, origins, DNS verification, secret rotation and soft deletion.
 
 ## Status
 
@@ -20,23 +20,23 @@ The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't
 - [x] Dashboard deployed at https://parallel-agent-dashboard.vercel.app, with Supabase redirects set.
 - [x] Removed the collector's demo page, its React copy and the local `public-demo` site, and deployed the change on 2 November. The live collector's root URL now returns 404.
 - [x] Install status (`feat-004`) and the dashboard's Dashboard tab deployed on 2 November, after the `install_activity` migration reached the production database.
+- [x] Activity contract and collection, the owner dashboard, automation signals, Web Bot Auth and soft deletion deployed on 3 November, after six migrations reached the production database. SDK 0.5.0 is published and frozen, and the activity event contract (`feat-005`) is done.
 
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
-- [ ] Activity event contract (`feat-005`): built and tested locally, not yet deployed. It adds the `activity_events` migration, which must reach the production database before the collector deploys.
-- [ ] Pilot release (`feat-010`): soft deletion with a 30-day restore, troubleshooting and uninstall docs and `docs/pilot.md` built and tested locally. Its hosted checks and a new-account onboarding wait for a deploy.
-- [ ] Heuristic automation signals (`feat-008`): built and tested locally, not deployed. What each signal contributes with real traffic is validation work for `feat-009`.
-- [ ] Owner dashboard (`feat-007`): built and tested locally, not deployed.
-- [ ] Activity collection (`feat-006`): built and tested locally, not deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for 0.4.0 to be published.
-- [ ] Web Bot Auth verification (`feat-012`): built and tested locally, not yet deployed. Its `add_signature_events` migration follows feat-005's. No signer or CDN is supported until a real request through it is verified on the hosted collector.
+- [ ] Pilot release (`feat-010`): deployed. Its hosted checks remain: `npm run smoke:hosted`, delete, restore and Delete now on a test product, a second account kept out, a real Web Bot Auth signer, and a new-account onboarding that the owner runs.
+- [ ] Heuristic automation signals (`feat-008`): deployed. What each signal contributes with real traffic is validation work for `feat-009`.
+- [ ] Owner dashboard (`feat-007`): deployed. Its error state has no test, as recorded in its evidence.
+- [ ] Activity collection (`feat-006`): deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for it to move to 0.5.0.
+- [ ] Web Bot Auth verification (`feat-012`): deployed. No signer or CDN is supported until a real request through it is verified on the hosted collector.
 
 ### What's Next
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Merge the pilot release PR, then deploy following `docs/pilot.md`: migrations first, then the collector, then the dashboard.
-4. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
+3. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
+4. Move the ticket app to SDK 0.5.0 so `feat-006`'s integration can be checked.
 5. Define what the 90–100% target is measured against, so validation (`feat-009`) can start.
 
 ## Blockers / Risks
@@ -45,7 +45,7 @@ The package is `0.5.0` on the `feat-008` branch; `main` has `0.3.0`, which isn't
 - [ ] **Unused settings remain**: `AGENT_ID_SITES` on Vercel and the old database login stay in place until the rollback option is no longer needed.
 - [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
-- [ ] **Environments in the dashboard**: the API supports adding environments, but the dashboard shows production only until the switcher lands in `feat-007`.
+- [ ] **`/downloads/release.json` is cached as immutable**: it names the current version, so a cache may still hold the 0.1.0 manifest after 0.5.0 was deployed. Installs use versioned tarball URLs, which never change.
 - [ ] **Dashboard e2e tests are local only**: CI runs its typecheck, lint, unit tests and build, but not the Playwright journey.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
@@ -100,8 +100,8 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 
 ## Files Modified This Session
 
-- `feature_list.json`, `progress.md`, `session-handoff.md` - hosted evidence and next steps.
-- `docs/operations.md` - deployment traps found during the move.
+- `releases/v0.5.0/`, `scripts/frozen-releases.mjs`, `tests/frozen-releases.test.mjs` - SDK 0.5.0 frozen after its deploy.
+- `feature_list.json`, `progress.md`, `session-handoff.md`, `AGENTS.md`, `docs/operations.md`, `docs/pilot.md` - deploy evidence and the frozen version.
 
 ## Evidence of Completion
 
@@ -110,6 +110,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] Moved sites: each secret and origin matched the previous live collector, and stored secrets are encrypted.
 - [x] A forged token was rejected with 401, which shows the collector reaches Supabase's signing keys.
 - [x] Published SDK files match the frozen `0.1.0` release.
+- [x] On 3 November, after the deploy, `/health` reported 0.5.0 on Postgres, the 0.1.0 files still matched `frozen.json`, and the published 0.5.0 files matched a local build byte for byte.
 - [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 24/24 dashboard journey tests.
 - [x] First real account: signed up, confirmed its email, signed in and created a product on the hosted service.
 - [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
