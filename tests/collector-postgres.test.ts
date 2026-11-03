@@ -41,7 +41,7 @@ function declaration(session: StoredSession, choice: "person" | "ai_assistant" =
     now: time + 1000,
   };
 }
-const cutoff = (at: number) => ({ sessions: at, activity: at });
+const cutoff = (at: number) => ({ sessions: at, activity: at, deletedProducts: at });
 
 before(async () => {
   db = new PGlite();
@@ -103,6 +103,18 @@ before(async () => {
   await db.exec(
     await readFile(
       new URL("../supabase/migrations/20261102160000_add_signal_events.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261102170000_allow_product_deletion.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/20261103120000_soft_delete_products.sql", import.meta.url),
       "utf8",
     ),
   );
@@ -237,6 +249,7 @@ test("Postgres pruning drains rate buckets independently of retained sessions", 
     removedSessions: 0,
     removedRateBuckets: 1500,
     removedActivity: 0,
+    removedProducts: 0,
     more: false,
   });
   assert.equal(

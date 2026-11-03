@@ -46,6 +46,13 @@ export interface DomainClaim {
   token: string;
   verifiedAt: number | null;
 }
+/** How long a deleted product can be restored before it's removed for good. */
+export const RESTORE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+export interface DeletedProduct {
+  id: string;
+  name: string;
+  deletedAt: number;
+}
 /** Owner-facing methods take the owner first so a query cannot omit the ownership check. */
 export interface ProductStore {
   createProduct(product: ProductRecord, production: EnvironmentRecord): Promise<void>;
@@ -58,6 +65,24 @@ export interface ProductStore {
     name: string,
     now: number,
   ): Promise<ProductWithEnvironments | null>;
+  /**
+   * Hides a product and stops its sites; every other method then treats it as missing, until
+   * it's restored. Returns false when this owner has no such product.
+   */
+  deleteProduct(ownerId: string, id: string, now: number): Promise<boolean>;
+  /** Deleted products this owner can still restore, those deleted at or after `since`. */
+  listDeletedProducts(ownerId: string, since: number): Promise<DeletedProduct[]>;
+  restoreProduct(
+    ownerId: string,
+    id: string,
+    since: number,
+    now: number,
+  ): Promise<ProductWithEnvironments | null>;
+  /**
+   * Removes a deleted product, its environments and everything its sites recorded, for good.
+   * Returns false when this owner has no such deleted product.
+   */
+  purgeProduct(ownerId: string, id: string): Promise<boolean>;
   /** Returns false when the product already has an environment of this type. */
   createEnvironment(ownerId: string, environment: EnvironmentRecord): Promise<boolean>;
   updateEnvironment(

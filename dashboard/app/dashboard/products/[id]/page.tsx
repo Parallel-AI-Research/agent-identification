@@ -13,6 +13,7 @@ import {
 import { pickEnvironment } from "@/lib/environments";
 import { AddEnvironment } from "./add-environment";
 import { AgentSetup } from "./agent-setup";
+import { DeleteProduct } from "./delete-product";
 import { DomainList } from "./domain-list";
 import { InstallStatusPanel, StatusBadges } from "./install-status";
 import { InstallTabs } from "./install-tabs";
@@ -125,6 +126,7 @@ export default async function ProductPage({
         />
       </Card>
       <AddEnvironment product={product} />
+      <DeleteProduct productId={product.id} name={product.name} />
     </div>
   );
 }

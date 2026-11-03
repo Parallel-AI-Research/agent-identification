@@ -26,6 +26,7 @@ import { bearer, body, eventLimit, HttpError } from "./http.js";
 import { handleOwnerRequest, type OwnerApiOptions } from "./owner-api.js";
 import {
   activeSecrets,
+  RESTORE_WINDOW_MS,
   secretFingerprint,
   staticDirectory,
   type Site,
@@ -142,6 +143,7 @@ export function createCollector(
   const cutoffs = (now: number) => ({
     sessions: now - retentionDays * 86400000,
     activity: now - activityRetentionDays * 86400000,
+    deletedProducts: now - RESTORE_WINDOW_MS,
   });
   // Install activity only feeds the owner's status view, so one note a minute per site,
   // signal and origin is enough, and a busy site doesn't write on every request.
@@ -455,12 +457,14 @@ export function createCollector(
         let total = 0;
         let totalRateBuckets = 0;
         let totalActivity = 0;
+        let totalProducts = 0;
         let more = false;
         for (let batch = 0; batch < 100; batch++) {
           const result = await store.prune(cutoffs(now), now, 1000);
           total += result.removedSessions;
           totalRateBuckets += result.removedRateBuckets;
           totalActivity += result.removedActivity;
+          totalProducts += result.removedProducts;
           more = result.more;
           if (!more) break;
         }
@@ -468,6 +472,7 @@ export function createCollector(
           removedSessions: total,
           removedRateBuckets: totalRateBuckets,
           removedActivity: totalActivity,
+          removedProducts: totalProducts,
           more,
         });
       }

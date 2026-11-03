@@ -24,6 +24,7 @@ const DOCS = [
   ["/docs/server-verification", "Server verification"],
   ["/docs/activity", "Activity"],
   ["/docs/signed-agents", "Signed agents"],
+  ["/docs/troubleshooting", "Troubleshooting and uninstalling"],
   ["/docs/limits", "What it can't do"],
 ];
 

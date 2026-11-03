@@ -24,6 +24,7 @@ import type {
 } from "../src/protocol.js";
 import { assertActivity, sameActivity, type ActivityResult } from "./activity.js";
 import type {
+  DeletedProduct,
   DomainClaim,
   EnvironmentChanges,
   EnvironmentRecord,
@@ -168,8 +169,26 @@ const ENVIRONMENT_COLUMNS = `e.*, coalesce((
   select jsonb_agg(o.origin order by o.origin)
   from agent_identification.environment_origins o where o.environment_id = e.id
 ), '[]'::jsonb) as origins`;
+// A deleted product, and its sites, read as missing everywhere except the restore list.
 const OWNED_ENVIRONMENTS = `agent_identification.environments e
-  join agent_identification.products p on p.id = e.product_id`;
+  join agent_identification.products p on p.id = e.product_id and p.deleted_at is null`;
+/**
+ * Removes the products `doomed` selects, their environments and everything their sites
+ * recorded, in one statement, so a product is never gone while its data stays, or the reverse.
+ */
+const purge = (doomed: string) => `with doomed as (${doomed}), sites as (
+    select site_id from agent_identification.environments
+    where product_id in (select id from doomed)
+  ), activity as (
+    delete from agent_identification.activity_events where site_id in (select site_id from sites)
+  ), sessions as (
+    delete from agent_identification.sessions where site_id in (select site_id from sites)
+  ), installs as (
+    delete from agent_identification.install_activity where site_id in (select site_id from sites)
+  ), removed as (
+    delete from agent_identification.products where id in (select id from doomed) returning id
+  )
+  select id from removed`;
 const ENVIRONMENT_ORDER = `array_position(array['production','beta','staging','dev'], e.type)`;
 
 export class PostgresStore implements CollectorStore, ProductStore {
@@ -224,7 +243,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
   }
   async countProducts(ownerId: string): Promise<number> {
     const rows = await this.execute(
-      "select count(*) as total from agent_identification.products where owner_id=$1",
+      `select count(*) as total from agent_identification.products
+       where owner_id=$1 and deleted_at is null`,
       [ownerId],
     );
     return Number(rows[0]?.total);
@@ -232,7 +252,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
   async listProducts(ownerId: string): Promise<ProductWithEnvironments[]> {
     const products = await this.execute(
       `select * from agent_identification.products
-       where owner_id=$1 order by created_at desc, id desc`,
+       where owner_id=$1 and deleted_at is null order by created_at desc, id desc`,
       [ownerId],
     );
     const environments = await this.execute(
@@ -248,7 +268,8 @@ export class PostgresStore implements CollectorStore, ProductStore {
   }
   async getProduct(ownerId: string, id: string): Promise<ProductWithEnvironments | null> {
     const products = await this.execute(
-      "select * from agent_identification.products where owner_id=$1 and id=$2",
+      `select * from agent_identification.products
+       where owner_id=$1 and id=$2 and deleted_at is null`,
       [ownerId, id],
     );
     if (!products[0]) return null;
@@ -267,15 +288,59 @@ export class PostgresStore implements CollectorStore, ProductStore {
   ): Promise<ProductWithEnvironments | null> {
     const rows = await this.execute(
       `update agent_identification.products set name=$3, updated_at=$4
-       where owner_id=$1 and id=$2 returning id`,
+       where owner_id=$1 and id=$2 and deleted_at is null returning id`,
       [ownerId, id, name, now],
     );
     return rows[0] ? this.getProduct(ownerId, id) : null;
   }
+  async deleteProduct(ownerId: string, id: string, now: number): Promise<boolean> {
+    const rows = await this.execute(
+      `update agent_identification.products set deleted_at=$3, updated_at=$3
+       where owner_id=$1 and id=$2 and deleted_at is null returning id`,
+      [ownerId, id, now],
+    );
+    return rows.length > 0;
+  }
+  async listDeletedProducts(ownerId: string, since: number): Promise<DeletedProduct[]> {
+    const rows = await this.execute(
+      `select id, name, deleted_at from agent_identification.products
+       where owner_id=$1 and deleted_at>=$2 order by deleted_at desc, id desc`,
+      [ownerId, since],
+    );
+    return rows.map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      deletedAt: Number(row.deleted_at),
+    }));
+  }
+  async restoreProduct(
+    ownerId: string,
+    id: string,
+    since: number,
+    now: number,
+  ): Promise<ProductWithEnvironments | null> {
+    const rows = await this.execute(
+      `update agent_identification.products set deleted_at=null, updated_at=$4
+       where owner_id=$1 and id=$2 and deleted_at>=$3 returning id`,
+      [ownerId, id, since, now],
+    );
+    return rows[0] ? this.getProduct(ownerId, id) : null;
+  }
+  async purgeProduct(ownerId: string, id: string): Promise<boolean> {
+    const rows = await this.execute(
+      purge(
+        `select id from agent_identification.products
+         where owner_id=$1 and id=$2 and deleted_at is not null`,
+      ),
+      [ownerId, id],
+    );
+    return rows.length > 0;
+  }
   async createEnvironment(ownerId: string, e: EnvironmentRecord): Promise<boolean> {
     const rows = await this.execute(
       `with allowed as (
-         select id from agent_identification.products where owner_id=$1 and id=$2
+         select id from agent_identification.products
+         where owner_id=$1 and id=$2 and deleted_at is null
        ), created as (
          insert into agent_identification.environments
          (id, product_id, type, name, site_id, secret_ciphertext, created_at, updated_at)
@@ -328,6 +393,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
          set name=coalesce($4,e.name), updated_at=$5
          from agent_identification.products p
          where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+         and p.deleted_at is null
          returning e.id
        ), removed as (
          delete from agent_identification.environment_origins
@@ -355,6 +421,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
            secret_ciphertext=$5, updated_at=$6
        from agent_identification.products p
        where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+         and p.deleted_at is null
          and e.secret_ciphertext=$7
        returning e.id`,
       [
@@ -380,6 +447,7 @@ export class PostgresStore implements CollectorStore, ProductStore {
        set previous_secret_ciphertext=null, previous_secret_expires_at=null, updated_at=$4
        from agent_identification.products p
        where p.id=e.product_id and p.owner_id=$1 and e.product_id=$2 and e.id=$3
+         and p.deleted_at is null
        returning e.id`,
       [ownerId, productId, id, now],
     );
@@ -427,14 +495,16 @@ export class PostgresStore implements CollectorStore, ProductStore {
   }
   async getEnvironmentBySiteId(siteId: string): Promise<EnvironmentRecord | null> {
     const rows = await this.execute(
-      `select ${ENVIRONMENT_COLUMNS} from agent_identification.environments e where e.site_id=$1`,
+      `select ${ENVIRONMENT_COLUMNS} from ${OWNED_ENVIRONMENTS} where e.site_id=$1`,
       [siteId],
     );
     return rows[0] ? environment(rows[0]) : null;
   }
   async isRegisteredOrigin(origin: string): Promise<boolean> {
     const rows = await this.execute(
-      "select 1 from agent_identification.environment_origins where origin=$1 limit 1",
+      `select 1 from agent_identification.environment_origins o
+       join ${OWNED_ENVIRONMENTS} on e.id = o.environment_id
+       where o.origin=$1 limit 1`,
       [origin],
     );
     return rows.length > 0;
@@ -684,6 +754,13 @@ export class PostgresStore implements CollectorStore, ProductStore {
        returning id`,
       [cutoffs.sessions, limit],
     );
+    const products = await this.execute(
+      purge(
+        `select id from agent_identification.products
+         where deleted_at<$1 order by deleted_at limit $2`,
+      ),
+      [cutoffs.deletedProducts, limit],
+    );
     const rates = await this.execute(
       `delete from agent_identification.rate_buckets
        where key_hash in (select key_hash from agent_identification.rate_buckets
@@ -695,7 +772,12 @@ export class PostgresStore implements CollectorStore, ProductStore {
       removedSessions: rows.length,
       removedRateBuckets: rates.length,
       removedActivity: activityRows.length,
-      more: rows.length === limit || rates.length === limit || activityRows.length === limit,
+      removedProducts: products.length,
+      more:
+        rows.length === limit ||
+        rates.length === limit ||
+        activityRows.length === limit ||
+        products.length === limit,
     };
   }
 }

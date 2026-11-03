@@ -4,7 +4,7 @@
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
 - Current status: The hosted collector, dashboard, public site, docs and changelog are live, including the install status (`feat-004`). The activity event contract (`feat-005`) and SDK 0.2.0 are built and tested locally, not deployed. `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `feat/automation-signals`, stacked on `feat/owner-dashboard`.
+- Branch / commit: `feat/pilot-release`, the last open PR; the branches below it are merged into `main`.
 
 ## Completed This Session
 
@@ -45,4 +45,4 @@
 
 ## Recommended Next Step
 
-- Mark `feat-003` done once a real site records a declaration. Then start the activity event contract (`feat-005`), or earlier if the owner approves, followed by Web Bot Auth verification (`feat-012`). `docs/web-bot-auth.md` has the research behind it.
+- Merge the pilot release PR, then deploy as `docs/pilot.md` describes: every new migration first, then the collector, then the dashboard. Then run the hosted checks and record them in `feat-010`.

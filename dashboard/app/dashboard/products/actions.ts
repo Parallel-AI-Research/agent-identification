@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   collector,
   CollectorError,
@@ -120,5 +121,44 @@ export async function verifyDomain(
     );
     revalidatePath(`/dashboard/products/${productId}`);
     return { success: `${domain} is verified.` };
+  });
+}
+
+export async function deleteProduct(
+  productId: string,
+  name: string,
+  _: ProductState,
+  form: FormData,
+): Promise<ProductState> {
+  if (String(form.get("confirm") ?? "").trim() !== name) {
+    return { error: `Type ${name} exactly to confirm.` };
+  }
+  const result = await attempt(async () => {
+    await collector(`/products/${productId}`, { method: "DELETE" });
+    return {};
+  });
+  if (result.error) return result;
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
+export async function restoreProduct(productId: string): Promise<ProductState> {
+  try {
+    await collector(`/products/${productId}/restore`, { method: "POST" });
+  } catch (error) {
+    if (!(error instanceof CollectorError)) throw error;
+    if (error.status === 404) return { error: "This product can no longer be restored." };
+    if (error.status === 409) return { error: `${error.message}. Delete one to restore this.` };
+    return { error: error.message };
+  }
+  revalidatePath("/dashboard");
+  return {};
+}
+
+export async function deleteProductForGood(productId: string): Promise<ProductState> {
+  return attempt(async () => {
+    await collector(`/products/${productId}?permanent=true`, { method: "DELETE" });
+    revalidatePath("/dashboard");
+    return {};
   });
 }

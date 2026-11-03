@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { collector, type Product } from "@/lib/collector";
+import { collector, type DeletedProduct, type Product } from "@/lib/collector";
+import { DeletedProducts } from "./deleted-products";
 import { StatusBadges } from "./products/[id]/install-status";
 
 export default async function ProductsPage() {
-  const { products } = await collector<{ products: Product[] }>("/products");
+  const { products, deleted } = await collector<{
+    products: Product[];
+    deleted: DeletedProduct[];
+  }>("/products");
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -44,6 +48,7 @@ export default async function ProductsPage() {
           </p>
         </Card>
       )}
+      {deleted.length ? <DeletedProducts products={deleted} /> : null}
     </>
   );
 }
