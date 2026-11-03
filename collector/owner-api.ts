@@ -16,6 +16,7 @@ import {
   type SecretCipher,
   type SiteDirectory,
 } from "./products.js";
+import { summarize } from "./analytics.js";
 import { INSTALL_REFUSALS, type CollectorStore, type InstallActivity } from "./store.js";
 
 export interface OwnerApiOptions {
@@ -27,8 +28,11 @@ export interface OwnerApiOptions {
   resolveTxt?: (name: string) => Promise<string[][]>;
 }
 const ROUTE =
-  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|activity|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
+  /^\/v1\/owner\/products(?:\/([^/]+)(\/environments(?:\/([^/]+)(?:\/(events|activity|analytics|secret|secret\/previous|domains|domains\/verify))?)?)?)?$/;
 const MAX_ORIGINS = 20;
+const ANALYTICS_RANGES: Record<string, number> = { "24h": 1, "7d": 7, "30d": 30 };
+const MAX_ANALYTICS_EVENTS = 10_000;
+const MAX_LISTED_SESSIONS = 100;
 const MAX_PRODUCTS = 25;
 const DEFAULT_NAMES: Record<EnvironmentType, string> = {
   production: "Production",
@@ -359,6 +363,35 @@ export async function handleOwnerRequest(
       type: type as (typeof EVENT_TYPES)[number] | undefined,
     });
     return respond({ events });
+  }
+  if (section === "analytics") {
+    if (request.method !== "GET") throw new HttpError(405, "Method not allowed");
+    const range = url.searchParams.get("range") ?? "7d";
+    const days = ANALYTICS_RANGES[range];
+    if (days === undefined) {
+      throw new HttpError(400, `range must be one of ${Object.keys(ANALYTICS_RANGES).join(", ")}`);
+    }
+    const sessionId = url.searchParams.get("sessionId") ?? undefined;
+    if (sessionId !== undefined && !isUuid(sessionId)) {
+      throw new HttpError(400, "sessionId must be a UUID");
+    }
+    const from = now - days * 86_400_000;
+    const events = await store.listActivity(environment.siteId, {
+      limit: MAX_ANALYTICS_EVENTS,
+      sessionId: sessionId?.toLowerCase(),
+      from,
+      to: now + 1,
+    });
+    const { overview, sessions } = summarize(events);
+    return respond({
+      range,
+      from: new Date(from).toISOString(),
+      checkedAt: new Date(now).toISOString(),
+      // The newest events come first, so a busy period is summarized from its latest part.
+      truncated: events.length === MAX_ANALYTICS_EVENTS,
+      overview,
+      sessions: sessions.slice(0, MAX_LISTED_SESSIONS),
+    });
   }
   if (section === "secret") {
     if (request.method !== "POST") throw new HttpError(405, "Method not allowed");

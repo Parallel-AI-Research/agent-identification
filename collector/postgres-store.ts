@@ -590,8 +590,17 @@ export class PostgresStore implements CollectorStore, ProductStore {
       `select ${ACTIVITY_COLUMNS} from agent_identification.activity_events
        where site_id=$1 and ($2::uuid is null or session_id=$2::uuid)
          and ($3::text is null or type=$3::text)
-       order by received_at desc, id desc limit $4`,
-      [siteId, options.sessionId ?? null, options.type ?? null, options.limit],
+         and ($4::bigint is null or received_at>=$4::bigint)
+         and ($5::bigint is null or received_at<$5::bigint)
+       order by received_at desc, id desc limit $6`,
+      [
+        siteId,
+        options.sessionId ?? null,
+        options.type ?? null,
+        options.from ?? null,
+        options.to ?? null,
+        options.limit,
+      ],
     );
     return rows.map(activity);
   }

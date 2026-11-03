@@ -68,6 +68,20 @@ curl https://parallel-agent-identification.vercel.app/v1/actions \
   -d '{"siteId":"YOUR-SITE-ID","actions":[{"id":"8d4f…","action":"ticket.update","outcome":"confirmed","occurredAt":"2026-11-02T12:00:00Z"}]}'
 ```
 
+## In the dashboard
+
+Each product has an **Activity** page for one environment at a time, with the last 24 hours, 7 days or 30 days. It counts sessions, page views, signed requests and confirmed actions separately, and a retry is never counted twice.
+
+Each session gets one label from the strongest evidence it has, with no score:
+
+- **Verified signer:** a request in it carried a verified [signature](/docs/signed-agents).
+- **Declared AI:** the visitor answered AI assistant.
+- **Suspected automation:** it showed automation signals.
+- **Declared person:** the visitor answered Person.
+- **Unknown:** nothing else. Unknown never means a person.
+
+Every signal stays on the session's timeline, with who vouches for it. When signals disagree, such as a Person answer in a session with a verified signature, the session shows **Conflicting signals** instead of picking one. To find your own test session, open the most recent one or paste the session ID that `widget.getState()` returns.
+
 ## Exporting
 
 Your server can read a site's activity with its secret:

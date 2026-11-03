@@ -102,3 +102,62 @@ export async function collector<T>(path: string, init: RequestInit = {}): Promis
   }
   return payload as T;
 }
+
+export type SessionLabel =
+  "verified_signer" | "declared_ai" | "suspected_automation" | "declared_person" | "unknown";
+type Outcomes = { attempted: number; rejected: number; confirmed: number };
+export interface SessionSummary {
+  sessionId: string;
+  origin: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  label: SessionLabel;
+  conflicts: string[];
+  pageViews: number;
+  actions: Outcomes;
+  declaration: {
+    choice: "ai_assistant" | "person" | "prefer_not_to_say";
+    agent: { name: string | null; provider: string | null; purpose: string | null };
+  } | null;
+  verifiedSigners: string[];
+  unverifiedSignatures: number;
+  automationSignals: string[];
+}
+export interface Analytics {
+  range: "24h" | "7d" | "30d";
+  from: string;
+  checkedAt: string;
+  truncated: boolean;
+  overview: {
+    sessions: number;
+    labels: Record<SessionLabel, number>;
+    pageViews: number;
+    signedRequests: { verified: number; unverified: number };
+    actions: Outcomes;
+    declarations: { ai_assistant: number; person: number; prefer_not_to_say: number };
+    withoutSession: { actions: number; signedRequests: number };
+  };
+  sessions: SessionSummary[];
+}
+/** One event on a session's timeline. Fields beyond the shared ones depend on its type. */
+export interface ActivityItem {
+  id: string;
+  type: "declaration" | "page_view" | "action" | "signature";
+  evidence: string;
+  occurredAt: string;
+  receivedAt: string;
+  sessionId: string | null;
+  origin: string | null;
+  accountRef: string | null;
+  choice?: "ai_assistant" | "person" | "prefer_not_to_say";
+  agent?: { name: string | null; provider: string | null; purpose: string | null };
+  path?: string | null;
+  route?: string | null;
+  action?: string;
+  resourceRef?: string | null;
+  outcome?: "attempted" | "rejected" | "confirmed";
+  signer?: string | null;
+  signatureAgent?: string | null;
+  result?: string;
+  verifier?: string | null;
+}

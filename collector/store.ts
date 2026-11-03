@@ -104,6 +104,10 @@ export interface ActivityQuery {
   limit: number;
   sessionId?: string;
   type?: ActivityEvent["type"];
+  /** Received at or after this time, in milliseconds. */
+  from?: number;
+  /** Received before this time, in milliseconds. */
+  to?: number;
 }
 export interface DeclarationInput {
   tokenHash: string;
@@ -331,7 +335,9 @@ export class MemoryStore implements CollectorStore, ProductStore {
         (event) =>
           event.siteId === siteId &&
           (options.sessionId === undefined || event.sessionId === options.sessionId) &&
-          (options.type === undefined || event.type === options.type),
+          (options.type === undefined || event.type === options.type) &&
+          (options.from === undefined || Date.parse(event.receivedAt) >= options.from) &&
+          (options.to === undefined || Date.parse(event.receivedAt) < options.to),
       )
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id.localeCompare(a.id))
       .slice(0, options.limit)

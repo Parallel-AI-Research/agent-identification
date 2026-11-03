@@ -199,6 +199,23 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await expect(signed).toContainText("Local test signer on /pricing");
   await expect(signed.getByText("Verified", { exact: true })).toBeVisible();
 
+  // Activity counts each kind of thing once and labels the session by its strongest signal.
+  const productUrl = page.url();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
+  await expect(page).toHaveURL(/\/activity\?env=[0-9a-f-]{36}$/);
+  const overview = page.locator("section", { hasText: "Overview" });
+  await expect(overview).toContainText("Sessions1");
+  await expect(overview).toContainText("Page views1");
+  await expect(overview).toContainText("Signed requests1");
+  await expect(overview).toContainText("1 signed requests it couldn't link to a session");
+  await page.getByRole("link", { name: /Declared AI/ }).click();
+  const timeline = page.locator("section", { hasText: "Timeline" });
+  await expect(timeline).toContainText("Answered AI assistant");
+  await expect(timeline).toContainText("Said by the visitor");
+  await expect(timeline).toContainText("Viewed /");
+  await expect(timeline).toContainText("Reported by your page");
+  await page.goto(productUrl);
+
   await expect(page.getByText("Unverified", { exact: true })).toBeVisible();
   await expect(page.getByText("_agent-identification.www.onboarding.example")).toBeVisible();
   await page.getByRole("button", { name: "Check DNS record" }).click();
@@ -343,4 +360,45 @@ test("password reset works and doesn't reveal who has an account", async ({ page
   await expect(page.locator("p[role=alert]")).toContainText("incorrect");
   await signIn(page, email, replacement);
   await expect(page).toHaveURL(/\/dashboard$/);
+});
+
+test("an environment is added from the dashboard, with its own snippet and analytics", async ({
+  page,
+}, info) => {
+  const email = address(info, "environments");
+  await signUp(page, email);
+  await confirm(page, email);
+  await addProduct(page, "Environments", ["https://env.example"]);
+  await page.getByRole("link", { name: "Continue to install" }).click();
+  const production = await page.locator("pre code").first().textContent();
+  await expect(page.getByRole("link", { name: "Production", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await page.getByRole("combobox", { name: "Environment" }).selectOption("staging");
+  await page.getByLabel("Its website origins").fill("https://staging.env.example");
+  await page.getByRole("button", { name: "Add environment" }).click();
+  await expect(page.getByText("Staging is ready")).toBeVisible();
+  await expect(page.getByText("It is shown once")).toBeVisible();
+  await page.getByRole("link", { name: "Open Staging to copy its snippet" }).click();
+  await expect(page).toHaveURL(/\?env=[0-9a-f-]{36}$/);
+  await expect(page.getByRole("link", { name: "Staging", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const staging = await page.locator("pre code").first().textContent();
+  expect(staging).not.toBe(production);
+  expect(staging).toMatch(/data-site="site_/);
+
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
+  await expect(page).toHaveURL(/\/activity\?env=[0-9a-f-]{36}$/);
+  await expect(page.getByText("No sessions in Staging in the last 7 days.")).toBeVisible();
+  await expect(page.getByText(/Nothing has loaded the widget in Staging yet/)).toBeVisible();
+  await page.getByRole("link", { name: "Last 30 days" }).click();
+  await expect(page).toHaveURL(/range=30d/);
+  await expect(page.getByText("No sessions in Staging in the last 30 days.")).toBeVisible();
+  await page.getByLabel("Session ID").fill("not a session");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator("p[role=alert]")).toContainText("Enter a session ID");
 });
