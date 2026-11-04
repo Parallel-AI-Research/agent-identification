@@ -4,7 +4,7 @@
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
 - Current status: Everything through the pilot release is merged and deployed, with SDK 0.5.0 published and frozen. The pilot's hosted checks remain, and `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `chore/freeze-sdk-0.5.0`, which archives the published 0.5.0 release; everything before it is merged into `main`.
+- Branch / commit: `chore/hosted-smoke-evidence`, which records the hosted smoke run; everything before it is merged into `main`.
 
 ## Completed This Session
 
@@ -16,13 +16,13 @@
 
 ## Verification Evidence
 
-| Check             | Command                | Result  | Notes                                        |
-| ----------------- | ---------------------- | ------- | -------------------------------------------- |
-| Hosted collector  | `npm run smoke:hosted` | Pass    | 9 checks, 7/7 sessions revoked on 2 November |
-| Hosted deploy     | `curl /health`         | Pass    | 0.5.0 on Postgres, 0.1.0 files unchanged     |
-| Collector         | `npm test`             | Pass    | 132/132                                      |
-| Dashboard journey | `npx playwright test`  | Pass    | 28/28 on merged main, Chromium and WebKit    |
-| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                        |
+| Check             | Command                | Result  | Notes                                         |
+| ----------------- | ---------------------- | ------- | --------------------------------------------- |
+| Hosted collector  | `npm run smoke:hosted` | Pass    | 10 checks, 7/7 sessions revoked on 3 November |
+| Hosted deploy     | `curl /health`         | Pass    | 0.5.0 on Postgres, 0.1.0 files unchanged      |
+| Collector         | `npm test`             | Pass    | 132/132                                       |
+| Dashboard journey | `npx playwright test`  | Pass    | 28/28 on merged main, Chromium and WebKit     |
+| Harness structure | `validate-harness.mjs` | 100/100 | Structural score only                         |
 
 ## Files Changed
 
@@ -47,4 +47,4 @@
 
 ## Recommended Next Step
 
-- Merge the 0.5.0 freeze PR. Then run the hosted checks in `docs/pilot.md`, starting with `npm run smoke:hosted`, and record them in `feat-010`.
+- Run the remaining hosted checks in `docs/pilot.md`: delete, restore and Delete now on a test product, a second account kept out, a real Web Bot Auth signer, and the new-account onboarding. Record them in `feat-010`.
