@@ -159,7 +159,8 @@ add the version to `frozenVersions` in `scripts/frozen-releases.mjs`.
 
 Keep each frozen version in `scripts/frozen-releases.mjs` and retain its archive
 when publishing a newer version. Missing or corrupt archives fail instead of
-silently repacking. `/downloads/release.json` describes the current version but is
-served with the same immutable cache policy as the versioned files, so a cache can
-keep an older manifest after an upgrade, as it may for 0.1.0's after 0.5.0 was
-deployed. Install from the versioned tarball URL, which never changes.
+silently repacking. `/downloads/release.json` describes the current version, so
+`vercel.json` caches it for five minutes, while the versioned tarballs and SDK
+files are immutable for a year. A cache may still hold the 0.1.0 manifest it
+stored under the old immutable policy. Install from the versioned tarball URL,
+which never changes.

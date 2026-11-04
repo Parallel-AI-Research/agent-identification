@@ -24,6 +24,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Activity collection (`feat-006`) verified with the ticket app as its integration fixture on 4 November. Page views and the app's reported ticket saves, rejected and confirmed, share one collector session for both unanswered and declared runs, in Chromium and WebKit.
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
 - [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
+- [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It takes effect with the next collector deploy, and a cache may still hold the 0.1.0 manifest it stored earlier.
 
 ### What's In Progress
 
@@ -46,7 +47,6 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Unused settings remain**: `AGENT_ID_SITES` on Vercel and the old database login stay in place until the rollback option is no longer needed.
 - [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
-- [ ] **`/downloads/release.json` is cached as immutable**: it names the current version, so a cache may still hold the 0.1.0 manifest after 0.5.0 was deployed. Installs use versioned tarball URLs, which never change.
 - [ ] **Dashboard e2e tests are local only**: CI runs its typecheck, lint, unit tests and build, but not the Playwright journey.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
@@ -104,6 +104,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - `feature_list.json`, `progress.md`, `session-handoff.md` - `feat-006` done after the ticket app integration check.
 - `dashboard/tests/e2e/onboarding.spec.ts`, `dashboard/next.config.mjs`, `dashboard/README.md` - a browser test for the Activity page's error state, using Next's test mode in `next dev` only. `feat-007` done.
 - `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/nextjs-signed-agents.mdx` - the corrected Next.js example and its changelog post.
+- `vercel.json`, `docs/operations.md` - a five-minute cache for `/downloads/release.json`.
 
 ## Evidence of Completion
 
