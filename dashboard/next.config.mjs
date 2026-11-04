@@ -1,4 +1,5 @@
 import { createMDX } from "fumadocs-mdx/next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
 const withMDX = createMDX();
 
@@ -30,4 +31,11 @@ const config = {
   },
 };
 
-export default withMDX(config);
+export default function nextConfig(phase) {
+  return withMDX({
+    ...config,
+    // Lets a browser test fake the collector for its own requests only. It stays off outside
+    // `next dev`, because a request header would then decide where the server's fetches go.
+    experimental: { testProxy: phase === PHASE_DEVELOPMENT_SERVER },
+  });
+}

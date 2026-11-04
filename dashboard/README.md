@@ -39,4 +39,4 @@ npm test
 npm run test:e2e
 ```
 
-`test:e2e` needs the local stack and uses local accounts only.
+`test:e2e` needs the local stack and uses local accounts only. One journey uses Next's test mode to make the collector fail for its own requests. Only `next dev` turns that mode on; production builds never do.
