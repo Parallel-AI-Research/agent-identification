@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-04 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector. The other hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005` and `feat-011` are done.
+**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector, and activity collection (`feat-006`) was verified through the ticket app. The other hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005`, `feat-006` and `feat-011` are done.
 
 SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0` assets are unchanged. Versions 0.2.0 to 0.4.0 were never deployed. The hosted collector loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard covers signup, install instructions, environments, activity, signed agents, origins, DNS verification, secret rotation and soft deletion.
 
@@ -21,6 +21,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Removed the collector's demo page, its React copy and the local `public-demo` site, and deployed the change on 2 November. The live collector's root URL now returns 404.
 - [x] Install status (`feat-004`) and the dashboard's Dashboard tab deployed on 2 November, after the `install_activity` migration reached the production database.
 - [x] Activity contract and collection, the owner dashboard, automation signals, Web Bot Auth and soft deletion deployed on 3 November, after six migrations reached the production database. SDK 0.5.0 is published and frozen, and the activity event contract (`feat-005`) is done.
+- [x] Activity collection (`feat-006`) verified with the ticket app as its integration fixture on 4 November. Page views and the app's reported ticket saves, rejected and confirmed, share one collector session for both unanswered and declared runs, in Chromium and WebKit.
 
 ### What's In Progress
 
@@ -28,7 +29,6 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] Pilot release (`feat-010`): deployed. `npm run smoke:hosted` passed 10 checks on 3 November, and a real Web Bot Auth signer verified on 4 November. Its other hosted checks remain: delete, restore and Delete now on a test product, a second account kept out, and a new-account onboarding that the owner runs.
 - [ ] Heuristic automation signals (`feat-008`): deployed. What each signal contributes with real traffic is validation work for `feat-009`.
 - [ ] Owner dashboard (`feat-007`): deployed. Its error state has no test, as recorded in its evidence.
-- [ ] Activity collection (`feat-006`): deployed. The ticket app moved to SDK 0.5.0 on 4 November and forwards signed requests. Its page views and server actions haven't been checked through it yet.
 - [ ] Web Bot Auth verification (`feat-012`): deployed. ChatGPT Work's cloud browser is supported, after a real request verified on the hosted collector on 4 November. No CDN verdict has been verified yet.
 
 ### What's Next
@@ -36,7 +36,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
 3. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
-4. Check page views and server actions through the ticket app on SDK 0.5.0 for `feat-006`, and verify a CDN verdict for `feat-012`.
+4. Cover the owner dashboard's error state with a test, the remaining gap in `feat-007`, and verify a CDN verdict for `feat-012`.
 5. Define what the 90–100% target is measured against, so validation (`feat-009`) can start.
 
 ## Blockers / Risks
@@ -101,8 +101,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 
 ## Files Modified This Session
 
-- `feature_list.json`, `progress.md`, `session-handoff.md` - the first verified signer and the ticket app's move to 0.5.0.
-- `docs/web-bot-auth.md`, `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/chatgpt-cloud-browser.mdx` - ChatGPT Work's cloud browser listed as supported.
+- `feature_list.json`, `progress.md`, `session-handoff.md` - `feat-006` done after the ticket app integration check.
 
 ## Evidence of Completion
 
@@ -116,6 +115,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 24/24 dashboard journey tests.
 - [x] First real account: signed up, confirmed its email, signed in and created a product on the hosted service.
 - [x] On 4 November, ChatGPT Work's cloud browser loaded the ticket app's `/login` page, and the hosted collector recorded it as ChatGPT agent, verified. Two earlier ChatGPT visits arrived unsigned and recorded nothing.
+- [x] On 4 November, the ticket app's package smoke check passed 15 scenarios in Chromium and WebKit against the local collector, including two that read the collector's activity export for page views, the declaration and reported saves.
 - [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session
