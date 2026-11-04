@@ -1,6 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { createServer } from "node:http";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { test as withNext } from "next/experimental/testmode/playwright";
 
 const MAIL = "http://127.0.0.1:54324";
 const PASSWORD = "correct-horse-battery";
@@ -402,6 +403,45 @@ test("an environment is added from the dashboard, with its own snippet and analy
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator("p[role=alert]")).toContainText("Enter a session ID");
 });
+
+// Next's test mode fakes the dashboard server's calls to the collector, for this test's requests only.
+withNext(
+  "activity offers a retry when the collector stops answering",
+  async ({ page, next }, info) => {
+    let answering = true;
+    next.onFetch((request) => {
+      if (
+        !answering &&
+        /\/v1\/owner\/products\/.+\/analytics$/.test(new URL(request.url).pathname)
+      ) {
+        return "abort";
+      }
+      // Every other call really happens. The test sends it, because Next's "continue" can't
+      // resend a request body it has already read.
+      return fetch(request);
+    });
+    const email = address(info, "outage");
+    await signUp(page, email);
+    await confirm(page, email);
+    await addProduct(page, "Outage", ["https://outage.example"]);
+    await page.getByRole("link", { name: "Continue to install" }).click();
+    await page.getByRole("link", { name: "Activity", exact: true }).click();
+    await expect(page.getByText("No sessions in Production in the last 7 days.")).toBeVisible();
+
+    // The product loads, then the analytics request fails, so no counts are shown at all.
+    answering = false;
+    await page.getByRole("link", { name: "Last 30 days" }).click();
+    await expect(
+      page.getByText(/Activity couldn't load because the collector didn't answer/),
+    ).toBeVisible();
+    await expect(page.getByText(/No sessions in Production/)).toBeHidden();
+
+    answering = true;
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByText("No sessions in Production in the last 30 days.")).toBeVisible();
+    await expect(page.getByText(/Activity couldn't load/)).toBeHidden();
+  },
+);
 
 test("a deleted product can be restored, or removed for good", async ({ page }, info) => {
   const email = address(info, "delete");
