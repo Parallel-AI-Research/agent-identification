@@ -17,6 +17,14 @@ A signature never blocks or admits anyone. Your own permissions stay in charge.
 
 No signer is listed as supported until a real signed request from it has been verified on the hosted collector. Signing is voluntary, so agents that don't sign, including ones working through a person's own browser, aren't identified this way.
 
+## Supported signers
+
+| Signer                       | Shown as      | Verified on the hosted collector |
+| ---------------------------- | ------------- | -------------------------------- |
+| ChatGPT Work's cloud browser | ChatGPT agent | 4 November 2026                  |
+
+ChatGPT signs only from its cloud browser. In our tests, ChatGPT visits that didn't use it arrived unsigned, so they weren't identified this way.
+
 ## Node.js
 
 Add one line wherever your server handles a request. It skips requests without a signature, and scripts, styles and images unless you pass `includeAssets: true`, so a page load counts once. It sends only the signed headers and never throws, so don't wait for it:

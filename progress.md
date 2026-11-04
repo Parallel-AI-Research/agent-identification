@@ -4,8 +4,8 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 
 ## Current State
 
-**Last Updated:** 2026-11-03 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. Its hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005` and `feat-011` are done.
+**Last Updated:** 2026-11-04 (Africa/Lagos)
+**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector. The other hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005` and `feat-011` are done.
 
 SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0` assets are unchanged. Versions 0.2.0 to 0.4.0 were never deployed. The hosted collector loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard covers signup, install instructions, environments, activity, signed agents, origins, DNS verification, secret rotation and soft deletion.
 
@@ -25,18 +25,18 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 ### What's In Progress
 
 - [ ] Confirming the generated snippet on a real customer site (`feat-003`).
-- [ ] Pilot release (`feat-010`): deployed. `npm run smoke:hosted` passed 10 checks on 3 November. Its other hosted checks remain: delete, restore and Delete now on a test product, a second account kept out, a real Web Bot Auth signer, and a new-account onboarding that the owner runs.
+- [ ] Pilot release (`feat-010`): deployed. `npm run smoke:hosted` passed 10 checks on 3 November, and a real Web Bot Auth signer verified on 4 November. Its other hosted checks remain: delete, restore and Delete now on a test product, a second account kept out, and a new-account onboarding that the owner runs.
 - [ ] Heuristic automation signals (`feat-008`): deployed. What each signal contributes with real traffic is validation work for `feat-009`.
 - [ ] Owner dashboard (`feat-007`): deployed. Its error state has no test, as recorded in its evidence.
-- [ ] Activity collection (`feat-006`): deployed. The ticket app still runs SDK 0.1.0 from the hosted tarball, so its integration waits for it to move to 0.5.0.
-- [ ] Web Bot Auth verification (`feat-012`): deployed. No signer or CDN is supported until a real request through it is verified on the hosted collector.
+- [ ] Activity collection (`feat-006`): deployed. The ticket app moved to SDK 0.5.0 on 4 November and forwards signed requests. Its page views and server actions haven't been checked through it yet.
+- [ ] Web Bot Auth verification (`feat-012`): deployed. ChatGPT Work's cloud browser is supported, after a real request verified on the hosted collector on 4 November. No CDN verdict has been verified yet.
 
 ### What's Next
 
 1. Confirm a declaration from a real site and mark `feat-003` done.
 2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
 3. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
-4. Move the ticket app to SDK 0.5.0 so `feat-006`'s integration can be checked.
+4. Check page views and server actions through the ticket app on SDK 0.5.0 for `feat-006`, and verify a CDN verdict for `feat-012`.
 5. Define what the 90–100% target is measured against, so validation (`feat-009`) can start.
 
 ## Blockers / Risks
@@ -50,7 +50,8 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The target needs a defined population and a baseline run before it is frozen or shown to a customer.
-- [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT agent's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
+- [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
+- [ ] **The Next.js example in the Signed agents docs fails under `next dev`**: Next rewrites the request URL's host to `localhost` in development, so a locally signed request is checked against the wrong host and fails as `wrong_authority`. The ticket app rebuilds the URL from the `Host` header and passes it as `url`. The docs example passes the request unchanged and hasn't been tried on a deployed Next.js app.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
 
@@ -100,8 +101,8 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 
 ## Files Modified This Session
 
-- `releases/v0.5.0/`, `scripts/frozen-releases.mjs`, `tests/frozen-releases.test.mjs` - SDK 0.5.0 frozen after its deploy.
-- `feature_list.json`, `progress.md`, `session-handoff.md`, `AGENTS.md`, `docs/operations.md`, `docs/pilot.md` - deploy evidence and the frozen version.
+- `feature_list.json`, `progress.md`, `session-handoff.md` - the first verified signer and the ticket app's move to 0.5.0.
+- `docs/web-bot-auth.md`, `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/chatgpt-cloud-browser.mdx` - ChatGPT Work's cloud browser listed as supported.
 
 ## Evidence of Completion
 
@@ -114,6 +115,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] On 3 November, after the deploy, `/health` reported 0.5.0 on Postgres, the 0.1.0 files still matched `frozen.json`, and the published 0.5.0 files matched a local build byte for byte.
 - [x] `./init.sh`: 108/108 tests and 3/3 dashboard unit tests. The last `--full` run had 48/48 SDK browser tests and 24/24 dashboard journey tests.
 - [x] First real account: signed up, confirmed its email, signed in and created a product on the hosted service.
+- [x] On 4 November, ChatGPT Work's cloud browser loaded the ticket app's `/login` page, and the hosted collector recorded it as ChatGPT agent, verified. Two earlier ChatGPT visits arrived unsigned and recorded nothing.
 - [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session

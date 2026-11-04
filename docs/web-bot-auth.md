@@ -1,6 +1,6 @@
 # Web Bot Auth
 
-Research note from 2 November 2026 for `feat-012`, which builds on it. `docs/protocol.md` has the exact rules the collector applies.
+Research note from 2 November 2026 for `feat-012`, which builds on it, updated on 4 November with the first verified signer. `docs/protocol.md` has the exact rules the collector applies.
 
 ## What it is
 
@@ -12,16 +12,26 @@ The IETF Web Bot Auth working group adopted the core protocol as [draft-ietf-web
 
 As of 2 November 2026:
 
-| Signer                           | What we found                                                                                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ChatGPT agent's cloud browser    | Signs, with `Signature-Agent: https://chatgpt.com`. This comes from OpenAI's allowlisting help article as others quote it; the article refused automated reading. |
-| Amazon Bedrock AgentCore Browser | Signs when the developer turns signing on. In preview since October 2025.                                                                                         |
-| Google's AI browsing agent       | Signs experimentally. Google says it doesn't sign every request, and Googlebot doesn't sign.                                                                      |
-| Cloudflare's signed agents       | Launched in 2025 with ChatGPT agent, Goose, Browserbase and Anchor Browser.                                                                                       |
-| Anthropic, Perplexity            | Only secondary sources claim they sign. Unconfirmed.                                                                                                              |
-| Payment networks                 | Visa's Trusted Agent Protocol, Mastercard Agent Pay and American Express build on Web Bot Auth, with a tag that says whether an agent is browsing or buying.      |
+| Signer                           | What we found                                                                                                                                                              |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ChatGPT Work's cloud browser     | Signs every request, with `Signature-Agent: "https://chatgpt.com"`, according to OpenAI's allowlisting article. Verified on the hosted collector on 4 November; see below. |
+| Amazon Bedrock AgentCore Browser | Signs when the developer turns signing on. In preview since October 2025.                                                                                                  |
+| Google's AI browsing agent       | Signs experimentally. Google says it doesn't sign every request, and Googlebot doesn't sign.                                                                               |
+| Cloudflare's signed agents       | Launched in 2025 with ChatGPT agent, Goose, Browserbase and Anchor Browser.                                                                                                |
+| Anthropic, Perplexity            | Only secondary sources claim they sign. Unconfirmed.                                                                                                                       |
+| Payment networks                 | Visa's Trusted Agent Protocol, Mastercard Agent Pay and American Express build on Web Bot Auth, with a tag that says whether an agent is browsing or buying.               |
 
 Cloudflare, Akamai, Vercel and HUMAN Security already verify signatures for their customers. Cloudflare publishes a `web-bot-auth` npm package and Rust crate.
+
+## Verified on the hosted collector
+
+| Signer                       | `Signature-Agent`       | Shown as      | First verified                     |
+| ---------------------------- | ----------------------- | ------------- | ---------------------------------- |
+| ChatGPT Work's cloud browser | `"https://chatgpt.com"` | ChatGPT agent | 4 November 2026, on the ticket app |
+
+OpenAI replaced ChatGPT agent with ChatGPT Work in 2026. OpenAI and the CDNs still call this bot ChatGPT Agent, so the collector's label stays.
+
+Only the cloud browser signs. On 4 November, two ChatGPT visits that most likely didn't use it arrived without signature headers, so the collector recorded nothing for them. A third, from the cloud browser, carried all three headers and verified.
 
 ## What it can't see
 
@@ -50,7 +60,8 @@ So Web Bot Auth gives near-certain identity for agents that sign and none for th
 - [draft-ietf-webbotauth-httpsig-protocol](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/)
 - [Web Bot Auth use cases draft](https://datatracker.ietf.org/doc/draft-nottingham-webbotauth-use-cases/)
 - [Google: authenticating requests with Web Bot Auth (experimental)](https://developers.google.com/crawling/docs/crawlers-fetchers/web-bot-auth)
-- [OpenAI: ChatGPT agent allowlisting](https://help.openai.com/en/articles/11845367)
+- [OpenAI: ChatGPT Work's cloud browser allowlisting](https://help.openai.com/en/articles/11845367-chatgpt-works-cloud-browser-allowlisting)
+- [OpenAI: using cloud browser in ChatGPT](https://help.openai.com/en/articles/20001280-using-cloud-browser-in-chatgpt)
 - [Amazon Bedrock AgentCore: reducing CAPTCHAs with Web Bot Auth](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-web-bot-auth.html)
 - [Cloudflare: signed agents](https://blog.cloudflare.com/signed-agents/)
 - [Cloudflare: verified bots with cryptography](https://blog.cloudflare.com/verified-bots-with-cryptography)
