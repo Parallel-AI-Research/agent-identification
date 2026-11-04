@@ -1,0 +1,14 @@
+---
+title: Signed agents on Next.js
+description: A corrected Next.js example that verifies in development and production.
+date: 2026-11-04
+---
+
+The Next.js example in [signed agents](/docs/signed-agents) didn't work, and it now does.
+
+## What changed
+
+- **`proxy.ts` instead of middleware:** the server helper needs Node.js. Next.js 16 runs `middleware.ts` in the Edge runtime, where the old example failed every request. Next.js 15.5 can use `middleware.ts` with the Node.js runtime.
+- **The visitor's host:** Next.js changes a request's URL to `localhost`, so the example now passes the URL the visitor requested. Without it, every signature failed as signed for another site, in `next dev` and in `next start`.
+
+We checked the new example with a signed request on Next.js 16, in `next dev` and `next start`, and on Next.js 15.5. If you copied the old example, replace it.
