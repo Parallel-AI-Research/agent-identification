@@ -4,7 +4,7 @@
 
 - Goal: Finish the first real signup, then build the analytics MVP in `feature_list.json` order.
 - Current status: Everything through the pilot release is merged and deployed, with SDK 0.5.0 published and frozen. ChatGPT Work's cloud browser verified on the hosted collector on 4 November, so it's the first supported signer. Activity collection (`feat-006`) is done after its ticket app integration check, and the owner dashboard (`feat-007`) after a test for its error state. The pilot's other hosted checks remain, and `feat-003` waits on a real site recording a declaration.
-- Branch / commit: `fix/release-manifest-cache`, which gives `/downloads/release.json` a five-minute cache. Everything before it is merged into `main`, and the corrected Next.js docs are deployed.
+- Branch / commit: `chore/record-collector-redeploy`, which records the 4 November collector redeploy. Everything before it is merged into `main` and deployed: the corrected Next.js docs on the dashboard and the five-minute `release.json` cache on the collector. The ticket app's fix for requests the browser cancels is ticket-management#5.
 
 ## Completed This Session
 
@@ -59,4 +59,4 @@
 
 - Run the remaining hosted checks in `docs/pilot.md`: delete, restore and Delete now on a test product, a second account kept out, and the new-account onboarding. Record them in `feat-010`.
 - Verify a CDN's signed-agent verdict for `feat-012`.
-- Deploy the collector so `release.json` gets its five-minute cache, then check the header on the live URL.
+- Run the dashboard's browser journeys in CI, which today run only locally, as `progress.md` describes under risks.

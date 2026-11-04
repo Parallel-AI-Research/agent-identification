@@ -24,7 +24,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Activity collection (`feat-006`) verified with the ticket app as its integration fixture on 4 November. Page views and the app's reported ticket saves, rejected and confirmed, share one collector session for both unanswered and declared runs, in Chromium and WebKit.
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
 - [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
-- [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It takes effect with the next collector deploy, and a cache may still hold the 0.1.0 manifest it stored earlier.
+- [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It went live with the collector redeploy on 4 November, and a cache may still hold the 0.1.0 manifest it stored earlier.
 
 ### What's In Progress
 
@@ -105,6 +105,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - `dashboard/tests/e2e/onboarding.spec.ts`, `dashboard/next.config.mjs`, `dashboard/README.md` - a browser test for the Activity page's error state, using Next's test mode in `next dev` only. `feat-007` done.
 - `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/nextjs-signed-agents.mdx` - the corrected Next.js example and its changelog post.
 - `vercel.json`, `docs/operations.md` - a five-minute cache for `/downloads/release.json`.
+- `feature_list.json`, `progress.md`, `session-handoff.md` - the 4 November collector redeploy recorded in `feat-010`.
 
 ## Evidence of Completion
 
@@ -121,6 +122,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] On 4 November, the ticket app's package smoke check passed 15 scenarios in Chromium and WebKit against the local collector, including two that read the collector's activity export for page views, the declaration and reported saves.
 - [x] On 4 November, `./init.sh --full` passed with 187/187 tests, 5/5 dashboard unit, 56/56 SDK browser tests, the dashboard build and 34/34 dashboard journey tests in Chromium and WebKit, including the new error-state journey.
 - [x] On 4 November, the corrected Next.js example verified a request signed by the local test signer through the local collector: on Next.js 16 under `next dev` and `next start`, and on Next.js 15.5 under `next start`. The old example failed every request on Next.js 16, and `proxy.ts` without `url` recorded `wrong_authority` under both commands.
+- [x] On 4 November, after the collector redeploy, `/health` reported 0.5.0 on Postgres, `release.json` answered with `public, max-age=300`, and the 0.1.0 and 0.5.0 SDK files, tarballs and manifests hashed the same as before the deploy and as their archives in `releases/`.
 - [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session
