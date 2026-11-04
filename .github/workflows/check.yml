@@ -1,12 +1,18 @@
 name: Check
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
+# A newer push to a pull request cancels its older run; runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,7 +21,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npx playwright install --with-deps chromium firefox webkit
+  # Playwright's image has the browsers and their system packages, so no slow apt install runs.
+  # Keep its tag on the same version as @playwright/test.
+  sdk-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -27,6 +48,7 @@ jobs:
           retention-days: 7
   dashboard:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: dashboard
@@ -42,3 +64,39 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+  # The journeys need a local Supabase stack, which runs in Docker on the runner. The browsers
+  # run in Playwright's image on the host network, so they reach it at 127.0.0.1.
+  dashboard-journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      - run: supabase start -x realtime,storage-api,imgproxy,studio,edge-runtime,logflare,vector,postgres-meta,supavisor
+      - run: supabase status -o env | sed -n 's/^PUBLISHABLE_KEY="\(.*\)"$/SUPABASE_PUBLISHABLE_KEY=\1/p' >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: dashboard
+      - name: npx playwright test (Chromium and WebKit)
+        run: >-
+          docker run --rm --network host --ipc host --user "$(id -u)"
+          -e CI -e SUPABASE_PUBLISHABLE_KEY -e HOME=/tmp
+          -v "$GITHUB_WORKSPACE:/work" -w /work/dashboard
+          mcr.microsoft.com/playwright:v1.64.1-noble
+          npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: dashboard-journey-evidence
+          path: dashboard/test-results/
+          retention-days: 7
