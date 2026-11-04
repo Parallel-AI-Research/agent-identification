@@ -25,6 +25,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
 - [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
 - [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It went live with the collector redeploy on 4 November, and a cache may still hold the 0.1.0 manifest it stored earlier.
+- [x] CI runs the dashboard journeys against a local Supabase stack, in Chromium and WebKit. Browser jobs run in Playwright's image, because installing browser system packages from Ubuntu's mirror took 21 to 35 minutes when it was slow. CI runs once per pull request push, cancels superseded runs and has job timeouts.
 
 ### What's In Progress
 
@@ -47,7 +48,6 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Unused settings remain**: `AGENT_ID_SITES` on Vercel and the old database login stay in place until the rollback option is no longer needed.
 - [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
-- [ ] **Dashboard e2e tests are local only**: CI runs its typecheck, lint, unit tests and build, but not the Playwright journey.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The target needs a defined population and a baseline run before it is frozen or shown to a customer.
@@ -106,6 +106,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/nextjs-signed-agents.mdx` - the corrected Next.js example and its changelog post.
 - `vercel.json`, `docs/operations.md` - a five-minute cache for `/downloads/release.json`.
 - `feature_list.json`, `progress.md`, `session-handoff.md` - the 4 November collector redeploy recorded in `feat-010`.
+- `.github/workflows/check.yml`, `dashboard/playwright.config.ts`, `docs/operations.md` - faster CI, and the dashboard journeys in CI.
 
 ## Evidence of Completion
 
