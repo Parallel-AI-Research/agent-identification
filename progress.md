@@ -23,6 +23,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Activity contract and collection, the owner dashboard, automation signals, Web Bot Auth and soft deletion deployed on 3 November, after six migrations reached the production database. SDK 0.5.0 is published and frozen, and the activity event contract (`feat-005`) is done.
 - [x] Activity collection (`feat-006`) verified with the ticket app as its integration fixture on 4 November. Page views and the app's reported ticket saves, rejected and confirmed, share one collector session for both unanswered and declared runs, in Chromium and WebKit.
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
+- [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
 
 ### What's In Progress
 
@@ -51,7 +52,6 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The target needs a defined population and a baseline run before it is frozen or shown to a customer.
 - [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
-- [ ] **The Next.js example in the Signed agents docs fails under `next dev`**: Next rewrites the request URL's host to `localhost` in development, so a locally signed request is checked against the wrong host and fails as `wrong_authority`. The ticket app rebuilds the URL from the `Host` header and passes it as `url`. The docs example passes the request unchanged and hasn't been tried on a deployed Next.js app.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
 
@@ -103,6 +103,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 
 - `feature_list.json`, `progress.md`, `session-handoff.md` - `feat-006` done after the ticket app integration check.
 - `dashboard/tests/e2e/onboarding.spec.ts`, `dashboard/next.config.mjs`, `dashboard/README.md` - a browser test for the Activity page's error state, using Next's test mode in `next dev` only. `feat-007` done.
+- `dashboard/content/docs/signed-agents.mdx`, `dashboard/content/changelog/nextjs-signed-agents.mdx` - the corrected Next.js example and its changelog post.
 
 ## Evidence of Completion
 
@@ -118,6 +119,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] On 4 November, ChatGPT Work's cloud browser loaded the ticket app's `/login` page, and the hosted collector recorded it as ChatGPT agent, verified. Two earlier ChatGPT visits arrived unsigned and recorded nothing.
 - [x] On 4 November, the ticket app's package smoke check passed 15 scenarios in Chromium and WebKit against the local collector, including two that read the collector's activity export for page views, the declaration and reported saves.
 - [x] On 4 November, `./init.sh --full` passed with 187/187 tests, 5/5 dashboard unit, 56/56 SDK browser tests, the dashboard build and 34/34 dashboard journey tests in Chromium and WebKit, including the new error-state journey.
+- [x] On 4 November, the corrected Next.js example verified a request signed by the local test signer through the local collector: on Next.js 16 under `next dev` and `next start`, and on Next.js 15.5 under `next start`. The old example failed every request on Next.js 16, and `proxy.ts` without `url` recorded `wrong_authority` under both commands.
 - [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session

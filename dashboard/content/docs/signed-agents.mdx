@@ -38,11 +38,6 @@ const options = {
   secret: process.env.AGENT_ID_SITE_SECRET!,
 };
 
-// Next.js middleware, or any handler that receives a Fetch Request:
-export function middleware(request: Request, event: { waitUntil(p: Promise<unknown>): void }) {
-  event.waitUntil(reportSignedRequest(request, options));
-}
-
 // Express:
 app.use((req, res, next) => {
   void reportSignedRequest(req, options);
@@ -51,6 +46,34 @@ app.use((req, res, next) => {
 ```
 
 Pass `sessionId` or `accountRef` in the options when your server knows them. `accountRef` is your own opaque ID for the account, never a name or email address.
+
+If something in front of your server changes the `Host` header, pass the URL the visitor requested as `url`. An agent signs the host it asked for, so a signature checked against another host fails.
+
+### Next.js
+
+Add it to `proxy.ts`, which runs on Node.js. Pass `url` as shown: Next.js changes the request's own URL to `localhost`, in `next dev` and in `next start`, so without it every signature fails as signed for another site.
+
+```ts
+// proxy.ts
+import { reportSignedRequest } from "@parallel-research/agent-identification/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+
+const options = {
+  apiUrl: "https://parallel-agent-identification.vercel.app",
+  siteId: "YOUR-SITE-ID",
+  secret: process.env.AGENT_ID_SITE_SECRET!,
+};
+
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  const url = new URL(request.url);
+  url.host = request.headers.get("host") ?? url.host;
+  event.waitUntil(reportSignedRequest(request, { ...options, url: url.href }));
+}
+```
+
+If you already have a `proxy.ts`, add the three lines to its function. Its `matcher`, if it has one, decides which pages are checked.
+
+Next.js 15.5 calls the file `middleware.ts`. Name the function `middleware` and set the Node.js runtime in its config: `export const config = { runtime: "nodejs" };`. The server export needs Node.js, so it can't run in the Edge runtime, which is middleware's default.
 
 ## Any other server
 
