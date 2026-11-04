@@ -1,0 +1,16 @@
+---
+title: ChatGPT's cloud browser verified
+description: The first signer verified on the hosted collector.
+date: 2026-11-04
+---
+
+Requests from ChatGPT Work's cloud browser now verify on the hosted collector, which makes it the first supported signer for [signed agents](/docs/signed-agents).
+
+## What's new
+
+- **Verified in production:** a page load from ChatGPT's cloud browser on our test app was checked against OpenAI's published key and recorded as **Verified**.
+- **Shown as ChatGPT agent:** the name OpenAI and the major CDNs use for this traffic.
+
+## Limits
+
+Only ChatGPT's cloud browser signs. In our tests, ChatGPT visits that didn't use it arrived unsigned. A signature names OpenAI as the operator, never the person or account behind the task.
