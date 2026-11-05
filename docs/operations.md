@@ -127,7 +127,11 @@ Run `npm run check` and `npm run test:e2e` before deployment. The package check
 installs the actual tarball into an independent temporary consumer and verifies
 ESM, TypeScript, optional React and SSR behavior.
 
-The CI workflow repeats checks and all three browser engines. Keep the lockfile.
+The CI workflow repeats the checks, the SDK browser tests in all three engines,
+and the dashboard checks and journeys, the journeys against a local Supabase
+stack in Chromium and WebKit. Browser jobs run in Playwright's Docker image,
+which already has the browsers and their system packages, so keep its tag on
+the same version as `@playwright/test`. Keep the lockfile.
 Bump both `package.json` version and `src/protocol.ts` VERSION for changes to
 published assets; do not overwrite an already published version. SDK URLs are
 versioned and cacheable. Preserve older version directories when upgrading a

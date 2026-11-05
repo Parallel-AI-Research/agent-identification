@@ -1,14 +1,19 @@
 import { execSync } from "node:child_process";
 import { defineConfig, devices } from "@playwright/test";
 
-// Runs against the local Supabase stack, so test accounts never reach a hosted project.
-const stack = Object.fromEntries(
-  execSync("supabase status -o env", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
-    .split("\n")
-    .map((line) => /^([A-Z_]+)="?([^"]*)"?$/.exec(line.trim()))
-    .filter((match) => match !== null)
-    .map((match) => [match[1], match[2]]),
-);
+// Runs against the local Supabase stack, so test accounts never reach a hosted project. CI runs
+// the browsers in a container without the Supabase CLI, so it passes the stack's key in instead.
+function localPublishableKey(): string {
+  const stack = Object.fromEntries(
+    execSync("supabase status -o env", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split("\n")
+      .map((line) => /^([A-Z_]+)="?([^"]*)"?$/.exec(line.trim()))
+      .filter((match) => match !== null)
+      .map((match) => [match[1], match[2]]),
+  );
+  return stack.PUBLISHABLE_KEY ?? stack.ANON_KEY ?? "";
+}
+const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || localPublishableKey();
 const supabaseUrl = "http://127.0.0.1:54321";
 const collectorUrl = "http://127.0.0.1:4310";
 
@@ -44,7 +49,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: stack.PUBLISHABLE_KEY ?? stack.ANON_KEY ?? "",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey,
         COLLECTOR_URL: collectorUrl,
         SITE_URL: "http://127.0.0.1:3100",
       },
