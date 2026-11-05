@@ -1,0 +1,18 @@
+---
+title: Install from your server, with nothing on your pages
+description: The default install now reports agents from your server, and your visitors see nothing.
+date: 2026-11-05
+---
+
+Installing no longer means putting a prompt in front of your visitors. Your server reports agents from the requests it already receives, and your pages stay as they are.
+
+## What changed
+
+- **Server reporting is the default install.** Your product page leads with snippets for Next.js, other Node.js servers and any other language. They pass on requests signed with [Web Bot Auth](/docs/signed-agents), and requests whose user agent names an AI agent or a headless browser. See [Install](/docs/install).
+- **Status counts your server.** Once the collector accepts a report from your server, **Status** says **Receiving events** and when your server last reported. Your server only reports agents, so Status shows a request you can send to check it.
+- **The coding-agent instructions** set up server reporting, and tell the agent not to add anything to your pages.
+- **The declaration widget is opt-in.** It moved to its own [page](/docs/declaration-widget) and to **Optional: the declaration widget** on your product page, both saying that every visitor sees it. Existing installs keep working.
+
+## What it doesn't see
+
+An agent that neither signs nor names itself, such as one working through a person's own browser, looks like any other visitor to your server, so it stays unknown. Reports without a session are counted on the Activity page apart from sessions.

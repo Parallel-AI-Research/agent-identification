@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Go from a new account to your first recorded answer.
+description: Go from a new account to your server's first report.
 ---
 
 You can read these docs without an account. You'll need one to add a product, because each site ID belongs to its owner.
@@ -9,40 +9,61 @@ You can read these docs without an account. You'll need one to add a product, be
 
 [Create an account](/sign-up) and confirm your email. In the [dashboard](/dashboard), choose **Add product**, then enter a name and the origins your product runs on.
 
-Origins must be exact. `https://example.com` and `https://www.example.com` are separate origins, so list both if you use both.
+Origins must be exact. `https://example.com` and `https://www.example.com` are separate origins, so list both if you use both. A signed request only verifies for one of these origins.
 
 ## 2. Save your server secret
 
-The dashboard shows your server secret once. Save it somewhere private, even if you don't need it yet. Only your server should ever hold it, and if you lose it, you can rotate it for a new one.
+The dashboard shows your server secret once. Save it somewhere private, then set it as `AGENT_ID_SITE_SECRET` wherever your server runs. Only your server should ever hold it, and if you lose it, you can rotate it for a new one.
 
-## 3. Install the widget
+## 3. Report from your server
 
-Your product page has a snippet with your own site ID. The quickest option is the script tag:
+Your product page has snippets with your own site ID. Install the package:
 
-```html
-<div id="visitor-choice"></div>
-<script
-  defer
-  src="https://parallel-agent-identification.vercel.app/sdk/v0.5.0/agent-id.js"
-  data-site="YOUR-SITE-ID"
-  data-target="#visitor-choice"
-  data-mode="optional"
-></script>
+```sh
+npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.5.0.tgz
 ```
 
-See [Install](/docs/install) for the JavaScript and React options, or hand the job to your [coding agent](/docs/coding-agents).
+Then add two calls where your server handles requests. In Next.js, that's `proxy.ts`:
+
+```ts
+// proxy.ts
+import {
+  reportRequestSignals,
+  reportSignedRequest,
+} from "@parallel-research/agent-identification/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+
+const agentId = {
+  apiUrl: "https://parallel-agent-identification.vercel.app",
+  siteId: "YOUR-SITE-ID",
+  secret: process.env.AGENT_ID_SITE_SECRET!,
+};
+
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Next.js changes the request's URL to localhost, and an agent signs the host it asked for.
+  const url = new URL(request.url);
+  url.host = request.headers.get("host") ?? url.host;
+  event.waitUntil(reportSignedRequest(request, { ...agentId, url: url.href }));
+  event.waitUntil(reportRequestSignals(request, agentId));
+}
+```
+
+Both calls skip ordinary requests without a network call, and neither throws or slows the response. See [Install](/docs/install) for other Node.js servers and for any other language, or hand the job to your [coding agent](/docs/coding-agents).
 
 ## 4. Check it works
 
-Load a page on one of your origins. On your product page, **Status** changes from **Waiting for installation** to **Receiving events** and shows where the widget loaded. Copying the snippet doesn't count. Only a real page load does.
+Your server only reports agents, so make a request that looks like one. With your site running, request a page as a headless browser, at its local address if it isn't deployed yet:
 
-Answer the prompt, and it should say **Response recorded**. Status then shows when the last declaration arrived.
+```sh
+curl -A "HeadlessChrome/1.0 (install check)" https://your-site.example/
+```
+
+On your product page, **Status** changes from **Waiting for installation** to **Receiving events** and says when your server last reported. The collector records your check as one request showing automation. Copying a snippet doesn't count. Only a report the collector accepts does.
 
 If something is refused, Status says what and how to fix it:
 
-- **A page on an origin you haven't listed:** add the origin if the site is yours. Origins must match exactly, so `https://example.com` and `https://www.example.com` are different, and a local address such as `http://localhost:3000` only works once you add it.
 - **A server secret the collector doesn't accept:** check that `AGENT_ID_SITE_SECRET` matches your current secret.
-- **A binding context the collector can't verify:** check that your server signs it with the current secret.
+- **A page on an origin you haven't listed:** this only applies to the [declaration widget](/docs/declaration-widget). Add the origin if the site is yours.
 
 Anyone can send a request claiming any origin or secret, so a refusal shows what reached the collector, not who sent it.
 

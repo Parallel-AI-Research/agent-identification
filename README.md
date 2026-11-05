@@ -1,17 +1,51 @@
 # Agent Identification
 
-A website-owned widget that records a visitor's explicit choice: **AI assistant**,
-**Person**, or **Prefer not to say**. Install it with a script tag, JavaScript, or
-the optional React component. Visitors and agent builders install nothing.
+See which AI agents use your product. Your server reports the requests that agents
+sign with Web Bot Auth, which the collector verifies against the signer's published
+keys, and requests whose user agent names an AI agent, which are only signals.
+Nothing is added to your pages, so visitors see nothing, and agent builders install
+nothing.
 
-This is **visible, self-reported classification**. It does not detect every agent,
-prove identity, or grant permissions. An agent can skip an optional prompt or
-choose a different answer. Required mode asks every visitor to choose.
+An optional declaration widget asks visitors to choose **AI assistant**,
+**Person**, or **Prefer not to say**. Every visitor sees it, people included, so
+it isn't part of the default install. Its answers are **visible, self-reported
+classification**. Nothing here detects every agent, proves who an agent acts for,
+or grants permissions.
 
 The hosted collector is `https://parallel-agent-identification.vercel.app`. Use it
 wherever the examples below say `https://YOUR-COLLECTOR`.
 
-## Add it to a website
+## Report agents from your server
+
+Install the package and add two calls where your server handles requests. Both skip
+ordinary requests without a network call, and neither throws or slows the response.
+Keep the site's secret in `AGENT_ID_SITE_SECRET` on the server only.
+
+```ts
+import {
+  reportRequestSignals,
+  reportSignedRequest,
+} from "@parallel-research/agent-identification/server";
+
+const agentId = {
+  apiUrl: "https://YOUR-COLLECTOR",
+  siteId: "your-public-site-id",
+  secret: process.env.AGENT_ID_SITE_SECRET!,
+};
+
+// Express:
+app.use((req, res, next) => {
+  void reportSignedRequest(req, agentId);
+  void reportRequestSignals(req, agentId);
+  next();
+});
+```
+
+In Next.js, put them in `proxy.ts` and pass the URL the visitor asked for, because
+Next.js rewrites the request's host to `localhost`. The dashboard's install page
+and docs have that example and one for servers in other languages.
+
+## Add the declaration widget (every visitor sees it)
 
 Ask your collector operator for its URL and a public site ID registered for your
 exact website origins. `https://example.com` and `https://www.example.com` are

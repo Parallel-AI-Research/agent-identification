@@ -6,19 +6,28 @@ const STEPS = [
     text: "Create an account, name your product and list the exact origins it runs on.",
   },
   {
-    title: "Install the widget",
-    text: "Paste a script tag, use the package, or hand the instructions to your coding agent.",
+    title: "Report from your server",
+    text: "Add two calls where your server handles requests, or hand the instructions to your coding agent. Your pages don't change.",
   },
   {
-    title: "See what's declared",
-    text: "Visitors choose AI assistant, Person or Prefer not to say, and each answer is recorded for your product.",
+    title: "See which agents came",
+    text: "Verified signers, suspected automation and the actions your server confirms, each labelled by its evidence.",
   },
 ];
 const LIMITS = [
-  ["It records", "What a visitor chooses to tell you, and when."],
-  ["It can check", "That a declaration belongs to the session your own server signed in."],
-  ["It can't tell you", "Who a visitor really is, or anything about one who doesn't answer."],
-  ["It doesn't detect", "Every agent. A visitor who says nothing stays unknown, never human."],
+  [
+    "It verifies",
+    "Agents that sign their requests with Web Bot Auth, checked against their operator's published keys.",
+  ],
+  [
+    "It flags",
+    "Requests whose user agent names an AI agent, or a headless browser. Anyone can send those, so they're signals, not proof.",
+  ],
+  ["It can't tell you", "Who an agent acts for. A signature names its operator, never a person."],
+  [
+    "It doesn't detect",
+    "Every agent. One that neither signs nor names itself stays unknown, never human.",
+  ],
 ];
 
 export default function HomePage() {
@@ -28,9 +37,9 @@ export default function HomePage() {
         See how AI agents use your product
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-fd-muted-foreground">
-        Agent analytics starts with one small step: asking. Add a widget to your site, and visitors
-        can tell you whether they&apos;re an AI assistant or a person. No changes for agent
-        builders, and nothing for visitors to install.
+        Your server tells the collector about agents in the requests it already receives. Signed
+        agents are checked against their operator&apos;s keys, automation is flagged, and you see
+        what each agent did. Nothing is added to your pages, so visitors see nothing.
       </p>
       <div className="mt-8">
         <Link
@@ -57,8 +66,8 @@ export default function HomePage() {
       <section className="mt-16">
         <h2 className="text-xl font-semibold">What it can and can&apos;t tell you</h2>
         <p className="mt-2 max-w-2xl text-fd-muted-foreground">
-          A declaration is self-reported. We&apos;d rather show you an honest unknown than a
-          confident guess.
+          A verified signature is evidence, and a user agent is only a claim. We&apos;d rather show
+          you an honest unknown than a confident guess.
         </p>
         <dl className="mt-5 grid gap-4 sm:grid-cols-2">
           {LIMITS.map(([term, detail]) => (
@@ -76,8 +85,9 @@ export default function HomePage() {
       <section className="mt-16 rounded-lg border bg-fd-card p-6">
         <h2 className="text-xl font-semibold">Still being built</h2>
         <p className="mt-2 max-w-2xl text-fd-muted-foreground">
-          Declarations, accounts and installation work today. Activity tracking and dashboard
-          analytics are next, and the{" "}
+          Server reporting, signature checks, activity and the dashboard work today, and
+          ChatGPT&apos;s cloud browser is the first verified signer. Recording page views without
+          showing visitors anything is next, and the{" "}
           <Link className="text-fd-primary underline" href="/changelog">
             changelog
           </Link>{" "}

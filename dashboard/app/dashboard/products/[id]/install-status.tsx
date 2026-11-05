@@ -1,5 +1,7 @@
+import { CopyBlock } from "@/components/copy-block";
 import { Badge, Notice } from "@/components/ui";
 import type { InstallIssue, InstallStatus } from "@/lib/collector";
+import { checkCommand } from "@/lib/snippets";
 import { ago } from "@/lib/time";
 import { CheckAgain } from "./check-again";
 
@@ -46,27 +48,43 @@ function advice(issue: InstallIssue) {
 }
 
 /** Driven only by what the collector received, so copying a snippet never changes it. */
-export function InstallStatusPanel({ install }: { install: InstallStatus }) {
+export function InstallStatusPanel({
+  install,
+  origins,
+}: {
+  install: InstallStatus;
+  origins: string[];
+}) {
   const now = Date.parse(install.checkedAt);
   return (
     <div className="space-y-3 text-sm">
       {install.status === "waiting" ? (
-        <p className="text-muted-foreground">
-          Nothing has loaded the widget yet. Load a page with the snippet on one of your origins,
-          then check again. Copying the snippet doesn&apos;t count.
-        </p>
+        <>
+          <p className="text-muted-foreground">
+            Your server hasn&apos;t reported anything yet. It only reports agents, so once it&apos;s
+            set up, request a page as a headless browser, then check again. The collector records it
+            as one request showing automation, from you. Copying a snippet doesn&apos;t count.
+          </p>
+          <CopyBlock value={checkCommand(origins[0] ?? "https://your-site.example")} />
+        </>
       ) : (
         <ul className="space-y-1">
+          {install.lastServerReportAt ? (
+            <li>Your server last reported {ago(install.lastServerReportAt, now)}.</li>
+          ) : null}
           {install.loaded.map((row) => (
             <li key={row.origin}>
-              Loaded on <code className="font-mono">{row.origin}</code> {ago(row.lastSeenAt, now)}.
+              The widget loaded on <code className="font-mono">{row.origin}</code>{" "}
+              {ago(row.lastSeenAt, now)}.
             </li>
           ))}
-          <li className="text-muted-foreground">
-            {install.lastDeclarationAt
-              ? `Last declaration ${ago(install.lastDeclarationAt, now)}.`
-              : "No declarations yet. One arrives when a visitor answers the prompt."}
-          </li>
+          {install.loaded.length || install.lastDeclarationAt ? (
+            <li className="text-muted-foreground">
+              {install.lastDeclarationAt
+                ? `Last declaration ${ago(install.lastDeclarationAt, now)}.`
+                : "No declarations yet. One arrives when a visitor answers the prompt."}
+            </li>
+          ) : null}
         </ul>
       )}
       {install.issues.map((issue) => (

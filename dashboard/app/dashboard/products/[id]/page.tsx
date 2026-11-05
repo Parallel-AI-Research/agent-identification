@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EnvironmentSwitcher } from "@/components/environment-switcher";
-import { Card } from "@/components/ui";
+import { Card, Notice } from "@/components/ui";
 import {
   collector,
   CollectorError,
@@ -75,7 +75,7 @@ export default async function ProductPage({
           <h2 className="font-semibold">Status</h2>
           <StatusBadges install={environment.install} />
         </div>
-        <InstallStatusPanel install={environment.install} />
+        <InstallStatusPanel install={environment.install} origins={environment.origins} />
       </Card>
       <Card>
         <h2 className="font-semibold">Signed agents</h2>
@@ -88,16 +88,31 @@ export default async function ProductPage({
       <Card>
         <h2 className="font-semibold">Install</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Add this to your site. It records what visitors choose to declare, so it can&apos;t detect
-          every agent or prove who a visitor is.
+          Your server reports agents from the requests it already receives: agents that sign their
+          requests, and user agents that name an AI agent. Nothing is added to your pages, so
+          visitors see nothing. Agents that do neither aren&apos;t caught this way.
         </p>
-        <InstallTabs values={install} />
+        <InstallTabs values={install} kind="server" />
         <AgentSetup values={install} origins={environment.origins} />
+        <details className="mt-3 rounded-md border border-border">
+          <summary className="cursor-pointer rounded-md px-3 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+            Optional: the declaration widget
+          </summary>
+          <div className="space-y-3 px-3 pb-3">
+            <Notice tone="warning">
+              Every visitor sees this widget, people included. It asks whether they&apos;re an AI
+              assistant or a person, and records what they choose to declare. Only add it where
+              you&apos;re happy for everyone to see it.
+            </Notice>
+            <InstallTabs values={install} kind="widget" />
+          </div>
+        </details>
       </Card>
       <Card>
         <h2 className="font-semibold">Website origins</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Only these exact origins can use this product&apos;s site ID.
+          A signed request only verifies when it was signed for one of these exact origins, and only
+          these can load the declaration widget.
         </p>
         <OriginsForm
           productId={product.id}
@@ -116,8 +131,8 @@ export default async function ProductPage({
       <Card>
         <h2 className="font-semibold">Server secret</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Server-only. Your backend uses it to sign sessions and verify declarations. It never goes
-          in browser code.
+          Server-only. Your server sends it with every report, and the declaration widget&apos;s
+          server checks use it too. It never goes in browser code.
         </p>
         <SecretPanel
           productId={product.id}
