@@ -378,6 +378,7 @@ export function createCollector(
             sessionId: result.status === "conflict" ? null : result.event.sessionId,
           });
         }
+        await note(site.id, "server_reported", "", now);
         return respond({ results });
       }
       if (url.pathname === "/v1/signals") {
@@ -416,6 +417,7 @@ export function createCollector(
             sessionId: result.status === "conflict" ? null : result.event.sessionId,
           });
         }
+        await note(site.id, "server_reported", "", now);
         return respond({ results });
       }
       if (url.pathname === "/v1/signatures") {
@@ -444,6 +446,8 @@ export function createCollector(
           keys,
           now,
         });
+        // A failed signature check still means the customer's server reported correctly.
+        await note(site.id, "server_reported", "", now);
         return respond({ event });
       }
       if (url.pathname === "/internal/prune") {

@@ -73,9 +73,12 @@ function installView(environment: EnvironmentRecord, activity: InstallActivity[]
   const loaded = own
     .filter((row) => row.signal === "loaded" && environment.origins.includes(row.origin))
     .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
-  const declared = own
-    .filter((row) => row.signal === "declared")
-    .reduce<number | null>((latest, row) => Math.max(latest ?? 0, row.lastSeenAt), null);
+  const latest = (signal: InstallActivity["signal"]) =>
+    own
+      .filter((row) => row.signal === signal)
+      .reduce<number | null>((last, row) => Math.max(last ?? 0, row.lastSeenAt), null);
+  const declared = latest("declared");
+  const reported = latest("server_reported");
   const issues = own
     .filter(
       (row) =>
@@ -85,12 +88,14 @@ function installView(environment: EnvironmentRecord, activity: InstallActivity[]
     )
     .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   return {
-    status: loaded.length ? ("receiving" as const) : ("waiting" as const),
+    status: loaded.length || reported !== null ? ("receiving" as const) : ("waiting" as const),
     loaded: loaded.map((row) => ({
       origin: row.origin,
       firstSeenAt: time(row.firstSeenAt),
       lastSeenAt: time(row.lastSeenAt),
     })),
+    /** The last report the collector accepted from the customer's server. */
+    lastServerReportAt: reported === null ? null : time(reported),
     lastDeclarationAt: declared === null ? null : time(declared),
     /** The collector's clock, so relative times don't depend on the caller's. */
     checkedAt: time(now),

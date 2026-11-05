@@ -44,6 +44,7 @@ const MIGRATIONS = [
   "20261102160000_add_signal_events.sql",
   "20261102170000_allow_product_deletion.sql",
   "20261103120000_soft_delete_products.sql",
+  "20261105120000_add_server_install_signal.sql",
 ];
 const RESET = `reset role;
   truncate agent_identification.products cascade;
@@ -107,6 +108,7 @@ interface Environment {
 interface Install {
   status: "waiting" | "receiving";
   loaded: { origin: string; firstSeenAt: string; lastSeenAt: string }[];
+  lastServerReportAt: string | null;
   lastDeclarationAt: string | null;
   checkedAt: string;
   issues: { signal: string; origin: string | null; firstSeenAt: string; lastSeenAt: string }[];
@@ -329,6 +331,7 @@ for (const [kind, open] of stores) {
       assert.deepEqual(await install(owners.alice, a), {
         status: "waiting",
         loaded: [],
+        lastServerReportAt: null,
         lastDeclarationAt: null,
         checkedAt: new Date(time).toISOString(),
         issues: [],
@@ -360,6 +363,84 @@ for (const [kind, open] of stores) {
         body: JSON.stringify({ origins: ["https://moved.example"] }),
       });
       assert.equal((await install(owners.alice, a)).status, "waiting");
+    });
+
+    test("an install with nothing on the page receives once its server's report is accepted", async () => {
+      let now = time;
+      const { handle, create, install } = fixture(store, { clock: () => now });
+      const a = await create(owners.alice, "Alice's product");
+      const b = await create(owners.bob, "Bob's product", ["https://bob.example"]);
+      const report = (secret: string, path: string, body: object) =>
+        handle(
+          new Request(`https://collector.test${path}`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+            body: JSON.stringify({ siteId: a.environment.siteId, ...body }),
+          }),
+        );
+      const signal = () => ({
+        signals: [
+          {
+            id: randomUUID(),
+            signal: "agent_user_agent",
+            detail: "ChatGPT-User",
+            occurredAt: new Date(now).toISOString(),
+          },
+        ],
+      });
+
+      // Another customer's secret is refused, and it doesn't make the install look connected.
+      assert.equal((await report(b.serverSecret, "/v1/signals", signal())).status, 401);
+      let current = await install(owners.alice, a);
+      assert.equal(current.status, "waiting");
+      assert.equal(current.lastServerReportAt, null);
+      // A report the collector rejects as invalid doesn't count either.
+      assert.equal(
+        (await report(a.serverSecret, "/v1/signals", { signals: [{ signal: "made-up" }] })).status,
+        400,
+      );
+      assert.equal((await install(owners.alice, a)).status, "waiting");
+
+      assert.equal((await report(a.serverSecret, "/v1/signals", signal())).status, 200);
+      current = await install(owners.alice, a);
+      assert.equal(current.status, "receiving");
+      assert.deepEqual(current.loaded, []);
+      assert.equal(current.lastServerReportAt, new Date(time).toISOString());
+      assert.equal((await install(owners.bob, b)).status, "waiting");
+
+      // Actions and signed requests count too, and the latest report is the one shown.
+      now = time + 61_000;
+      const action = {
+        actions: [
+          {
+            id: randomUUID(),
+            action: "order.create",
+            outcome: "confirmed",
+            occurredAt: new Date(now).toISOString(),
+          },
+        ],
+      };
+      assert.equal((await report(a.serverSecret, "/v1/actions", action)).status, 200);
+      assert.equal(
+        (await install(owners.alice, a)).lastServerReportAt,
+        new Date(now).toISOString(),
+      );
+      now = time + 122_000;
+      const unsigned = {
+        request: {
+          method: "GET",
+          url: `${origin}/pricing`,
+          headers: {
+            signature: "sig1=:AAAA:",
+            "signature-input": 'sig1=("@authority");created=1;keyid="k";tag="web-bot-auth"',
+          },
+        },
+      };
+      assert.equal((await report(a.serverSecret, "/v1/signatures", unsigned)).status, 200);
+      assert.equal(
+        (await install(owners.alice, a)).lastServerReportAt,
+        new Date(now).toISOString(),
+      );
     });
 
     test("a refused install tells its owner what to fix, and nobody else", async () => {
