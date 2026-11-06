@@ -115,8 +115,8 @@ export default async function ActivityPage({
 
       {environment.install.status === "waiting" ? (
         <Notice tone="warning">
-          Nothing has loaded the widget in {environment.name} yet, so only what your server reports
-          can appear here. See Status on the product page.
+          Nothing has reported to {environment.name} yet. See Status on the product page to check
+          your install.
         </Notice>
       ) : null}
       {analytics.truncated ? (
@@ -154,11 +154,13 @@ export default async function ActivityPage({
             of automation, never proof of an AI agent.
           </p>
         ) : null}
-        {overview.withoutSession.actions || overview.withoutSession.signedRequests ? (
+        {overview.withoutSession.actions ||
+        overview.withoutSession.signedRequests ||
+        overview.withoutSession.signals ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Your server also reported {overview.withoutSession.actions} actions and{" "}
-            {overview.withoutSession.signedRequests} signed requests it couldn&apos;t link to a
-            session.
+            Your server also reported {overview.withoutSession.actions} actions,{" "}
+            {overview.withoutSession.signedRequests} signed requests and{" "}
+            {overview.withoutSession.signals} automation signals it couldn&apos;t link to a session.
           </p>
         ) : null}
       </Card>

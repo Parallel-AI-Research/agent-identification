@@ -1,5 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { createServer } from "node:http";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { test as withNext } from "next/experimental/testmode/playwright";
 
@@ -95,40 +97,118 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   expect(page.url()).not.toContain(secret);
   await expect(page.locator("body")).not.toContainText(secret);
 
-  const snippet = (await page.locator("pre code").first().textContent()) ?? "";
-  const siteId = /data-site="(site_[A-Za-z0-9_-]+)"/.exec(snippet)?.[1];
+  // The default install is server reporting, which adds nothing to the customer's pages.
+  const install = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Install" }),
+  });
+  await expect(install.getByRole("tab", { name: "Next.js" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const snippet = (await install.locator("pre code").first().textContent()) ?? "";
+  const siteId = /siteId: "(site_[A-Za-z0-9_-]+)"/.exec(snippet)?.[1];
   expect(siteId).toBeTruthy();
+  expect(snippet).toContain("reportSignedRequest");
+  expect(snippet).toContain("reportRequestSignals");
   expect(snippet).not.toContain("YOUR-SITE-ID");
+  expect(snippet).not.toContain("<script");
 
   // Copying the snippet is not an install, so the product keeps waiting.
   const status = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Status" }),
   });
   await expect(status).toContainText("Waiting for installation");
-  await page.getByRole("button", { name: "Copy", exact: true }).first().click();
+  await expect(status).toContainText(`curl -A "HeadlessChrome/1.0 (install check)" ${SITE}/`);
+  await install.getByRole("button", { name: "Copy", exact: true }).first().click();
   await page.reload();
   await expect(status).toContainText("Waiting for installation");
   await expect(status).not.toContainText("Receiving events");
 
   await page.getByText("Set this up with your coding agent").click();
-  const instructions = page.locator("details pre code");
+  const instructions = page.locator("details", { hasText: "coding agent" }).locator("pre code");
   await expect(instructions).toContainText(siteId!);
-  await expect(instructions).toContainText("Response recorded");
+  await expect(instructions).toContainText("don't add the declaration widget");
+  await expect(instructions).not.toContainText("visitor-choice");
   await expect(instructions).not.toContainText(secret);
 
-  // The generated snippet works from a real server on the customer's own origin, and is
-  // refused on an origin the product doesn't list.
-  const serve = (port: number) => {
-    const website = createServer((_, response) => {
+  // The customer's own server on its own origin, running the server package the way the
+  // snippet does. It waits for the reports here only so the test doesn't race them.
+  const sdk = (await import(
+    pathToFileURL(path.resolve(process.cwd(), "../dist/server/index.js")).href
+  )) as typeof import("../../../src/server/index");
+  const agentId = { apiUrl: COLLECTOR, siteId: siteId!, secret };
+  let pageHtml = "<!doctype html><title>Site</title>";
+  const serve = (port: number, report: boolean) => {
+    const website = createServer(async (request, response) => {
+      if (report) {
+        await Promise.all([
+          sdk.reportSignedRequest(request, agentId),
+          sdk.reportRequestSignals(request, agentId),
+        ]);
+      }
       response.writeHead(200, { "content-type": "text/html" });
-      response.end(`<!doctype html><title>Site</title>${snippet}`);
+      response.end(pageHtml);
     });
     return new Promise<typeof website>((resolve) =>
       website.listen(port, "127.0.0.1", () => resolve(website)),
     );
   };
-  const websites = [await serve(4555), await serve(4556)];
+  const websites = [await serve(4555, true), await serve(4556, false)];
   try {
+    // The install check from the Status card: one request that claims a headless browser.
+    const check = await page.request.get(`${SITE}/`, {
+      headers: { "user-agent": "HeadlessChrome/1.0 (install check)" },
+    });
+    expect(check.ok()).toBe(true);
+    await page.reload();
+    await expect(status).toContainText("Receiving events");
+    await expect(status).toContainText("Your server last reported just now");
+    await expect(status).not.toContainText("The widget loaded");
+
+    // An agent that signs its request with Web Bot Auth asks the customer's site for a page,
+    // and the site's server reports it. The key is fixed, so runs in each browser publish the
+    // same key to the collector's cache.
+    const privateKey = createPrivateKey({
+      key: Buffer.from(`302e020100300506032b657004220420${"11".repeat(32)}`, "hex"),
+      format: "der",
+      type: "pkcs8",
+    });
+    const jwk = createPublicKey(privateKey).export({ format: "jwk" });
+    const keyid = createHash("sha256")
+      .update(JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x }))
+      .digest("base64url");
+    const directory = createServer((_, response) => {
+      response.writeHead(200, {
+        "content-type": "application/http-message-signatures-directory+json",
+      });
+      response.end(JSON.stringify({ keys: [jwk] }));
+    });
+    await new Promise<void>((resolve) => directory.listen(4557, "127.0.0.1", resolve));
+    try {
+      const created = Math.floor(Date.now() / 1000);
+      const params = `("@authority" "signature-agent";key="sig1");created=${created};keyid="${keyid}";alg="ed25519";expires=${created + 300};tag="web-bot-auth"`;
+      const base = `"@authority": ${new URL(SITE).host}\n"signature-agent";key="sig1": "${SIGNER}"\n"@signature-params": ${params}`;
+      const signature = sign(null, Buffer.from(base), privateKey).toString("base64");
+      const visit = await page.request.get(`${SITE}/pricing`, {
+        headers: {
+          "signature-agent": `sig1="${SIGNER}"`,
+          "signature-input": `sig1=${params}`,
+          signature: `sig1=:${signature}:`,
+        },
+      });
+      expect(visit.ok()).toBe(true);
+    } finally {
+      await new Promise((resolve) => directory.close(resolve));
+    }
+
+    // The declaration widget stays available as an opt-in that says everyone sees it. It
+    // works on the customer's own origin and is refused on one the product doesn't list.
+    await page.getByText("Optional: the declaration widget").click();
+    const widget = page.locator("details", { hasText: "Optional: the declaration widget" });
+    await expect(widget).toContainText("Every visitor sees this widget, people included");
+    const widgetSnippet = (await widget.locator("pre code").textContent()) ?? "";
+    expect(widgetSnippet).toContain(`data-site="${siteId}"`);
+    pageHtml += widgetSnippet;
     await page.goto(`${SITE}/`);
     await page.getByRole("button", { name: "AI assistant" }).click();
     await expect(page.getByRole("status")).toHaveText("Response recorded: AI assistant.");
@@ -138,56 +218,16 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
     await page.goto(`${UNLISTED}/`);
     await refused;
   } finally {
+    // Closing waits for idle keep-alive connections, which WebKit holds open for a while.
+    for (const website of websites) website.closeAllConnections();
     await Promise.all(websites.map((website) => new Promise((resolve) => website.close(resolve))));
-  }
-
-  // An agent that signs its request with Web Bot Auth, reported by the customer's server. The
-  // key is fixed, so runs in each browser publish the same key to the collector's cache.
-  const privateKey = createPrivateKey({
-    key: Buffer.from(`302e020100300506032b657004220420${"11".repeat(32)}`, "hex"),
-    format: "der",
-    type: "pkcs8",
-  });
-  const jwk = createPublicKey(privateKey).export({ format: "jwk" });
-  const keyid = createHash("sha256")
-    .update(JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x }))
-    .digest("base64url");
-  const directory = createServer((_, response) => {
-    response.writeHead(200, {
-      "content-type": "application/http-message-signatures-directory+json",
-    });
-    response.end(JSON.stringify({ keys: [jwk] }));
-  });
-  await new Promise<void>((resolve) => directory.listen(4557, "127.0.0.1", resolve));
-  try {
-    const created = Math.floor(Date.now() / 1000);
-    const params = `("@authority" "signature-agent";key="sig1");created=${created};keyid="${keyid}";alg="ed25519";expires=${created + 300};tag="web-bot-auth"`;
-    const base = `"@authority": ${new URL(SITE).host}\n"signature-agent";key="sig1": "${SIGNER}"\n"@signature-params": ${params}`;
-    const signature = sign(null, Buffer.from(base), privateKey).toString("base64");
-    const report = await page.request.post(`${COLLECTOR}/v1/signatures`, {
-      headers: { authorization: `Bearer ${secret}` },
-      data: {
-        siteId,
-        request: {
-          method: "GET",
-          url: `${SITE}/pricing`,
-          headers: {
-            "signature-agent": `sig1="${SIGNER}"`,
-            "signature-input": `sig1=${params}`,
-            signature: `sig1=:${signature}:`,
-          },
-        },
-      },
-    });
-    expect(report.ok()).toBe(true);
-  } finally {
-    await new Promise((resolve) => directory.close(resolve));
   }
 
   await page.goto("/dashboard");
   await expect(page.getByText("Receiving events")).toBeVisible();
   await page.getByRole("link", { name: /Storefront/ }).click();
-  await expect(status).toContainText(`Loaded on ${SITE}`);
+  await expect(status).toContainText("Your server last reported just now");
+  await expect(status).toContainText(`The widget loaded on ${SITE}`);
   await expect(status).toContainText("Last declaration just now");
   await expect(async () => {
     await page.reload();
@@ -208,7 +248,10 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await expect(overview).toContainText("Sessions1");
   await expect(overview).toContainText("Page views1");
   await expect(overview).toContainText("Signed requests1");
-  await expect(overview).toContainText("1 signed requests it couldn't link to a session");
+  // The server's reports carry no session binding, so they stand apart from the widget's session.
+  await expect(overview).toContainText(
+    "0 actions, 1 signed requests and 1 automation signals it couldn't link to a session",
+  );
   await page.getByRole("link", { name: /Declared AI/ }).click();
   const timeline = page.locator("section", { hasText: "Timeline" });
   await expect(timeline).toContainText("Answered AI assistant");
@@ -371,7 +414,13 @@ test("an environment is added from the dashboard, with its own snippet and analy
   await confirm(page, email);
   await addProduct(page, "Environments", ["https://env.example"]);
   await page.getByRole("link", { name: "Continue to install" }).click();
-  const production = await page.locator("pre code").first().textContent();
+  const snippet = () =>
+    page
+      .locator("section", { has: page.getByRole("heading", { name: "Install" }) })
+      .locator("pre code")
+      .first()
+      .textContent();
+  const production = await snippet();
   await expect(page.getByRole("link", { name: "Production", exact: true })).toHaveAttribute(
     "aria-current",
     "page",
@@ -388,14 +437,14 @@ test("an environment is added from the dashboard, with its own snippet and analy
     "aria-current",
     "page",
   );
-  const staging = await page.locator("pre code").first().textContent();
+  const staging = await snippet();
   expect(staging).not.toBe(production);
-  expect(staging).toMatch(/data-site="site_/);
+  expect(staging).toMatch(/siteId: "site_/);
 
   await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(/\/activity\?env=[0-9a-f-]{36}$/);
   await expect(page.getByText("No sessions in Staging in the last 7 days.")).toBeVisible();
-  await expect(page.getByText(/Nothing has loaded the widget in Staging yet/)).toBeVisible();
+  await expect(page.getByText(/Nothing has reported to Staging yet/)).toBeVisible();
   await page.getByRole("link", { name: "Last 30 days" }).click();
   await expect(page).toHaveURL(/range=30d/);
   await expect(page.getByText("No sessions in Staging in the last 30 days.")).toBeVisible();

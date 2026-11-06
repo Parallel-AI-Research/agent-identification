@@ -12,6 +12,8 @@ export interface InstallIssue {
 export interface InstallStatus {
   status: "waiting" | "receiving";
   loaded: { origin: string; firstSeenAt: string; lastSeenAt: string }[];
+  /** The last report the collector accepted from the customer's server. */
+  lastServerReportAt: string | null;
   lastDeclarationAt: string | null;
   /** The collector's time, which relative times are measured from. */
   checkedAt: string;

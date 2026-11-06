@@ -8,9 +8,10 @@
     "install",
     "coding-agents",
     "---Guides---",
-    "server-verification",
-    "activity",
     "signed-agents",
+    "activity",
+    "declaration-widget",
+    "server-verification",
     "troubleshooting",
     "limits"
   ]

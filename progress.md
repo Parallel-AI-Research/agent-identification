@@ -4,8 +4,8 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 
 ## Current State
 
-**Last Updated:** 2026-11-04 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector, and activity collection (`feat-006`) was verified through the ticket app. The owner dashboard (`feat-007`) is done after its error state got a test. The other hosted checks and a new-account onboarding remain. `feat-009` is blocked on defining the 90–100% target, and `feat-003` still needs one real declaration from a customer site. `feat-002`, `feat-004`, `feat-005`, `feat-006`, `feat-007` and `feat-011` are done.
+**Last Updated:** 2026-11-05 (Africa/Lagos)
+**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector, and activity collection (`feat-006`) was verified through the ticket app. The owner dashboard (`feat-007`) is done after its error state got a test. The other hosted checks and a new-account onboarding remain. On 5 November the owner chose a default install that puts nothing in front of visitors, so the install now leads with server reporting and the widget is an opt-in; a script that draws nothing follows in SDK 0.6.0. The owner also defined the 90–100% target against agents we run ourselves, which unblocks `feat-009`. `feat-003` still needs a real customer site. `feat-002`, `feat-004`, `feat-005`, `feat-006`, `feat-007` and `feat-011` are done.
 
 SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0` assets are unchanged. Versions 0.2.0 to 0.4.0 were never deployed. The hosted collector loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard covers signup, install instructions, environments, activity, signed agents, origins, DNS verification, secret rotation and soft deletion.
 
@@ -25,6 +25,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
 - [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
 - [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It went live with the collector redeploy on 4 November, and a cache may still hold the 0.1.0 manifest it stored earlier.
+- [x] The default install reports from the customer's server and adds nothing to the page, on 5 November at the owner's choice. Status counts an accepted server report, the coding-agent instructions set up server reporting, and the widget moved behind a warning that every visitor sees it. Not yet deployed: it needs a migration first.
 - [x] CI runs the dashboard journeys against a local Supabase stack, in Chromium and WebKit. Browser jobs run in Playwright's image, because installing browser system packages from Ubuntu's mirror took 21 to 35 minutes when it was slow. CI runs once per pull request push, cancels superseded runs and has job timeouts.
 
 ### What's In Progress
@@ -36,11 +37,13 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 
 ### What's Next
 
-1. Confirm a declaration from a real site and mark `feat-003` done.
-2. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-3. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
-4. Verify a CDN verdict for `feat-012`.
-5. Define what the 90–100% target is measured against, so validation (`feat-009`) can start.
+1. Deploy the server-first install: the `server_reported` migration, then the collector, then the dashboard.
+2. Build the script that records page views and automation signals without drawing anything (SDK 0.6.0), so server-only installs get sessions.
+3. Install on a real customer site and mark `feat-003` done.
+4. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
+5. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
+6. Verify a CDN verdict for `feat-012`.
+7. Plan `feat-009`'s test matrix and baseline run, now that the target is measured against agents we run ourselves.
 
 ## Blockers / Risks
 
@@ -49,8 +52,9 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
-- [ ] **The live widget shows to every visitor**: 0.1.0 puts a visible prompt in front of people, which conflicts with the agents-only goal. The install prompt and docs still describe that version, so it should not go on a real product. The owner shelved the invisible widget for Web Bot Auth (`feat-012`), which puts nothing on the page.
-- [ ] **`feat-009` targets**: the owner's goal is 90–100% identification. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The target needs a defined population and a baseline run before it is frozen or shown to a customer.
+- [ ] **The widget shows to every visitor**: 0.1.0 and 0.5.0 put a visible prompt in front of people, which conflicts with the agents-only goal. Once the server-first install deploys, the dashboard, docs and coding-agent instructions only offer it as an opt-in that says so. Until then, the live install flow still adds it.
+- [ ] **Server-only installs have no sessions**: server reports carry no session, so the Activity page counts them apart and lists no sessions until the script in SDK 0.6.0 gives these installs sessions.
+- [ ] **`feat-009` targets**: the owner's goal is 90–100% identification, measured against agents we run ourselves across the test matrix, each kind reported separately. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The numbers are set after a baseline run, before anything is shown to a customer.
 - [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
@@ -67,7 +71,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
   - Context: the public site and docs replaced it, so the owner asked to remove it. The collector now serves the API, the SDK and `/trial/`, and its root URL returns 404.
   - Alternatives considered: redirecting the root URL to the public site, which nothing needs yet.
 - **Install status comes only from what the collector received**
-  - Context: an owner needs to know whether an install works. Copying a snippet proves nothing, so status changes only on a widget load from an allowed origin, a declaration, or a refusal. Session preflights from any HTTPS or local origin are answered, so a page on an unlisted origin can be traced to its site. The session itself is still refused.
+  - Context: an owner needs to know whether an install works. Copying a snippet proves nothing, so status changes only on a widget load from an allowed origin, a report the collector accepted from the customer's server, a declaration, or a refusal. Session preflights from any HTTPS or local origin are answered, so a page on an unlisted origin can be traced to its site. The session itself is still refused.
   - Alternatives considered: matching refused origins to owners by domain, which would show one customer's traffic to anyone who lists the same domain.
 - **One navbar across the public site, docs and dashboard**
   - Context: every page shares the same navigation, with Docs and Changelog on the left, a light and dark toggle, and a Dashboard button or account menu at the far right.
@@ -107,6 +111,7 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - `vercel.json`, `docs/operations.md` - a five-minute cache for `/downloads/release.json`.
 - `feature_list.json`, `progress.md`, `session-handoff.md` - the 4 November collector redeploy recorded in `feat-010`.
 - `.github/workflows/check.yml`, `dashboard/playwright.config.ts`, `docs/operations.md` - faster CI, and the dashboard journeys in CI.
+- `collector/`, `supabase/migrations/20261105120000_add_server_install_signal.sql`, `dashboard/` and its docs, `README.md`, `docs/protocol.md` - the server-first install.
 
 ## Evidence of Completion
 
@@ -124,7 +129,8 @@ The remaining product decisions are recorded per feature under `decisions` in `f
 - [x] On 4 November, `./init.sh --full` passed with 187/187 tests, 5/5 dashboard unit, 56/56 SDK browser tests, the dashboard build and 34/34 dashboard journey tests in Chromium and WebKit, including the new error-state journey.
 - [x] On 4 November, the corrected Next.js example verified a request signed by the local test signer through the local collector: on Next.js 16 under `next dev` and `next start`, and on Next.js 15.5 under `next start`. The old example failed every request on Next.js 16, and `proxy.ts` without `url` recorded `wrong_authority` under both commands.
 - [x] On 4 November, after the collector redeploy, `/health` reported 0.5.0 on Postgres, `release.json` answered with `public, max-age=300`, and the 0.1.0 and 0.5.0 SDK files, tarballs and manifests hashed the same as before the deploy and as their archives in `releases/`.
-- [ ] Not run: a declaration from a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
+- [x] On 5 November, `./init.sh --full` passed with 190/190 tests, 7/7 dashboard unit, 56/56 SDK browser tests, the dashboard build and 34/34 dashboard journeys. The generated Next.js and Express snippets, copied as is, verified a signed request and recorded a headless check through the local collector, and recorded nothing for an ordinary request.
+- [ ] Not run: a real customer site, a real domain verified end to end, and any trial of an agent using this harness.
 
 ## Notes for Next Session
 

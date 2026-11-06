@@ -39,7 +39,12 @@ export interface StoredEvent {
 }
 /** What an install has done, kept per site so its owner can see whether it works. */
 export type InstallSignal =
-  "loaded" | "declared" | "origin_refused" | "secret_refused" | "binding_refused";
+  | "loaded"
+  | "declared"
+  | "server_reported"
+  | "origin_refused"
+  | "secret_refused"
+  | "binding_refused";
 export interface InstallActivity {
   siteId: string;
   signal: InstallSignal;

@@ -21,6 +21,7 @@ const DOCS = [
   ["/docs/quickstart", "Quickstart"],
   ["/docs/install", "Install"],
   ["/docs/coding-agents", "Set up with a coding agent"],
+  ["/docs/declaration-widget", "Declaration widget"],
   ["/docs/server-verification", "Server verification"],
   ["/docs/activity", "Activity"],
   ["/docs/signed-agents", "Signed agents"],
@@ -32,7 +33,8 @@ test("the home page works without signing in and states its limits", async ({ pa
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AI agents");
-  await expect(page.getByText("A declaration is self-reported.")).toBeVisible();
+  await expect(page.getByText("Nothing is added to your pages")).toBeVisible();
+  await expect(page.getByText("A verified signature is evidence")).toBeVisible();
   await expect(page.getByText("Still being built")).toBeVisible();
   await page.getByRole("link", { name: "Read the quickstart" }).click();
   await expect(page).toHaveURL(/\/docs\/quickstart$/);

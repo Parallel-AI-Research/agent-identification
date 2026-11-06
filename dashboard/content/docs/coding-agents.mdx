@@ -9,16 +9,19 @@ The instructions are generated for your product. They include your site ID, the 
 
 ## What the agent does
 
-1. Works out how your project renders its pages.
-2. Adds the widget to your shared layout or template.
-3. Loads a page and checks that the answer is recorded.
-4. Tells you which files it changed and what it checked.
+1. Finds where your server handles requests: middleware, a request hook, or Next.js's `proxy.ts`.
+2. Adds the two reporting calls there, without changing how any request is handled.
+3. Asks you to set `AGENT_ID_SITE_SECRET` yourself.
+4. Requests a page as a headless browser and asks you to check that **Status** says **Receiving events**.
+5. Tells you which files it changed and what it checked.
+
+The instructions tell it not to add anything to your pages, including the [declaration widget](/docs/declaration-widget), because every visitor would see it.
 
 ## What to check yourself
 
-- **The prompt is visible to your visitors.** Make sure you're happy with where it appears before it reaches production.
+- **Nothing changed on your pages.** Visitors shouldn't see anything new.
 - **Your server secret isn't in the code.** It should only ever come from an environment variable that you set.
-- **Local testing needs its own origin.** A local address only works if you add it to your product.
+- **The reports don't hold up your responses.** Both calls run in the background.
 
 ## Docs for agents
 

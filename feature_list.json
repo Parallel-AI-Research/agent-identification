@@ -59,10 +59,12 @@
       ],
       "decisions": [
         "Domain control uses a DNS TXT record and does not block events. A domain shows as unverified until the check passes, and each domain has one verified owner.",
-        "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once."
+        "Rotation keeps the old secret working for 24 hours, with a separate revoke-now action for leaks. Secrets are shown once.",
+        "The default install puts nothing in front of visitors, at the owner's choice on 5 November: the customer's server reports signed requests and user-agent signals, and a script that draws nothing follows in SDK 0.6.0. The declaration widget stays in the docs as an opt-in that says every visitor sees it, and leaves the dashboard's snippets and the coding-agent instructions.",
+        "An install counts as receiving once the collector accepts a report from the customer's server, as well as when the widget loads."
       ],
       "openDecisions": [],
-      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, both fixed and deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. The copy fallback was confirmed on the live site in a browser that denies clipboard access. The agent setup panel is deployed and was confirmed on a real product page. Not done: the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers."
+      "evidence": "2026-11-01: the dashboard is deployed at parallel-agent-dashboard.vercel.app, with Supabase redirects and email confirmation set. Its pages load and signed-out visitors are redirected. The collector reached Supabase's signing keys and rejected a forged token. Locally, 10/10 Playwright journey tests pass in Chromium and WebKit against a local Supabase stack. A real account signed up, confirmed its email, signed in and created a product on the hosted service. That run found two bugs, both fixed and deployed: email links opened in another browser reported an expired link, and copying failed silently where the browser denies clipboard access. The copy fallback was confirmed on the live site in a browser that denies clipboard access. The agent setup panel is deployed and was confirmed on a real product page. Not done: the generated snippet has not recorded a declaration on a real customer site, and no real domain has been verified end to end. Custom email is still needed before external testers. 2026-11-05, local: the default install moved to server reporting, with nothing on the page. ./init.sh --full passed with 190/190 collector, contract and SDK unit tests, 7/7 dashboard unit, 56/56 SDK browser and 34/34 dashboard journey tests in Chromium and WebKit. The collector notes an accepted report on /v1/signatures, /v1/signals or /v1/actions as server_reported, on memory, Postgres under the restricted role and the production driver; another customer's secret and an invalid report don't count, and the install shows receiving with the time of the server's last report. In the onboarding journey, a real Node server on the customer's origin runs the server package with the dashboard's site ID and secret: the Status card's headless check turns the install to Receiving events with nothing on the page, and a request signed by the local test signer, sent to that server, appears as Verified under Signed agents. The coding-agent instructions hold the server snippets and no widget, and the widget's snippets sit behind a warning that every visitor sees it, where the journey still records a declaration from the customer's origin. The generated Next.js snippet, copied as is into a Next.js 16.3.8 app on the 0.5.0 tarball, recorded a signed request as verified under next dev and next start, a headless check once, and nothing for an ordinary request; the generated Express snippet did the same on Express 5.1.0 and also recorded a ChatGPT-User user agent. Not yet done: the migration and deploys, and a real customer site."
     },
     {
       "id": "feat-011",
@@ -251,7 +253,7 @@
       "name": "Controlled validation",
       "description": "Run the pilot acceptance work against a frozen, documented test matrix.",
       "dependencies": ["feat-007", "feat-008", "feat-012"],
-      "status": "blocked",
+      "status": "not-started",
       "acceptance": [
         "The matrix covers cooperative agents, silent agents, agents choosing Person, ordinary scripted automation, humans and mixed human/agent sessions.",
         "Tests cover API-only access, JavaScript-disabled clients, denied actions and abandoned visits.",
@@ -262,11 +264,10 @@
       ],
       "decisions": [
         "Three hard rules apply now: no customer sees another's data, no self-report is shown as verified, and no unknown session is labelled human.",
-        "Detection targets are set after a small baseline run and frozen before the measured pilot."
+        "Detection targets are set after a small baseline run and frozen before the measured pilot.",
+        "The owner's 90–100% identification goal is measured against agents we run ourselves across the test matrix, decided on 5 November: signed cloud browsers, agents in a person's own browser, API clients and scripted automation. Each kind is reported separately, so a result names the agent and how it ran. The owner agrees the numeric targets after the baseline run."
       ],
-      "openDecisions": [
-        "Numeric detection, coverage and false-positive targets, set from the baseline run. The owner's goal is 90–100% identification; what that share is measured against needs defining before any customer is told it."
-      ],
+      "openDecisions": [],
       "evidence": ""
     },
     {

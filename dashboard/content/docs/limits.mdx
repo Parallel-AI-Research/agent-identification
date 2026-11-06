@@ -1,6 +1,6 @@
 ---
 title: What it can't do
-description: What a recorded answer does and doesn't tell you.
+description: What a verified signature, a signal and a recorded answer do and don't tell you.
 ---
 
 These limits matter if you're making decisions from this data.
@@ -9,16 +9,20 @@ These limits matter if you're making decisions from this data.
 
 | What you have            | What it shows                                       | What it doesn't show                                      |
 | ------------------------ | --------------------------------------------------- | --------------------------------------------------------- |
+| A verified signature     | The signer's published key signed this request.     | Who the agent acts for, or permission to act.             |
+| An automation signal     | The request said it was automated, or an agent.     | That it was. Anyone can send a user agent.                |
 | An "AI assistant" answer | The session recorded that response.                 | Verified identity, or permission to act.                  |
 | A "Person" answer        | The session recorded that response.                 | That the visitor is a person. It's self-reported too.     |
 | A verified receipt       | The answer belongs to a session your server bound.  | That the answer is true, or that an AI took every action. |
 | No answer                | Nothing was recorded in the data you're looking at. | That the visitor was human.                               |
 
-## It doesn't detect agents
+## It doesn't detect every agent
 
-The widget asks. An agent can skip an optional prompt, or choose a different answer. Required mode asks every visitor to choose, but it accepts all three answers, so it isn't detection either.
+Your server reports agents that sign their requests and requests whose user agent names an agent. Signing is voluntary, and an agent working through a person's own browser usually does neither, so it looks like any other visitor and stays unknown.
 
-A visitor who doesn't answer stays unknown.
+The [declaration widget](/docs/declaration-widget) asks instead. An agent can skip an optional prompt, or choose a different answer. Required mode asks every visitor to choose, but it accepts all three answers, so it isn't detection either.
+
+A visitor nothing identifies stays unknown, never human.
 
 ## It doesn't grant permission
 
@@ -26,6 +30,6 @@ A declaration is not an authorization decision. Your existing permissions stay i
 
 ## What's collected today
 
-Declarations keep the session ID, origin, answer and timestamps, plus an agent's own name, provider and purpose if it gives them. Tokens and session bindings are stored only as hashes, and raw IP addresses aren't stored. Sessions are removed after seven days, and each session's activity after 30.
+Signed requests keep the result, the signer, and the path with its query removed and anything that looks like an ID masked. Signals keep their kind and detail, such as the agent name in a user agent. Declarations keep the session ID, origin, answer and timestamps, plus an agent's own name, provider and purpose if it gives them. Tokens and session bindings are stored only as hashes, and raw IP addresses aren't stored. Sessions are removed after seven days, and each session's activity after 30.
 
-Since SDK 0.4.0 the widget records a page view on each page load with the path only: no query string, and parts that look like IDs or email addresses replaced with `:id`. You can turn page views off. Automation signals, such as a webdriver flag, are only sent if you turn them on. Page titles, page text, screenshots and form contents are never collected. Any change will be in the [changelog](/changelog).
+If you add the declaration widget, since SDK 0.4.0 it records a page view on each page load with the path only: no query string, and parts that look like IDs or email addresses replaced with `:id`. You can turn page views off. Automation signals, such as a webdriver flag, are only sent if you turn them on. Page titles, page text, screenshots and form contents are never collected. Any change will be in the [changelog](/changelog).
