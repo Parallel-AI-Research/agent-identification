@@ -40,7 +40,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 ### What's Next
 
 1. Deploy SDK 0.6.0 (the collector, then the dashboard), check the published 0.1.0 and 0.5.0 files are unchanged, then freeze 0.6.0 in `releases/`.
-2. Ask the owner whether server reports should join the page script's sessions, which needs a first-party cookie on customers' sites.
+2. Link server reports to the page script's sessions through the page's response, as the owner chose on 6 November: the server adds a random report ID to the response it reported, and the page script reads it from the browser's timing data. Confirm the browsers expose it first.
 3. Install on a real customer site and mark `feat-003` done.
 4. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
 5. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
@@ -55,13 +55,17 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The widget shows to every visitor**: 0.1.0 and 0.5.0 put a visible prompt in front of people, which conflicts with the agents-only goal. Since 6 November the dashboard, docs and coding-agent instructions only offer it as an opt-in that says so, but installs that already added it still show it.
-- [ ] **Server reports don't join sessions**: the page script gives visits sessions, but the server's signed requests, signals and actions carry no session binding, so the Activity page counts them apart. Linking them needs a value both know from the first request, most simply a first-party cookie the server sets, which may need visitors' consent; that's the owner's call.
+- [ ] **Server reports don't join sessions**: the page script gives visits sessions, but the server's signed requests, signals and actions carry no session binding, so the Activity page counts them apart. The owner chose on 6 November to link them through the page's response, with no cookie, and that's the next build.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification, measured against agents we run ourselves across the test matrix, each kind reported separately. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The numbers are set after a baseline run, before anything is shown to a customer.
 - [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
 
 ## Decisions Made
+
+- **Server reports join sessions through the page's response**
+  - Context: the server knows about a signed or agent-named request before the page script has a session, so they need a shared value. The server adds a random report ID to the response of a request it reported, and the page script reads it from the browser's timing data, so only a browser that received that response can claim it. The owner chose this on 6 November.
+  - Alternatives considered: a first-party cookie, which links every request but can need visitors' consent; keeping reports apart.
 
 - **The page script reports automation signals by default**
   - Context: the owner chose on 5 November a script that "records page views and automation signals and draws nothing". The 0.5.0 widget made the page's signals opt-in because they collect something new; the page script turns them on by default, once per session, with `data-automation-signals="off"` to stop them. The widget's stay opt-in.

@@ -51,7 +51,7 @@
 ## Blockers / Risks
 
 - The old collector database is no longer pruned, and it stays in place for rollback until the owner decides.
-- Server reports don't join the page script's sessions. Linking them needs a first-party cookie on customers' sites, which is the owner's call.
+- Server reports don't join the page script's sessions yet. The owner chose to link them through the page's response, with no cookie.
 - No real customer site runs the install yet.
 - The unused `public-demo` site is still in the hosted database, waiting for the owner's cleanup decision.
 
@@ -65,5 +65,6 @@
 ## Recommended Next Step
 
 - Once `sdk/page-script` merges, deploy the collector, then the dashboard, check the published 0.1.0 and 0.5.0 files, and freeze 0.6.0 in `releases/`.
+- Then link server reports to the page script's sessions through the page's response, checking first that Chromium, WebKit and Firefox expose it.
 - Plan `feat-009`'s test matrix and baseline run.
 - The owner's hosted checks in `docs/pilot.md` and a CDN verdict for `feat-012` still need their accounts.
