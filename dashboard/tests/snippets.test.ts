@@ -4,21 +4,25 @@ import {
   agentPrompt,
   checkCommand,
   httpSnippet,
+  nextPageScriptSnippet,
   nextSnippet,
   nodeSnippet,
   packageSnippet,
+  pageScriptSnippet,
   parseOrigins,
   reactSnippet,
   scriptSnippet,
   serverSnippet,
+  trackSnippet,
 } from "../lib/snippets";
 
 const values = { siteId: "site_abc123", collectorUrl: "https://collector.example" };
 const serverSnippets = [nextSnippet, nodeSnippet, httpSnippet];
+const pageSnippets = [pageScriptSnippet, nextPageScriptSnippet, trackSnippet];
 const widgetSnippets = [scriptSnippet, packageSnippet, reactSnippet];
 
 test("every snippet uses the product's own site ID and collector", () => {
-  for (const build of [...serverSnippets, ...widgetSnippets, serverSnippet]) {
+  for (const build of [...serverSnippets, ...pageSnippets, ...widgetSnippets, serverSnippet]) {
     const snippet = build(values);
     assert(snippet.includes(values.siteId));
     assert(snippet.includes(values.collectorUrl));
@@ -44,8 +48,26 @@ test("the default install reports from the server and adds nothing to the page",
   assert(httpSnippet(values).includes("/v1/signals"));
 });
 
+test("the page script snippets load the script that draws nothing, never the widget", () => {
+  for (const build of [pageScriptSnippet, nextPageScriptSnippet]) {
+    assert(build(values).includes("/sdk/v0.6.0/agent-id-track.js"));
+  }
+  assert(trackSnippet(values).includes("track({"));
+  assert(trackSnippet(values).includes("-0.6.0.tgz"));
+  for (const build of pageSnippets) {
+    const snippet = build(values);
+    assert(!/visitor-choice|data-target|agent-id\.js|init\(|AgentIdentification/.test(snippet));
+  }
+});
+
+test("the widget leaves page views to the page script, so a visit isn't counted twice", () => {
+  assert(scriptSnippet(values).includes('data-page-views="off"'));
+  assert(packageSnippet(values).includes("pageViews: false"));
+  assert(reactSnippet(values).includes("pageViews={false}"));
+});
+
 test("browser snippets never contain a secret reference", () => {
-  for (const build of widgetSnippets) {
+  for (const build of [...pageSnippets, ...widgetSnippets]) {
     assert(!/secret/i.test(build(values)));
   }
 });
@@ -63,7 +85,7 @@ test("origins can be separated by new lines, commas or spaces, without duplicate
   assert.deepEqual(parseOrigins("  \n "), []);
 });
 
-test("agent instructions install server reporting, add nothing to pages and carry no secret", () => {
+test("agent instructions install server reporting and the page script, and carry no secret", () => {
   const docsUrl = "https://dashboard.example/llms.txt";
   const prompt = agentPrompt(values, ["https://a.example", "https://b.example"], docsUrl);
   assert(prompt.includes(docsUrl));
@@ -73,11 +95,13 @@ test("agent instructions install server reporting, add nothing to pages and carr
   assert(prompt.includes(nextSnippet(values)));
   assert(prompt.includes(nodeSnippet(values)));
   assert(prompt.includes(checkCommand("https://a.example")));
+  assert(prompt.includes(pageScriptSnippet(values)));
+  assert(prompt.includes(nextPageScriptSnippet(values)));
   assert(!prompt.includes("YOUR-SITE-ID"));
   // The widget shows to every visitor, so the agent is told not to add it.
   assert(!prompt.includes(scriptSnippet(values)));
   assert(!prompt.includes(reactSnippet(values)));
-  assert(prompt.includes("don't add the declaration widget"));
+  assert(prompt.includes("Don't add the declaration widget"));
   // The secret is only ever named as an environment variable the customer sets.
   assert(!/secret:\s*["'][^"']/.test(prompt));
   assert(prompt.includes("Never commit the secret"));

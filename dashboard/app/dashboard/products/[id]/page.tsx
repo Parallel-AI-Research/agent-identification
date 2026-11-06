@@ -88,11 +88,15 @@ export default async function ProductPage({
       <Card>
         <h2 className="font-semibold">Install</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Your server reports agents from the requests it already receives: agents that sign their
-          requests, and user agents that name an AI agent. Nothing is added to your pages, so
-          visitors see nothing. Agents that do neither aren&apos;t caught this way.
+          Two parts, and visitors see neither. Your server reports agents that sign their requests
+          or name themselves in their user agent. The page script draws nothing: it gives each visit
+          a session with its page views, and reports browsers that show automation. Agents that do
+          none of these aren&apos;t caught.
         </p>
+        <h3 className="mb-2 text-sm font-semibold">1. Report from your server</h3>
         <InstallTabs values={install} kind="server" />
+        <h3 className="mt-5 mb-2 text-sm font-semibold">2. Add the page script</h3>
+        <InstallTabs values={install} kind="pages" />
         <AgentSetup values={install} origins={environment.origins} />
         <details className="mt-3 rounded-md border border-border">
           <summary className="cursor-pointer rounded-md px-3 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
@@ -112,7 +116,7 @@ export default async function ProductPage({
         <h2 className="font-semibold">Website origins</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
           A signed request only verifies when it was signed for one of these exact origins, and only
-          these can load the declaration widget.
+          these can run the page script or the declaration widget.
         </p>
         <OriginsForm
           productId={product.id}

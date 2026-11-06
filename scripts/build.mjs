@@ -1,11 +1,16 @@
 import { build } from "esbuild";
-import { mkdir, readFile, copyFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, copyFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { assertFrozenInputs, loadFrozenReleases, restoreFrozenSdk } from "./frozen-releases.mjs";
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const frozenReleases = await loadFrozenReleases();
 await assertFrozenInputs(frozenReleases, pkg);
+// The page script arrived in 0.6.0, so older frozen releases rebuild without it.
+const pageScript = await access("src/browser/track-script.ts").then(
+  () => true,
+  () => false,
+);
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
 const shared = {
@@ -31,6 +36,15 @@ await Promise.all([
     platform: "browser",
     minify: true,
   }),
+  pageScript &&
+    build({
+      ...shared,
+      entryPoints: ["src/browser/track-script.ts"],
+      outfile: "dist/agent-id-track.js",
+      format: "iife",
+      platform: "browser",
+      minify: true,
+    }),
   build({
     ...shared,
     entryPoints: ["src/react/index.tsx"],
@@ -54,7 +68,8 @@ await copyFile("src/browser/styles.css", "dist/agent-id.css");
 await assertFrozenInputs(frozenReleases, pkg, ".", { dist: true });
 const sdk = `public/sdk/v${pkg.version}`;
 await mkdir(sdk, { recursive: true });
-await Promise.all(["agent-id.js", "agent-id.css"].map((f) => copyFile(`dist/${f}`, `${sdk}/${f}`)));
+const assets = ["agent-id.js", ...(pageScript ? ["agent-id-track.js"] : []), "agent-id.css"];
+await Promise.all(assets.map((f) => copyFile(`dist/${f}`, `${sdk}/${f}`)));
 await build({
   ...shared,
   entryPoints: ["examples/react/main.tsx"],
@@ -65,7 +80,7 @@ await build({
   define: { "process.env.NODE_ENV": '"development"' },
 });
 const integrity = { version: pkg.version, assets: {} };
-for (const f of ["agent-id.js", "agent-id.css"]) {
+for (const f of assets) {
   const b = await readFile(`dist/${f}`);
   integrity.assets[f] = {
     bytes: b.length,
@@ -74,4 +89,4 @@ for (const f of ["agent-id.js", "agent-id.css"]) {
 }
 await writeFile(`${sdk}/integrity.json`, JSON.stringify(integrity, null, 2) + "\n");
 await restoreFrozenSdk(frozenReleases);
-console.log(`Built script, ESM, React and server exports for ${pkg.version}.`);
+console.log(`Built scripts, ESM, React and server exports for ${pkg.version}.`);

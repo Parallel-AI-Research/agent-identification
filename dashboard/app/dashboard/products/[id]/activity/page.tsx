@@ -225,9 +225,9 @@ export default async function ActivityPage({
 
       <p className="text-sm text-muted-foreground">
         Each session gets one label from the strongest evidence it has: a verified signature, then
-        what the visitor said, with every signal kept on its timeline. A session with no signal
-        stays Unknown, which never means a person. Agents that don&apos;t sign or answer can&apos;t
-        be told apart here.
+        an AI assistant answer, then automation signals, then a Person answer, with every signal
+        kept on its timeline. A session with no signal stays Unknown, which never means a person.
+        Agents that don&apos;t sign, answer or show automation can&apos;t be told apart here.
       </p>
     </div>
   );

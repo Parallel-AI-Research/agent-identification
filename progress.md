@@ -5,7 +5,7 @@ This file is committed to a public repository. Keep credentials, tokens, raw evi
 ## Current State
 
 **Last Updated:** 2026-11-06 (Africa/Lagos)
-**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector, and activity collection (`feat-006`) was verified through the ticket app. The owner dashboard (`feat-007`) is done after its error state got a test. The other hosted checks and a new-account onboarding remain. On 5 November the owner chose a default install that puts nothing in front of visitors, so the install now leads with server reporting and the widget is an opt-in; a script that draws nothing follows in SDK 0.6.0. The owner also defined the 90–100% target against agents we run ourselves, which unblocks `feat-009`. `feat-003` still needs a real customer site. `feat-002`, `feat-004`, `feat-005`, `feat-006`, `feat-007` and `feat-011` are done.
+**Active Feature:** `feat-010`, the pilot release, merged and deployed on 3 November with `feat-005` to `feat-008` and `feat-012`. On 4 November ChatGPT Work's cloud browser became the first signer verified on the hosted collector, and activity collection (`feat-006`) was verified through the ticket app. The owner dashboard (`feat-007`) is done after its error state got a test. The other hosted checks and a new-account onboarding remain. On 5 November the owner chose a default install that puts nothing in front of visitors, so the install now leads with server reporting and the widget is an opt-in. On 6 November SDK 0.6.0 added that script, the page script, which draws nothing and gives each visit a session with its page views and automation signals; it isn't deployed yet. The owner also defined the 90–100% target against agents we run ourselves, which unblocks `feat-009`. `feat-003` still needs a real customer site. `feat-002`, `feat-004`, `feat-005`, `feat-006`, `feat-007` and `feat-011` are done.
 
 SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0` assets are unchanged. Versions 0.2.0 to 0.4.0 were never deployed. The hosted collector loads sites from the dedicated Supabase project, customers own products and environments through an owner API, and the dashboard covers signup, install instructions, environments, activity, signed agents, origins, DNS verification, secret rotation and soft deletion.
 
@@ -27,6 +27,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It went live with the collector redeploy on 4 November, and a cache may still hold the 0.1.0 manifest it stored earlier.
 - [x] The default install reports from the customer's server and adds nothing to the page, on 5 November at the owner's choice. Status counts an accepted server report, the coding-agent instructions set up server reporting, and the widget moved behind a warning that every visitor sees it. It went live on 6 November: the migration, then the collector, then the dashboard after the fix below.
 - [x] CI runs the dashboard journeys against a local Supabase stack, in Chromium and WebKit. Browser jobs run in Playwright's image, because installing browser system packages from Ubuntu's mirror took 21 to 35 minutes when it was slow. CI runs once per pull request push, cancels superseded runs and has job timeouts.
+- [x] SDK 0.6.0 adds the page script on 6 November: one tag, or `track()`, that draws nothing and sets no cookies. It records page views, including a single-page app's path changes, and the browser's automation signals once per session, in a tab session it shares with the widget. The Install card has it as step 2, Status says when pages last reported, and the coding-agent instructions add it. Not yet deployed.
 - [x] The dashboard's CI job checks out `dashboard/` alone, as Vercel builds it. A test that imported types from outside `dashboard/` passed CI but failed the dashboard deploy on 6 November.
 
 ### What's In Progress
@@ -38,12 +39,13 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 
 ### What's Next
 
-1. Build the script that records page views and automation signals without drawing anything (SDK 0.6.0), so server-only installs get sessions.
-2. Install on a real customer site and mark `feat-003` done.
-3. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-4. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
-5. Verify a CDN verdict for `feat-012`.
-6. Plan `feat-009`'s test matrix and baseline run, now that the target is measured against agents we run ourselves.
+1. Deploy SDK 0.6.0 (the collector, then the dashboard), check the published 0.1.0 and 0.5.0 files are unchanged, then freeze 0.6.0 in `releases/`.
+2. Ask the owner whether server reports should join the page script's sessions, which needs a first-party cookie on customers' sites.
+3. Install on a real customer site and mark `feat-003` done.
+4. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
+5. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
+6. Verify a CDN verdict for `feat-012`.
+7. Plan `feat-009`'s test matrix and baseline run, now that the target is measured against agents we run ourselves.
 
 ## Blockers / Risks
 
@@ -53,13 +55,17 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
 - [ ] **The widget shows to every visitor**: 0.1.0 and 0.5.0 put a visible prompt in front of people, which conflicts with the agents-only goal. Since 6 November the dashboard, docs and coding-agent instructions only offer it as an opt-in that says so, but installs that already added it still show it.
-- [ ] **Server-only installs have no sessions**: server reports carry no session, so the Activity page counts them apart and lists no sessions until the script in SDK 0.6.0 gives these installs sessions.
+- [ ] **Server reports don't join sessions**: the page script gives visits sessions, but the server's signed requests, signals and actions carry no session binding, so the Activity page counts them apart. Linking them needs a value both know from the first request, most simply a first-party cookie the server sets, which may need visitors' consent; that's the owner's call.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification, measured against agents we run ourselves across the test matrix, each kind reported separately. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The numbers are set after a baseline run, before anything is shown to a customer.
 - [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
 - [ ] **Firefox locally**: local startup failed on 21 October, so `./init.sh --full` runs Chromium and WebKit only. CI runs all three.
 - [ ] **Silent-agent detection is unproven**: the MVP plan treats it as validation work (`feat-008`, `feat-009`), not as an existing capability.
 
 ## Decisions Made
+
+- **The page script reports automation signals by default**
+  - Context: the owner chose on 5 November a script that "records page views and automation signals and draws nothing". The 0.5.0 widget made the page's signals opt-in because they collect something new; the page script turns them on by default, once per session, with `data-automation-signals="off"` to stop them. The widget's stay opt-in.
+  - Alternatives considered: opt-in signals in the page script, which would leave most installs without the evidence the owner asked for.
 
 - **Web Bot Auth instead of an invisible widget**
   - Context: the owner wants agents identified without showing people anything. Web Bot Auth checks agents that sign their requests, with nothing on the page, and payment networks build on it. `feat-012` now covers it, including a CDN's signed-agent verdict, and comes straight after the event contract (`feat-005`). The collector checks signatures, because browser code can't read request headers and one implementation should serve every backend. Heuristics for unsigned traffic stay in `feat-008`.

@@ -23,8 +23,8 @@ function advice(issue: InstallIssue) {
     case "origin_refused":
       return (
         <>
-          A page on <code className="font-mono">{issue.origin}</code> tried to load the widget, but
-          this environment doesn&apos;t allow that origin. If the site is yours, add it under
+          A page on <code className="font-mono">{issue.origin}</code> tried to report to this
+          environment, but it doesn&apos;t allow that origin. If the site is yours, add it under
           Website origins. Anyone can claim an origin, so only add sites you run.
         </>
       );
@@ -61,9 +61,9 @@ export function InstallStatusPanel({
       {install.status === "waiting" ? (
         <>
           <p className="text-muted-foreground">
-            Your server hasn&apos;t reported anything yet. It only reports agents, so once it&apos;s
-            set up, request a page as a headless browser, then check again. The collector records it
-            as one request showing automation, from you. Copying a snippet doesn&apos;t count.
+            Nothing has reported yet. Open a page that has the page script, and request one as a
+            headless browser to check your server, which only reports agents. The collector records
+            that request as automation, from you. Copying a snippet doesn&apos;t count.
           </p>
           <CopyBlock value={checkCommand(origins[0] ?? "https://your-site.example")} />
         </>
@@ -74,19 +74,31 @@ export function InstallStatusPanel({
           ) : null}
           {install.loaded.map((row) => (
             <li key={row.origin}>
-              The widget loaded on <code className="font-mono">{row.origin}</code>{" "}
+              Pages on <code className="font-mono">{row.origin}</code> last reported{" "}
               {ago(row.lastSeenAt, now)}.
             </li>
           ))}
-          {install.loaded.length || install.lastDeclarationAt ? (
+          {install.lastServerReportAt ? null : (
             <li className="text-muted-foreground">
-              {install.lastDeclarationAt
-                ? `Last declaration ${ago(install.lastDeclarationAt, now)}.`
-                : "No declarations yet. One arrives when a visitor answers the prompt."}
+              Your server hasn&apos;t reported yet. It only reports agents, so request a page as a
+              headless browser to check it.
+            </li>
+          )}
+          {install.loaded.length ? null : (
+            <li className="text-muted-foreground">
+              No page has reported yet. Open one that has the page script.
+            </li>
+          )}
+          {install.lastDeclarationAt ? (
+            <li className="text-muted-foreground">
+              Last declaration {ago(install.lastDeclarationAt, now)}.
             </li>
           ) : null}
         </ul>
       )}
+      {install.status === "receiving" && !install.lastServerReportAt ? (
+        <CopyBlock value={checkCommand(origins[0] ?? "https://your-site.example")} />
+      ) : null}
       {install.issues.map((issue) => (
         <Notice key={`${issue.signal}:${issue.origin}`} tone="warning">
           {advice(issue)} Last seen {ago(issue.lastSeenAt, now)}.

@@ -4,13 +4,13 @@ description: An optional prompt that asks visitors whether they're an AI assista
 ---
 
 <Callout type="warn">
-  Every visitor sees this widget, people included. It isn't part of the default install, which adds
-  nothing to your pages. Only add it where you're happy for everyone to see it.
+  Every visitor sees this widget, people included. It isn't part of the default install, which draws
+  nothing on your pages. Only add it where you're happy for everyone to see it.
 </Callout>
 
-The widget asks each visitor how they're visiting: **AI assistant**, **Person** or **Prefer not to say**. It records what they choose, and since SDK 0.4.0 it also records a page view on each page load. An answer is self-reported, so it never proves who a visitor is.
+The widget asks each visitor how they're visiting: **AI assistant**, **Person** or **Prefer not to say**. It records what they choose. An answer is self-reported, so it never proves who a visitor is.
 
-Your product page has these snippets under **Optional: the declaration widget**, with your own site ID filled in.
+Your product page has these snippets under **Optional: the declaration widget**, with your own site ID filled in. They're for pages that already have the [page script](/docs/install#the-page-script): the widget joins the tab's session, so an answer sits next to that visit's page views, and the snippets turn the widget's own page views off so a visit isn't counted twice. Without the page script, leave page views on.
 
 ## Script tag
 
@@ -18,10 +18,11 @@ Your product page has these snippets under **Optional: the declaration widget**,
 <div id="visitor-choice"></div>
 <script
   defer
-  src="https://parallel-agent-identification.vercel.app/sdk/v0.5.0/agent-id.js"
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.6.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="optional"
+  data-page-views="off"
 ></script>
 ```
 
@@ -30,7 +31,7 @@ Without `data-target`, the widget adds itself to the end of the page.
 ## JavaScript
 
 ```sh
-npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.5.0.tgz
+npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.6.0.tgz
 ```
 
 ```js
@@ -41,6 +42,8 @@ const widget = init({
   siteId: "YOUR-SITE-ID",
   apiUrl: "https://parallel-agent-identification.vercel.app",
   mode: "optional",
+  // The page script records page views.
+  pageViews: false,
 });
 await widget.ready;
 ```
@@ -59,6 +62,7 @@ export function VisitorChoice() {
       siteId="YOUR-SITE-ID"
       apiUrl="https://parallel-agent-identification.vercel.app"
       mode="optional"
+      pageViews={false}
     />
   );
 }
@@ -77,7 +81,7 @@ A gate in the browser can be bypassed, so it doesn't protect anything by itself.
 
 ## Check it works
 
-Load a page on one of your origins. **Status** on your product page says where the widget loaded. Answer the prompt, and it should say **Response recorded**. Status then shows when the last declaration arrived.
+Load a page on one of your origins. **Status** on your product page says when your pages on that origin last reported. Answer the prompt, and it should say **Response recorded**. Status then shows when the last declaration arrived.
 
 The widget only works on the origins you list. A page on another origin is refused, and Status says which one.
 

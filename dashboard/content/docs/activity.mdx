@@ -1,32 +1,32 @@
 ---
 title: Activity
-description: Signed requests, signals and actions from your server, and page views from the widget, on one timeline per session.
+description: Page views from the page script, and signed requests, signals and actions from your server, on one timeline per session.
 ---
 
-Each session has one timeline. The [declaration widget](/docs/declaration-widget), if you use it, adds page views, your server adds what visitors did, and declarations and [signed agents](/docs/signed-agents) join the same timeline. Events from different sources sit side by side, even when they disagree, so you can see a visitor who answered Person next to your server's report of something only an agent would do.
+Each session has one timeline. The [page script](/docs/install#the-page-script) starts the session and adds page views, your server adds what visitors did, and declarations and [signed agents](/docs/signed-agents) join the same timeline. Events from different sources sit side by side, even when they disagree, so you can see a visitor who answered Person next to your server's report of something only an agent would do.
 
 ## Page views
 
-Page views come from the [declaration widget](/docs/declaration-widget), which every visitor sees, so an install that only reports from your server has none. Since SDK 0.4.0 the widget records a page view on each page load, whether or not the visitor answers. It sends the path only: no query string or fragment, and parts that look like IDs or email addresses are replaced with `:id`. The collector masks every path again itself.
+Page views come from the [page script](/docs/install#the-page-script), which draws nothing. Since SDK 0.6.0 it records a page view when a page loads, and again whenever the path changes without a reload. An install that only reports from your server has none. It sends the path only: no query string or fragment, and parts that look like IDs or email addresses are replaced with `:id`. The collector masks every path again itself.
 
-If your paths hold other personal details, give your own route pattern, such as `/tickets/:id`:
+If your paths hold other personal details, give your own route pattern for that page, such as `/tickets/:id`:
 
 ```html
 <script
   defer
-  src="…/sdk/v0.5.0/agent-id.js"
+  src="…/sdk/v0.6.0/agent-id-track.js"
   data-site="YOUR-SITE-ID"
   data-route="/tickets/:id"
 ></script>
 ```
 
-To turn page views off, add `data-page-views="off"`, or pass `pageViews: false` to `init()`.
-
-An app that changes pages without reloading records each change itself:
+An app that changes pages without the History API can record each change itself, with the tracker that `track()` returns:
 
 ```ts
-await widget.pageView({ route: "/tickets/:id" });
+await tracker.pageView({ route: "/tickets/:id" });
 ```
+
+The declaration widget can record page views too, but its snippets leave them to the page script, so a visit isn't counted twice.
 
 ## Actions from your server
 
@@ -72,7 +72,7 @@ curl https://parallel-agent-identification.vercel.app/v1/actions \
 
 Signals are evidence that a visitor is automated, for agents that neither sign nor answer. They never prove an AI agent: an automated browser might be an ordinary test script, and anyone can put an agent's name in a user agent. A session whose strongest evidence is a signal is labelled **Suspected automation**.
 
-- **From the page:** if you use the declaration widget, add `data-automation-signals="on"`, or pass `automationSignals: true`, and it reports whether the browser says it's automated (`navigator.webdriver`) or headless. It's off by default.
+- **From the page:** the page script reports whether the browser says it's automated (`navigator.webdriver`) or headless, once per session. Turn it off with `data-automation-signals="off"`. Automation tools such as Playwright and Selenium set `navigator.webdriver`, and so do many agents that drive a browser in the cloud. An agent that works through a person's own browser usually doesn't.
 - **From your server:** `reportRequestSignals(request, options)` reads the request's user agent. It reports a token that an AI agent or crawler publishes for itself, such as `ChatGPT-User` or `ClaudeBot`, and headless Chrome. It skips other requests without a network call.
 
 ```ts
@@ -85,7 +85,7 @@ void reportRequestSignals(request, { apiUrl, siteId, secret, sessionBinding });
 
 Each product has an **Activity** page for one environment at a time, with the last 24 hours, 7 days or 30 days. It counts sessions, page views, signed requests and confirmed actions separately, and a retry is never counted twice.
 
-Sessions come from the declaration widget. A report from your server joins a session only when it carries that session's binding, so with nothing on your pages, signed requests, signals and actions are counted apart from sessions. Signed requests are also listed on your product page under **Signed agents**.
+Sessions come from the page script, or from the declaration widget. A report from your server joins a session only when it carries that session's binding, and the page script's sessions don't have one yet, so your server's signed requests, signals and actions are counted apart from sessions. Signed requests are also listed on your product page under **Signed agents**.
 
 Each session gets one label from the strongest evidence it has, with no score:
 
@@ -95,7 +95,7 @@ Each session gets one label from the strongest evidence it has, with no score:
 - **Declared person:** the visitor answered Person.
 - **Unknown:** nothing else. Unknown never means a person.
 
-Every signal stays on the session's timeline, with who vouches for it. When signals disagree, such as a Person answer in a session with a verified signature, the session shows **Conflicting signals** instead of picking one. To find your own test session, open the most recent one or paste the session ID that `widget.getState()` returns.
+Every signal stays on the session's timeline, with who vouches for it. When signals disagree, such as a Person answer in a session with a verified signature, the session shows **Conflicting signals** instead of picking one. To find your own test session, open the most recent one.
 
 ## Exporting
 

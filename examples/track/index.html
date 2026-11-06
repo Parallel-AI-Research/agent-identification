@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fieldwork — Page script</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script
+      id="tracking-script"
+      defer
+      src="http://127.0.0.1:4310/sdk/v0.6.0/agent-id-track.js"
+      data-site="demo-site"
+    ></script>
+    <script defer src="/track/demo.js"></script>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <div class="brand"><span>f</span>fieldwork</div>
+        <div class="tag">Team workspace · Page script example</div>
+      </nav>
+    </header>
+    <main>
+      <div class="eyebrow">Workspace / <span id="section">Home</span></div>
+      <h1>A little progress, shared.</h1>
+      <p class="intro">
+        This page has the page script and nothing else. It records page views and automation
+        signals, and puts nothing on the page.
+      </p>
+      <div class="layout">
+        <section class="card">
+          <h2>Change pages without reloading</h2>
+          <p>These links change the path through the History API, as a single-page app does.</p>
+          <p>
+            <a href="/track/pricing" data-navigate>Pricing</a> ·
+            <a href="/track/tickets/42" data-navigate>Ticket 42</a> ·
+            <a href="/track/" data-navigate>Home</a>
+          </p>
+        </section>
+      </div>
+      <footer>Fieldwork demo · <a href="/plain/">Open the declaration widget example</a></footer>
+    </main>
+  </body>
+</html>

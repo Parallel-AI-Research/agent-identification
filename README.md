@@ -2,9 +2,10 @@
 
 See which AI agents use your product. Your server reports the requests that agents
 sign with Web Bot Auth, which the collector verifies against the signer's published
-keys, and requests whose user agent names an AI agent, which are only signals.
-Nothing is added to your pages, so visitors see nothing, and agent builders install
-nothing.
+keys, and requests whose user agent names an AI agent, which are only signals. A
+page script that draws nothing gives each visit a session with its page views, and
+reports browsers that say they're automated. Visitors see nothing, and agent
+builders install nothing.
 
 An optional declaration widget asks visitors to choose **AI assistant**,
 **Person**, or **Prefer not to say**. Every visitor sees it, people included, so
@@ -45,6 +46,28 @@ In Next.js, put them in `proxy.ts` and pass the URL the visitor asked for, becau
 Next.js rewrites the request's host to `localhost`. The dashboard's install page
 and docs have that example and one for servers in other languages.
 
+## Add the page script
+
+Add one tag to every page. It draws nothing, sets no cookies and needs no secret.
+
+```html
+<script
+  defer
+  src="https://YOUR-COLLECTOR/sdk/v0.6.0/agent-id-track.js"
+  data-site="YOUR-SITE-ID"
+></script>
+```
+
+For each tab it starts a session and records a page view on load and whenever the
+path changes without a reload, with the path only: no query or fragment, and parts
+that look like IDs or email addresses masked. Once per session it reports
+`navigator.webdriver` or a headless Chrome user agent as a signal, never as proof of
+an agent. Turn these off with `data-navigation="off"` or
+`data-automation-signals="off"`, and give a page's route pattern with `data-route`.
+In a bundled app, call `track({ siteId, apiUrl })` from the package once in the
+browser. Failures never change the page; listen for `agent-identification:error`
+on `document` to see them.
+
 ## Add the declaration widget (every visitor sees it)
 
 Ask your collector operator for its URL and a public site ID registered for your
@@ -56,12 +79,15 @@ on servers.
 <div id="visitor-choice"></div>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.5.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.6.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="optional"
 ></script>
 ```
+
+With the page script on the same page, the widget joins its tab session; add
+`data-page-views="off"` so a visit's page view isn't recorded twice.
 
 The script uses its own origin for the API and stylesheet by default. Set
 `data-api` or `data-style` if you host the assets separately. Without `data-target`,
@@ -74,7 +100,7 @@ To require a choice before using a section of the page:
 <form id="checkout"><!-- Your existing form --></form>
 <script
   defer
-  src="https://YOUR-COLLECTOR/sdk/v0.5.0/agent-id.js"
+  src="https://YOUR-COLLECTOR/sdk/v0.6.0/agent-id.js"
   data-site="YOUR-SITE-ID"
   data-target="#visitor-choice"
   data-mode="required"
@@ -106,7 +132,7 @@ The collector serves a versioned npm tarball; npm registry publication is not
 required:
 
 ```sh
-npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.5.0.tgz
+npm install https://YOUR-COLLECTOR/downloads/parallel-research-agent-identification-0.6.0.tgz
 ```
 
 ```js
@@ -211,7 +237,7 @@ For a restrictive Content Security Policy, allow the collector in `script-src`,
 `style-src` and `connect-src`. Use external integration scripts or your existing
 nonce policy. The widget uses an external stylesheet and requires no inline
 script/style exceptions. Its `styleUrl` can point to your own copy of the CSS.
-Versioned asset hashes are at `/sdk/v0.5.0/integrity.json`.
+Versioned asset hashes are at `/sdk/v0.6.0/integrity.json`.
 
 ## Development and operating the collector
 
@@ -225,7 +251,7 @@ npm run dev:collector
 npm run dev:examples
 ```
 
-Open `http://127.0.0.1:4311/plain/` or `/react/`. The local collector is an
+Open `http://127.0.0.1:4311/plain/`, `/react/` or `/track/`. The local collector is an
 in-memory fixture on port 4310. A second website origin on port 4312 exercises
 isolation. Nothing in these demos requires the ticket-management app.
 
@@ -259,10 +285,10 @@ and [integration examples](examples/README.md). Production requires PostgreSQL
 storage and separate secrets per site. Declarations keep the session ID, origin,
 choice and timestamps, plus an agent's own name, provider and purpose when it
 gives them; token/binding values are hashed in storage. Sessions are pruned after
-seven days and activity events after 30. The widget records one page view per page
-load with the path only: no query string or fragment, and segments that look like
-IDs or email addresses masked. Turn it off with `data-page-views="off"` or
-`pageViews: false`. Page titles, page text, screenshots, form contents and raw IP
+seven days and activity events after 30. The page script, and the widget unless
+`data-page-views="off"` or `pageViews: false` is set, record page views with the
+path only: no query string or fragment, and segments that look like IDs or email
+addresses masked. Page titles, page text, screenshots, form contents and raw IP
 addresses are never collected.
 
 The integration tests establish implementation behavior. They do not establish

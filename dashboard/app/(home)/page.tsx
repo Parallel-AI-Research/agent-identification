@@ -6,12 +6,12 @@ const STEPS = [
     text: "Create an account, name your product and list the exact origins it runs on.",
   },
   {
-    title: "Report from your server",
-    text: "Add two calls where your server handles requests, or hand the instructions to your coding agent. Your pages don't change.",
+    title: "Add it to your server and pages",
+    text: "Two calls where your server handles requests, and a script tag that draws nothing. Or hand the instructions to your coding agent.",
   },
   {
     title: "See which agents came",
-    text: "Verified signers, suspected automation and the actions your server confirms, each labelled by its evidence.",
+    text: "Verified signers, suspected automation, the pages each visit viewed and the actions your server confirms, each labelled by its evidence.",
   },
 ];
 const LIMITS = [
@@ -21,12 +21,12 @@ const LIMITS = [
   ],
   [
     "It flags",
-    "Requests whose user agent names an AI agent, or a headless browser. Anyone can send those, so they're signals, not proof.",
+    "User agents that name an AI agent, and browsers that say they're automated. Those can be faked, so they're signals, not proof.",
   ],
   ["It can't tell you", "Who an agent acts for. A signature names its operator, never a person."],
   [
     "It doesn't detect",
-    "Every agent. One that neither signs nor names itself stays unknown, never human.",
+    "Every agent. One that neither signs, names itself nor shows automation stays unknown, never human.",
   ],
 ];
 
@@ -37,9 +37,10 @@ export default function HomePage() {
         See how AI agents use your product
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-fd-muted-foreground">
-        Your server tells the collector about agents in the requests it already receives. Signed
-        agents are checked against their operator&apos;s keys, automation is flagged, and you see
-        what each agent did. Nothing is added to your pages, so visitors see nothing.
+        Your server tells the collector about agents in the requests it already receives, and a page
+        script records each visit&apos;s pages without drawing anything. Signed agents are checked
+        against their operator&apos;s keys, automation is flagged, and you see what each agent did.
+        Visitors see nothing.
       </p>
       <div className="mt-8">
         <Link
@@ -85,9 +86,9 @@ export default function HomePage() {
       <section className="mt-16 rounded-lg border bg-fd-card p-6">
         <h2 className="text-xl font-semibold">Still being built</h2>
         <p className="mt-2 max-w-2xl text-fd-muted-foreground">
-          Server reporting, signature checks, activity and the dashboard work today, and
-          ChatGPT&apos;s cloud browser is the first verified signer. Recording page views without
-          showing visitors anything is next, and the{" "}
+          Server reporting, the page script, signature checks, activity and the dashboard work
+          today, and ChatGPT&apos;s cloud browser is the first verified signer. Measuring how many
+          agents it identifies, against agents we run ourselves, is next, and the{" "}
           <Link className="text-fd-primary underline" href="/changelog">
             changelog
           </Link>{" "}

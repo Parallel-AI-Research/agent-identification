@@ -1,6 +1,6 @@
 # Integration examples
 
-Both examples use the same SDK and collector, with a website origin separate from
+The examples use the same SDK and collector, with a website origin separate from
 the collector origin.
 
 ```sh
@@ -11,14 +11,19 @@ npm run dev:collector
 npm run dev:examples
 ```
 
-- Script installation: <http://127.0.0.1:4311/plain/>
+- Page script, which draws nothing: <http://127.0.0.1:4311/track/>
+- Script installation of the declaration widget: <http://127.0.0.1:4311/plain/>
 - React package: <http://127.0.0.1:4311/react/>
 - Second website origin for isolation tests: <http://127.0.0.1:4312/plain/>
 
 The local collector uses an in-memory fixture and `demo-site`. Nothing persists
 after it stops. Its known test secret is not suitable for a deployed site.
 
-The script example boots directly from the script tag in `plain/index.html`.
+The page script example has only the script tag in `track/index.html`;
+`track/demo.js` changes the path with the History API, as a single-page app does,
+so each change records a page view.
+
+The widget's script example boots directly from the script tag in `plain/index.html`.
 `plain/demo.js` adds the example form and lifecycle controls. It is not required
 to display the widget. The React example imports the package's `/react` export;
 the build bundles it with React for a self-contained browser demonstration.
