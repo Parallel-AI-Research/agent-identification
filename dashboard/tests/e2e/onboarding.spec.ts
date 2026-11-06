@@ -1,5 +1,5 @@
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
@@ -133,10 +133,13 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
 
   // The customer's own server on its own origin, running the server package the way the
   // snippet does. It waits for the reports here only so the test doesn't race them.
+  const agentId = { apiUrl: COLLECTOR, siteId: siteId!, secret };
+  // Vercel builds dashboard/ without the rest of the repository, so the package's own types
+  // aren't there to import.
+  type Report = (request: IncomingMessage, options: typeof agentId) => Promise<unknown>;
   const sdk = (await import(
     pathToFileURL(path.resolve(process.cwd(), "../dist/server/index.js")).href
-  )) as typeof import("../../../src/server/index");
-  const agentId = { apiUrl: COLLECTOR, siteId: siteId!, secret };
+  )) as { reportSignedRequest: Report; reportRequestSignals: Report };
   let pageHtml = "<!doctype html><title>Site</title>";
   const serve = (port: number, report: boolean) => {
     const website = createServer(async (request, response) => {
