@@ -25,7 +25,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [x] Owner dashboard (`feat-007`) done on 4 November, once a browser test covered its error state. It was deployed on 3 November, and the test changes no product behaviour.
 - [x] Corrected the Next.js example in the Signed agents docs on 4 November. It now uses `proxy.ts` and passes the visitor's URL, and it verified a signed request on Next.js 16 and 15.5.
 - [x] `/downloads/release.json` is cached for five minutes instead of a year, because it names the current version. Versioned tarballs and SDK files stay immutable. It went live with the collector redeploy on 4 November, and a cache may still hold the 0.1.0 manifest it stored earlier.
-- [x] The default install reports from the customer's server and adds nothing to the page, on 5 November at the owner's choice. Status counts an accepted server report, the coding-agent instructions set up server reporting, and the widget moved behind a warning that every visitor sees it. Its migration and the collector went live on 6 November. The dashboard's deploy failed its type check on Vercel, so the live dashboard stays on its previous version until the fix below is merged and deployed.
+- [x] The default install reports from the customer's server and adds nothing to the page, on 5 November at the owner's choice. Status counts an accepted server report, the coding-agent instructions set up server reporting, and the widget moved behind a warning that every visitor sees it. It went live on 6 November: the migration, then the collector, then the dashboard after the fix below.
 - [x] CI runs the dashboard journeys against a local Supabase stack, in Chromium and WebKit. Browser jobs run in Playwright's image, because installing browser system packages from Ubuntu's mirror took 21 to 35 minutes when it was slow. CI runs once per pull request push, cancels superseded runs and has job timeouts.
 - [x] The dashboard's CI job checks out `dashboard/` alone, as Vercel builds it. A test that imported types from outside `dashboard/` passed CI but failed the dashboard deploy on 6 November.
 
@@ -38,13 +38,12 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 
 ### What's Next
 
-1. Deploy the dashboard with the server-first install. Its migration and the collector are live.
-2. Build the script that records page views and automation signals without drawing anything (SDK 0.6.0), so server-only installs get sessions.
-3. Install on a real customer site and mark `feat-003` done.
-4. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
-5. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
-6. Verify a CDN verdict for `feat-012`.
-7. Plan `feat-009`'s test matrix and baseline run, now that the target is measured against agents we run ourselves.
+1. Build the script that records page views and automation signals without drawing anything (SDK 0.6.0), so server-only installs get sessions.
+2. Install on a real customer site and mark `feat-003` done.
+3. Decide when to clear the old collector data and retire its settings, as listed under risks. This now includes the unused hosted `public-demo` site.
+4. Run the pilot's hosted checks, including a new-account onboarding, and record them in `feat-010`.
+5. Verify a CDN verdict for `feat-012`.
+6. Plan `feat-009`'s test matrix and baseline run, now that the target is measured against agents we run ourselves.
 
 ## Blockers / Risks
 
@@ -53,7 +52,7 @@ SDK `0.5.0` is published and frozen in `releases/v0.5.0/`, and published `0.1.0`
 - [ ] **Encryption key**: losing `AGENT_ID_ENCRYPTION_KEY` loses every site secret, so it needs a private backup.
 - [ ] **Hosted email**: Supabase's built-in sender is heavily rate limited and may only reach organisation members, so external testers need custom SMTP.
 - [ ] **Offline receipt checks during rotation**: a server on the new secret can't check a receipt signed with the old one, and the reverse. Online verification from a bound session works throughout.
-- [ ] **The widget shows to every visitor**: 0.1.0 and 0.5.0 put a visible prompt in front of people, which conflicts with the agents-only goal. Once the server-first dashboard deploys, the dashboard, docs and coding-agent instructions only offer it as an opt-in that says so. Until then, the live install flow still adds it.
+- [ ] **The widget shows to every visitor**: 0.1.0 and 0.5.0 put a visible prompt in front of people, which conflicts with the agents-only goal. Since 6 November the dashboard, docs and coding-agent instructions only offer it as an opt-in that says so, but installs that already added it still show it.
 - [ ] **Server-only installs have no sessions**: server reports carry no session, so the Activity page counts them apart and lists no sessions until the script in SDK 0.6.0 gives these installs sessions.
 - [ ] **`feat-009` targets**: the owner's goal is 90–100% identification, measured against agents we run ourselves across the test matrix, each kind reported separately. No website-only method can promise that share of every agent, because an agent that only reads screenshots sees exactly what a person sees. The numbers are set after a baseline run, before anything is shown to a customer.
 - [ ] **Web Bot Auth coverage**: signing is voluntary. The confirmed signers are cloud browsers such as ChatGPT Work's, and we found no sign that agents acting through a person's own browser sign, so their sessions stay unverified. Even ChatGPT signs only from its cloud browser: two of its three visits on 4 November arrived unsigned. See `docs/web-bot-auth.md`. The share of agent traffic that signs needs measuring with real traffic.
