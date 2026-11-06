@@ -1,0 +1,15 @@
+---
+title: A page script that draws nothing
+description: Each visit now gets a session with the pages it viewed, and visitors still see nothing.
+date: 2026-11-06
+---
+
+SDK 0.6.0 adds a page script, the second part of the default install. Add one tag to every page, and each visit gets a session with the pages it viewed, so you can see what an agent looked at. It also reports a browser that says it's automated, which many agents running a browser in the cloud do.
+
+It draws nothing, sets no cookies, and sends only paths, with IDs and email addresses masked. It records a single-page app's page changes on its own. See [the page script](/docs/install#the-page-script).
+
+Status on your product page now says when your pages last reported from each origin, next to when your server last reported, and tells you which part hasn't reported yet.
+
+The declaration widget's snippets now leave page views to the page script. When both are on a page, they share the tab's session, so a visitor's answer sits next to their page views.
+
+Your server's reports don't join the page script's sessions yet, so the Activity page still counts them apart.

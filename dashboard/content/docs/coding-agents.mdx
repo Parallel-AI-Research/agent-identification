@@ -11,15 +11,16 @@ The instructions are generated for your product. They include your site ID, the 
 
 1. Finds where your server handles requests: middleware, a request hook, or Next.js's `proxy.ts`.
 2. Adds the two reporting calls there, without changing how any request is handled.
-3. Asks you to set `AGENT_ID_SITE_SECRET` yourself.
-4. Requests a page as a headless browser and asks you to check that **Status** says **Receiving events**.
-5. Tells you which files it changed and what it checked.
+3. Adds the [page script](/docs/install#the-page-script) to your shared layout or template, so every page has it.
+4. Asks you to set `AGENT_ID_SITE_SECRET` yourself.
+5. Opens a page, requests one as a headless browser, and asks you to check that **Status** says **Receiving events**.
+6. Tells you which files it changed and what it checked.
 
-The instructions tell it not to add anything to your pages, including the [declaration widget](/docs/declaration-widget), because every visitor would see it.
+The instructions tell it to add only the page script to your pages, and not the [declaration widget](/docs/declaration-widget), because every visitor would see the widget.
 
 ## What to check yourself
 
-- **Nothing changed on your pages.** Visitors shouldn't see anything new.
+- **Nothing changed on your pages.** Visitors shouldn't see anything new. The only addition is the page script's tag.
 - **Your server secret isn't in the code.** It should only ever come from an environment variable that you set.
 - **The reports don't hold up your responses.** Both calls run in the background.
 

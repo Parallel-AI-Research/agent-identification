@@ -2,7 +2,7 @@ export interface InstallValues {
   siteId: string;
   collectorUrl: string;
 }
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 
 function packageUrl(collectorUrl: string): string {
   return `${collectorUrl}/downloads/parallel-research-agent-identification-${VERSION}.tgz`;
@@ -71,7 +71,36 @@ curl ${collectorUrl}/v1/signals \\
   -d '{"siteId":"${siteId}","signals":[{"id":"<a new UUID>","signal":"agent_user_agent","detail":"ChatGPT-User","occurredAt":"<now, ISO 8601>"}]}'`;
 }
 
-/** The opt-in declaration widget, which every visitor sees. */
+/** The page script draws nothing. It gives each visit a session with its page views. */
+export function pageScriptSnippet({ siteId, collectorUrl }: InstallValues): string {
+  return `<script
+  defer
+  src="${collectorUrl}/sdk/v${VERSION}/agent-id-track.js"
+  data-site="${siteId}"
+></script>`;
+}
+
+export function nextPageScriptSnippet({ siteId, collectorUrl }: InstallValues): string {
+  return `// app/layout.tsx
+import Script from "next/script";
+
+// Inside <body>, after {children}:
+<Script src="${collectorUrl}/sdk/v${VERSION}/agent-id-track.js" data-site="${siteId}" />`;
+}
+
+export function trackSnippet({ siteId, collectorUrl }: InstallValues): string {
+  return `npm install ${packageUrl(collectorUrl)}
+
+import { track } from "@parallel-research/agent-identification";
+
+// Once, in the browser, when your app starts.
+track({ siteId: "${siteId}", apiUrl: "${collectorUrl}" });`;
+}
+
+/**
+ * The opt-in declaration widget, which every visitor sees. It shares the tab's session with the
+ * page script, which already records page views, so the widget's own are off.
+ */
 export function scriptSnippet({ siteId, collectorUrl }: InstallValues): string {
   return `<div id="visitor-choice"></div>
 <script
@@ -80,6 +109,7 @@ export function scriptSnippet({ siteId, collectorUrl }: InstallValues): string {
   data-site="${siteId}"
   data-target="#visitor-choice"
   data-mode="optional"
+  data-page-views="off"
 ></script>`;
 }
 
@@ -93,6 +123,8 @@ const widget = init({
   siteId: "${siteId}",
   apiUrl: "${collectorUrl}",
   mode: "optional",
+  // The page script records page views.
+  pageViews: false,
 });
 await widget.ready;`;
 }
@@ -107,6 +139,7 @@ export function VisitorChoice() {
       siteId="${siteId}"
       apiUrl="${collectorUrl}"
       mode="optional"
+      pageViews={false}
     />
   );
 }`;
@@ -148,7 +181,7 @@ export function checkCommand(origin: string): string {
  * values, so the prompt is safe to share with any tool.
  */
 export function agentPrompt(values: InstallValues, origins: string[], docsUrl: string): string {
-  return `Add Agent Identification's server reporting to this project. It tells me which AI agents use the site, from the requests my server already receives. Nothing is added to the pages, and visitors see nothing.
+  return `Add Agent Identification to this project. It tells me which AI agents use the site: my server reports the requests agents make, and a page script that draws nothing records each visit's pages. Visitors see nothing.
 
 Install details:
 - Site ID: ${values.siteId}
@@ -167,12 +200,21 @@ ${nodeSnippet(values)}
 
 4. If it isn't Node.js, send the same reports with an HTTP client, as in the docs: ${docsUrl}
 
-5. Ask me to set AGENT_ID_SITE_SECRET myself. Then, with the site running, request a page as a headless browser, at its local address if it isn't deployed yet, and tell me to check that the dashboard's Status says Receiving events:
+5. Add the page script to every page, through the shared layout or template. In a Next.js app, put it in the root layout:
+
+${nextPageScriptSnippet(values)}
+
+Anywhere else, add this tag to the shared template:
+
+${pageScriptSnippet(values)}
+
+6. Ask me to set AGENT_ID_SITE_SECRET myself. Then, with the site running, open a page in a browser and request one as a headless browser, at its local address if it isn't deployed yet. Tell me to check that the dashboard's Status says Receiving events and lists both:
 
 ${checkCommand(origins[0] ?? "https://your-site.example")}
 
 Rules:
-- Don't add anything to the pages, and don't add the declaration widget. Every visitor would see it.
+- Add only the page script to the pages. Don't add the declaration widget: every visitor would see it.
+- If the site sends a Content Security Policy, allow ${values.collectorUrl} in script-src and connect-src.
 - Never commit the secret or put it in browser code. Read it from the AGENT_ID_SITE_SECRET environment variable.
 - The site ID is public, so it's safe to commit.
 - Don't wait for the reports before responding, and don't change how any request is handled.

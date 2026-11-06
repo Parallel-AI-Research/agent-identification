@@ -9,6 +9,8 @@ const allowedPaths = new Map([
   ["/react/app.js", ["examples/react/app.js", "text/javascript"]],
   ["/plain/", ["examples/plain/index.html", "text/html"]],
   ["/react/", ["examples/react/index.html", "text/html"]],
+  ["/track/", ["examples/track/index.html", "text/html"]],
+  ["/track/demo.js", ["examples/track/demo.js", "text/javascript"]],
 ]);
 for (const port of [4311, 4312]) {
   createServer(async (req, res) => {

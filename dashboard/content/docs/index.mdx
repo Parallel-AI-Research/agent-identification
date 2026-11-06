@@ -1,14 +1,15 @@
 ---
 title: Introduction
-description: See which AI agents use your product, reported by your own server, with nothing added to your pages.
+description: See which AI agents use your product, reported by your own server and a page script that draws nothing.
 ---
 
-Agent analytics helps you understand how AI agents use your product. Your server tells the collector about the requests it already receives, and your dashboard shows which agents came and what they did. Nothing is added to your pages, so your visitors see nothing, and agent builders install nothing.
+Agent analytics helps you understand how AI agents use your product. Your server tells the collector about the requests it already receives, a page script that draws nothing records each visit's pages, and your dashboard shows which agents came and what they did. Your visitors see nothing, and agent builders install nothing.
 
 ## What you get today
 
 - **Signed agents, verified.** Some agents sign their requests with [Web Bot Auth](/docs/signed-agents). The collector checks each signature against the keys its operator publishes, so a verified visit names the company running the agent.
-- **Automation signals.** A request whose user agent names an AI agent, such as `ChatGPT-User` or `ClaudeBot`, or a headless browser, is recorded as [suspected automation](/docs/activity#automation-signals).
+- **Automation signals.** A request whose user agent names an AI agent, such as `ChatGPT-User` or `ClaudeBot`, or a browser that says it's automated or headless, is recorded as [suspected automation](/docs/activity#automation-signals).
+- **Page views.** The [page script](/docs/install#the-page-script) gives each visit a session with the pages it viewed, so you can see what an agent looked at.
 - **Actions.** Your server can report what visitors did, such as an order placed or a message sent, and whether it succeeded.
 - **A dashboard** for your products, environments, origins, domains and secrets, with an [Activity](/docs/activity) page for each environment.
 
@@ -16,7 +17,7 @@ There's also an optional [declaration widget](/docs/declaration-widget) that ask
 
 ## Evidence, not proof
 
-A verified signature identifies an agent's operator, never the person or account it acts for. A user agent is only a claim, because anyone can send one. An agent that neither signs nor names itself stays unknown, and unknown never means human. Read [what it can't do](/docs/limits) before you rely on it.
+A verified signature identifies an agent's operator, never the person or account it acts for. A user agent or an automated browser is only a signal, because anyone can fake one. An agent that does none of these stays unknown, and unknown never means human. Read [what it can't do](/docs/limits) before you rely on it.
 
 ## Next steps
 

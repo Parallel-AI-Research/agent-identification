@@ -1,9 +1,9 @@
 ---
 title: Install
-description: Report agents from your server, with nothing added to your pages.
+description: Report agents from your server, and add a page script that draws nothing.
 ---
 
-Your server reports agents from the requests it already receives, and your pages stay as they are. Your product page in the dashboard has these snippets with your own site ID filled in. The site ID is public, so it's safe to commit.
+An install has two parts, and visitors see neither. Your server reports agents from the requests it already receives, and [the page script](#the-page-script) records each visit's pages without drawing anything. Your product page in the dashboard has these snippets with your own site ID filled in. The site ID is public, so it's safe to commit.
 
 Every report needs your server secret, so set `AGENT_ID_SITE_SECRET` wherever your server runs. Never put it in browser code.
 
@@ -17,7 +17,7 @@ Both skip ordinary requests without a network call, as well as scripts, styles a
 ## Next.js
 
 ```sh
-npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.5.0.tgz
+npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.6.0.tgz
 ```
 
 Add this to `proxy.ts`, which runs on Node.js. If you already have one, add the lines to its function. Its `matcher`, if it has one, decides which requests are checked.
@@ -94,16 +94,68 @@ curl https://parallel-agent-identification.vercel.app/v1/signals \
 
 The tokens the Node.js package looks for are `ChatGPT-User`, `OAI-SearchBot`, `GPTBot`, `Claude-User`, `Claude-SearchBot`, `ClaudeBot`, `Perplexity-User`, `PerplexityBot`, `MistralAI-User` and `DuckAssistBot`. A headless browser is `headless_browser` with the detail `HeadlessChrome`.
 
+## The page script
+
+The page script draws nothing and needs no secret. Add it to every page, through your shared layout or template:
+
+```html
+<script
+  defer
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.6.0/agent-id-track.js"
+  data-site="YOUR-SITE-ID"
+></script>
+```
+
+In a Next.js app, add it to your root layout, inside `<body>`:
+
+```tsx
+// app/layout.tsx
+import Script from "next/script";
+
+<Script
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.6.0/agent-id-track.js"
+  data-site="YOUR-SITE-ID"
+/>;
+```
+
+In a bundled app, call `track()` once in the browser, from the same package your server uses:
+
+```ts
+import { track } from "@parallel-research/agent-identification";
+
+track({ siteId: "YOUR-SITE-ID", apiUrl: "https://parallel-agent-identification.vercel.app" });
+```
+
+For each tab, it starts a session and records:
+
+- **A page view for every page.** It records one when the page loads, and again whenever the path changes without a reload, as it does in a single-page app. Only the path is sent, with parts that look like IDs or email addresses masked. Query strings and fragments are never sent.
+- **Automation the browser shows,** once per session: `navigator.webdriver`, which automation tools such as Playwright and Selenium set, and a headless Chrome user agent. These are [signals](/docs/activity#automation-signals), not proof that an AI agent is there.
+
+The session lasts 30 minutes and is kept in the tab's `sessionStorage`. The script sets no cookies, and it collects no page titles, page text, form contents or IP addresses. It only reports from your product's origins: a page anywhere else is refused, and Status tells you.
+
+Options, as attributes on the script tag or as options to `track()`:
+
+| Attribute                       | Option                     | What it does                                                                                                        |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `data-route="/tickets/:id"`     | `route`                    | Your route pattern for this page, for parts masking can't catch.                                                    |
+| `data-navigation="off"`         | `navigation: false`        | Stops recording path changes without a reload. Call `pageView()` on the tracker `track()` returns yourself instead. |
+| `data-automation-signals="off"` | `automationSignals: false` | Stops reporting automation the browser shows.                                                                       |
+| `data-storage="memory"`         | `storage: "memory"`        | Keeps the session in memory only, so each page load starts a new one.                                               |
+
+If your site sends a Content Security Policy, allow `https://parallel-agent-identification.vercel.app` in `script-src` and `connect-src`. When the script can't reach the collector, the page doesn't change. Listen for `agent-identification:error` on `document` to see why.
+
+If you also use the [declaration widget](/docs/declaration-widget), it shares the tab's session, so a visitor's answer sits next to their page views. Its snippets leave page views to the page script.
+
 ## Check it works
 
-Your server only reports agents, so request a page as a headless browser:
+Open a page that has the page script. Your server only reports agents, so request a page as a headless browser:
 
 ```sh
 curl -A "HeadlessChrome/1.0 (install check)" https://your-site.example/
 ```
 
-**Status** on your product page then says **Receiving events** and when your server last reported. See [troubleshooting](/docs/troubleshooting) if it doesn't.
+**Status** on your product page then says **Receiving events**, when your server last reported, and when your pages last reported from each origin. See [troubleshooting](/docs/troubleshooting) if it doesn't.
 
 ## What it doesn't see
 
-Server reporting sees what your server receives. An agent that neither signs nor names itself, such as one working through a person's own browser, looks like any other visitor and stays unknown. Reports that carry no session are counted on the Activity page apart from sessions.
+An agent that neither signs, names itself nor shows automation, such as one working through a person's own browser, looks like any other visitor and stays unknown. Your server's reports don't carry the page script's session yet, so the Activity page counts them apart from sessions.

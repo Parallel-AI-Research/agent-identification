@@ -1,5 +1,5 @@
 /** Shared wire protocol. Classifications are always self-reported. */
-export const VERSION = "0.5.0";
+export const VERSION = "0.6.0";
 export const CHOICES = ["ai_assistant", "person", "prefer_not_to_say"] as const;
 export type Choice = (typeof CHOICES)[number];
 export type Mode = "optional" | "required";

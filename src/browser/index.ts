@@ -4,14 +4,33 @@ import {
   isRoutePattern,
   routePath,
   type Choice,
-  type Signal,
   type CreatedSession,
   type Mode,
   type RecordedDeclaration,
   type SessionStatus,
 } from "../protocol.js";
+import {
+  HttpError,
+  asError,
+  automationSignals,
+  confirmed,
+  endpoint,
+  futureDate,
+  loadSession,
+  opaque,
+  pageOrigin,
+  persistSession,
+  record,
+  send,
+  sessionToken,
+  siteId,
+  storageKey,
+  uuid,
+  type StoredSession,
+} from "./shared.js";
 
 export type { Choice, Mode, RecordedDeclaration, SessionStatus };
+export { track, type Tracker, type TrackerOptions } from "./track.js";
 
 export interface WidgetOptions {
   container: HTMLElement | string;
@@ -65,28 +84,13 @@ interface Configuration {
   automationSignals: boolean;
 }
 
-interface StoredSession {
-  token: string;
-  sessionId: string;
-  expiresAt: string;
-}
-
 const instances = new WeakMap<HTMLElement, Controller>();
 const gates = new WeakMap<HTMLElement, Controller>();
-const memorySessions = new Map<string, StoredSession>();
 const labels: Record<Choice, string> = {
   ai_assistant: "AI assistant",
   person: "Person",
   prefer_not_to_say: "Prefer not to say",
 };
-const requestTimeoutMs = 15_000;
-
-class HttpError extends Error {
-  constructor(readonly status: number) {
-    super(`Identification service returned HTTP ${status}.`);
-    this.name = "HttpError";
-  }
-}
 
 function element(value: HTMLElement | string, name: string): HTMLElement {
   const found = typeof value === "string" ? document.querySelector(value) : value;
@@ -96,45 +100,18 @@ function element(value: HTMLElement | string, name: string): HTMLElement {
   return found;
 }
 
-function endpoint(value: string, name: string): string {
-  let url: URL;
-  try {
-    url = new URL(value, window.location.href);
-  } catch {
-    throw new Error(`${name} must be a valid URL.`);
-  }
-  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  if (
-    (url.protocol !== "https:" && !(url.protocol === "http:" && local)) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  ) {
-    throw new Error(
-      `${name} must use HTTPS (or localhost HTTP), without credentials, query or fragment.`,
-    );
-  }
-  return url.href.replace(/\/$/, "");
-}
-
 function configure(options: WidgetOptions): Configuration {
   const container = element(options.container, "container");
   const gate = options.gate === undefined ? undefined : element(options.gate, "gate");
   const apiUrl = endpoint(options.apiUrl, "apiUrl");
   const mode = options.mode ?? "optional";
   const storage = options.storage ?? "session";
-  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(options.siteId)) {
-    throw new Error("siteId must contain 1–100 letters, numbers, underscores or hyphens.");
-  }
   if (mode !== "optional" && mode !== "required") throw new Error("Invalid identification mode.");
   if (storage !== "session" && storage !== "memory") throw new Error("Invalid storage option.");
   if (gate && (gate === container || gate.contains(container))) {
     throw new Error("The gate must not contain the identification widget.");
   }
-  if (window.location.origin === "null") {
-    throw new Error("Serve this website over HTTPS (or localhost HTTP) to use identification.");
-  }
+  const origin = pageOrigin();
   if (options.route !== undefined && !isRoutePattern(options.route)) {
     throw new Error("route must be a path pattern such as /tickets/:id.");
   }
@@ -142,8 +119,8 @@ function configure(options: WidgetOptions): Configuration {
     container,
     gate,
     apiUrl,
-    siteId: options.siteId,
-    origin: window.location.origin,
+    siteId: siteId(options.siteId),
+    origin,
     mode,
     storage,
     styleUrl: endpoint(options.styleUrl ?? `${apiUrl}/sdk/v${VERSION}/agent-id.css`, "styleUrl"),
@@ -161,39 +138,6 @@ function sameConfiguration(left: Configuration, right: Configuration): boolean {
     if ((key === "onRecorded" || key === "onError") && right[key] === undefined) return true;
     return left[key] === right[key];
   });
-}
-
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function opaque(value: unknown, min = 1, max = 512): value is string {
-  return (
-    typeof value === "string" &&
-    value.length >= min &&
-    value.length <= max &&
-    /^[A-Za-z0-9._~-]+$/.test(value)
-  );
-}
-
-function uuid(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-  );
-}
-
-function sessionToken(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Za-z0-9_-]{32,512}$/.test(value);
-}
-
-function futureDate(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
-    Number.isFinite(Date.parse(value)) &&
-    Date.parse(value) > Date.now()
-  );
 }
 
 function validateStatus(
@@ -231,28 +175,6 @@ function validateStatus(
     eventId: value.eventId as string | null,
     evidence: "self_reported",
   };
-}
-
-function readStored(value: unknown): StoredSession | null {
-  if (
-    !record(value) ||
-    !sessionToken(value.token) ||
-    !uuid(value.sessionId) ||
-    !futureDate(value.expiresAt)
-  ) {
-    return null;
-  }
-  return { token: value.token, sessionId: value.sessionId, expiresAt: value.expiresAt };
-}
-
-async function storageKey(config: Configuration, context: string | undefined): Promise<string> {
-  const scope = JSON.stringify([config.apiUrl, config.siteId, config.origin, context ?? null]);
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(scope));
-  return `parallel-agent-id:v1:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function asError(value: unknown): Error {
-  return value instanceof Error ? value : new Error("Identification request failed.");
 }
 
 class Controller implements Widget {
@@ -404,82 +326,15 @@ class Controller implements Widget {
   }
 
   private load(): StoredSession | null {
-    if (!this.key) return null;
-    let found = memorySessions.get(this.key) ?? null;
-    if (this.config.storage === "session") {
-      try {
-        const serialized = sessionStorage.getItem(this.key);
-        found = serialized ? readStored(JSON.parse(serialized)) : found;
-        if (serialized && !found) sessionStorage.removeItem(this.key);
-      } catch {
-        // Storage can be disabled or corrupted. The server still validates all restored tokens.
-      }
-    }
-    return readStored(found);
+    return this.key ? loadSession(this.key, this.config.storage) : null;
   }
 
   private persist(value: StoredSession | null): void {
-    if (!this.key) return;
-    for (const [key, stored] of memorySessions) {
-      if (!futureDate(stored.expiresAt)) memorySessions.delete(key);
-    }
-    if (value) memorySessions.set(this.key, { ...value });
-    else memorySessions.delete(this.key);
-    if (this.config.storage === "session") {
-      try {
-        if (value) sessionStorage.setItem(this.key, JSON.stringify(value));
-        else sessionStorage.removeItem(this.key);
-      } catch {
-        // An in-memory session remains usable when browser storage is blocked.
-      }
-    }
+    if (this.key) persistSession(this.key, this.config.storage, value);
   }
 
-  private async request(
-    path: string,
-    method: string,
-    body?: unknown,
-    token?: string,
-  ): Promise<unknown> {
-    const operation = this.controller.signal;
-    const request = new AbortController();
-    const abort = () => request.abort();
-    operation.addEventListener("abort", abort, { once: true });
-    if (operation.aborted) request.abort();
-    const timeout = setTimeout(() => request.abort(), requestTimeoutMs);
-    try {
-      const response = await fetch(`${this.config.apiUrl}${path}`, {
-        method,
-        headers: {
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-          ...(token
-            ? { Authorization: `Bearer ${token}`, "X-Agent-Site": this.config.siteId }
-            : {}),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        credentials: "omit",
-        cache: "no-store",
-        mode: "cors",
-        referrerPolicy: "no-referrer",
-        signal: request.signal,
-      });
-      if (!response.ok) throw new HttpError(response.status);
-      if (method === "DELETE") {
-        if (response.status !== 204) throw new Error("Session revocation was not confirmed.");
-        return null;
-      }
-      if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
-        throw new Error("Identification service did not return JSON.");
-      }
-      return await response.json();
-    } catch (error) {
-      if (request.signal.aborted && !operation.aborted)
-        throw new Error("Identification service timed out. Please retry.", { cause: error });
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-      operation.removeEventListener("abort", abort);
-    }
+  private request(path: string, method: string, body?: unknown, token?: string): Promise<unknown> {
+    return send(this.config, this.controller.signal, path, method, body, token);
   }
 
   private async start(version: number): Promise<SessionStatus> {
@@ -601,16 +456,8 @@ class Controller implements Widget {
       try {
         if (!session) throw new Error("Identification session is not ready.");
         const body = await this.request(path, "POST", payload, session.token);
-        const confirmed =
-          record(body) &&
-          Array.isArray(body.results) &&
-          body.results.some(
-            (result: unknown) =>
-              record(result) &&
-              result.id === id &&
-              (result.status === "recorded" || result.status === "duplicate"),
-          );
-        if (!confirmed) throw new Error(`Identification service did not confirm the ${what}.`);
+        if (!confirmed(body, id))
+          throw new Error(`Identification service did not confirm the ${what}.`);
         return;
       } catch (error) {
         // A reset or destroy supersedes it; it belongs to the session that ended.
@@ -631,13 +478,7 @@ class Controller implements Widget {
 
   /** Opt-in: what this browser shows of automation, as evidence and never as identity. */
   private async reportSignals(): Promise<void> {
-    const found: { signal: Signal; detail: string }[] = [];
-    if (navigator.webdriver === true)
-      found.push({ signal: "webdriver", detail: "navigator.webdriver" });
-    if (/HeadlessChrome\//.test(navigator.userAgent)) {
-      found.push({ signal: "headless_browser", detail: "HeadlessChrome" });
-    }
-    for (const signal of found) {
+    for (const signal of automationSignals()) {
       const event = { id: crypto.randomUUID(), ...signal, occurredAt: new Date().toISOString() };
       await this.deliver("/v1/browser-signals", { signals: [event] }, event.id, "signal");
     }

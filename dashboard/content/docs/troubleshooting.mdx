@@ -7,10 +7,18 @@ description: What to check when something doesn't show up, and how to remove an 
 
 Start with **Status** on the product page. It only changes on what the collector actually received.
 
-- **Waiting for installation:** the collector hasn't accepted a report from your server. Your server only reports agents, so request a page as a headless browser with `curl -A "HeadlessChrome/1.0 (install check)" https://your-site.example/`, then check again. If it still waits, check that the reporting code runs for that request, that `AGENT_ID_SITE_SECRET` is set where your server runs, and that you're looking at the right environment. Each helper resolves to `failed` with a reason instead of throwing, so pass `onError` to log it.
-- **A page tried to load the widget, but this environment doesn't allow that origin:** this only applies to the [declaration widget](/docs/declaration-widget). Add the origin under **Website origins** if the site is yours. Origins must match exactly, so `https://www.example.com` and `https://example.com` are different.
+- **Waiting for installation:** nothing from your server or your pages has reached the collector. Open a page that has the page script. Your server only reports agents, so request a page as a headless browser with `curl -A "HeadlessChrome/1.0 (install check)" https://your-site.example/`, then check again.
+- **Your server hasn't reported yet:** check that the reporting code runs for that request, that `AGENT_ID_SITE_SECRET` is set where your server runs, and that you're looking at the right environment. Each helper resolves to `failed` with a reason instead of throwing, so pass `onError` to log it.
+- **No page has reported yet:** check that the page script's tag is on the page you opened, with your site ID, and see [the page script doesn't report](#the-page-script-doesnt-report).
+- **A page tried to report to this environment, but it doesn't allow that origin:** add the origin under **Website origins** if the site is yours. Origins must match exactly, so `https://www.example.com` and `https://example.com` are different.
 - **A server request used a secret this environment doesn't accept:** check `AGENT_ID_SITE_SECRET` against the current secret. After a rotation, the old one works for 24 hours.
 - **The widget sent a binding context the collector couldn't verify:** your server signed it with an old secret, or it expired. Contexts last up to 15 minutes.
+
+## The page script doesn't report
+
+- **Content Security Policy:** allow the collector in `script-src` and `connect-src`.
+- **The page receives an `agent-identification:error` event** on `document`, with the reason in `event.detail.message`. The page itself never shows an error.
+- **Another environment:** the script reports to the environment whose site ID is in `data-site`.
 
 ## The widget doesn't appear
 
@@ -20,15 +28,15 @@ Start with **Status** on the product page. It only changes on what the collector
 ## Page views, actions or signed agents are missing
 
 - **Signed requests that fail as signed for another site:** something in front of your server changed the request's host. Pass the URL the visitor asked for as `url`, as the [Next.js example](/docs/install#nextjs) does.
-- **Page views** come from the declaration widget, so they need it installed, with SDK 0.4.0 or later, and stop when `data-page-views="off"` is set.
-- **Actions** only join a session when `sessionBinding` matches the binding your server put in the widget's binding context. Without one, they're counted as actions without a session.
+- **Page views** come from the [page script](/docs/install#the-page-script), or from the declaration widget when its page views are on. A single-page app's path changes are recorded when it uses the History API; otherwise call `pageView()`.
+- **Actions** only join a session when `sessionBinding` matches the binding your server put in the widget's binding context. Without one, they're counted as actions without a session, and the page script's sessions don't have a binding yet.
 - **Signed agents** need your server to report signed requests. An **Unknown signer** result means the agent isn't on the allowlist yet; it's still recorded.
 - Every helper resolves to `failed` with a reason instead of throwing. Pass `onError` to log it.
 
 ## Uninstalling
 
 1. Remove `reportSignedRequest()`, `reportRequestSignals()` and `reportAction()` from your server, and delete `AGENT_ID_SITE_SECRET`.
-2. If you added the declaration widget, remove its snippet or `init()` call from your pages.
+2. Remove the page script's tag or `track()` call from your pages, and the declaration widget's snippet or `init()` call if you added it.
 3. To stop every install of a product at once, delete it at the bottom of its page. Installs stop within 30 seconds, and you can restore it from **Recently deleted** on **Your products** for 30 days. Restoring brings back the same secret, so rotate it if it may have leaked.
 4. To remove the data too, choose **Delete now** under **Recently deleted**, or wait 30 days. Either removes its environments, site IDs and secrets, and everything they recorded, and it can't be undone.
 

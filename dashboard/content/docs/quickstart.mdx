@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Go from a new account to your server's first report.
+description: Go from a new account to your first reports.
 ---
 
 You can read these docs without an account. You'll need one to add a product, because each site ID belongs to its owner.
@@ -20,7 +20,7 @@ The dashboard shows your server secret once. Save it somewhere private, then set
 Your product page has snippets with your own site ID. Install the package:
 
 ```sh
-npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.5.0.tgz
+npm install https://parallel-agent-identification.vercel.app/downloads/parallel-research-agent-identification-0.6.0.tgz
 ```
 
 Then add two calls where your server handles requests. In Next.js, that's `proxy.ts`:
@@ -50,23 +50,37 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
 
 Both calls skip ordinary requests without a network call, and neither throws or slows the response. See [Install](/docs/install) for other Node.js servers and for any other language, or hand the job to your [coding agent](/docs/coding-agents).
 
-## 4. Check it works
+## 4. Add the page script
 
-Your server only reports agents, so make a request that looks like one. With your site running, request a page as a headless browser, at its local address if it isn't deployed yet:
+Add this tag to every page, through your shared layout or template. It draws nothing. It gives each visit a session with its page views, and reports a browser that shows automation, so you can see what an agent did on your site.
+
+```html
+<script
+  defer
+  src="https://parallel-agent-identification.vercel.app/sdk/v0.6.0/agent-id-track.js"
+  data-site="YOUR-SITE-ID"
+></script>
+```
+
+In a Next.js app, put it in your root layout with `next/script`. See [the page script](/docs/install#the-page-script) for that, for bundled apps, and for its options.
+
+## 5. Check it works
+
+Open a page that has the page script. Then, because your server only reports agents, make a request that looks like one. With your site running, request a page as a headless browser, at its local address if it isn't deployed yet:
 
 ```sh
 curl -A "HeadlessChrome/1.0 (install check)" https://your-site.example/
 ```
 
-On your product page, **Status** changes from **Waiting for installation** to **Receiving events** and says when your server last reported. The collector records your check as one request showing automation. Copying a snippet doesn't count. Only a report the collector accepts does.
+On your product page, **Status** changes from **Waiting for installation** to **Receiving events**. It says when your server last reported, and when your pages last reported from each origin. The collector records your check as one request showing automation. Copying a snippet doesn't count. Only a report the collector accepts does.
 
 If something is refused, Status says what and how to fix it:
 
 - **A server secret the collector doesn't accept:** check that `AGENT_ID_SITE_SECRET` matches your current secret.
-- **A page on an origin you haven't listed:** this only applies to the [declaration widget](/docs/declaration-widget). Add the origin if the site is yours.
+- **A page on an origin you haven't listed:** the page script only reports from your product's origins. Add the origin if the site is yours.
 
 Anyone can send a request claiming any origin or secret, so a refusal shows what reached the collector, not who sent it.
 
-## 5. Verify your domain
+## 6. Verify your domain
 
 This step is optional and never blocks your data. On your product page, add the DNS record shown, then choose **Check DNS record**. Until then, the domain is labelled as unverified.

@@ -33,7 +33,7 @@ test("the home page works without signing in and states its limits", async ({ pa
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AI agents");
-  await expect(page.getByText("Nothing is added to your pages")).toBeVisible();
+  await expect(page.getByText("records each visit's pages without drawing anything")).toBeVisible();
   await expect(page.getByText("A verified signature is evidence")).toBeVisible();
   await expect(page.getByText("Still being built")).toBeVisible();
   await page.getByRole("link", { name: "Read the quickstart" }).click();

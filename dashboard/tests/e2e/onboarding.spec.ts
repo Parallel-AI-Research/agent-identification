@@ -101,7 +101,8 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   const install = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Install" }),
   });
-  await expect(install.getByRole("tab", { name: "Next.js" })).toHaveAttribute(
+  const serverTabs = install.getByRole("tablist", { name: "Server install" });
+  await expect(serverTabs.getByRole("tab", { name: "Next.js" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -127,7 +128,8 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await page.getByText("Set this up with your coding agent").click();
   const instructions = page.locator("details", { hasText: "coding agent" }).locator("pre code");
   await expect(instructions).toContainText(siteId!);
-  await expect(instructions).toContainText("don't add the declaration widget");
+  await expect(instructions).toContainText("Don't add the declaration widget");
+  await expect(instructions).toContainText("agent-id-track.js");
   await expect(instructions).not.toContainText("visitor-choice");
   await expect(instructions).not.toContainText(secret);
 
@@ -166,7 +168,23 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
     await page.reload();
     await expect(status).toContainText("Receiving events");
     await expect(status).toContainText("Your server last reported just now");
-    await expect(status).not.toContainText("The widget loaded");
+    await expect(status).toContainText("No page has reported yet");
+
+    // The page script from step 2. A visit records a page view, and the page shows nothing.
+    const pageScript = (await install.locator("pre code").nth(1).textContent()) ?? "";
+    expect(pageScript).toContain("/agent-id-track.js");
+    expect(pageScript).toContain(`data-site="${siteId}"`);
+    pageHtml += pageScript;
+    const productPage = page.url();
+    const viewed = page.waitForResponse(
+      (response) => response.url() === `${COLLECTOR}/v1/page-views` && response.ok(),
+    );
+    await page.goto(`${SITE}/`);
+    await viewed;
+    expect(await page.locator("body").innerHTML()).toBe("");
+    await page.goto(productPage);
+    await expect(status).toContainText(`Pages on ${SITE} last reported just now`);
+    await expect(status).not.toContainText("No page has reported yet");
 
     // An agent that signs its request with Web Bot Auth asks the customer's site for a page,
     // and the site's server reports it. The key is fixed, so runs in each browser publish the
@@ -211,6 +229,8 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
     await expect(widget).toContainText("Every visitor sees this widget, people included");
     const widgetSnippet = (await widget.locator("pre code").textContent()) ?? "";
     expect(widgetSnippet).toContain(`data-site="${siteId}"`);
+    // It joins the page script's session and leaves page views to it.
+    expect(widgetSnippet).toContain('data-page-views="off"');
     pageHtml += widgetSnippet;
     await page.goto(`${SITE}/`);
     await page.getByRole("button", { name: "AI assistant" }).click();
@@ -230,11 +250,11 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await expect(page.getByText("Receiving events")).toBeVisible();
   await page.getByRole("link", { name: /Storefront/ }).click();
   await expect(status).toContainText("Your server last reported just now");
-  await expect(status).toContainText(`The widget loaded on ${SITE}`);
+  await expect(status).toContainText(`Pages on ${SITE} last reported just now`);
   await expect(status).toContainText("Last declaration just now");
   await expect(async () => {
     await page.reload();
-    await expect(status).toContainText(`A page on ${UNLISTED} tried to load the widget`, {
+    await expect(status).toContainText(`A page on ${UNLISTED} tried to report to this`, {
       timeout: 1000,
     });
   }).toPass({ timeout: 10_000 });
@@ -248,10 +268,11 @@ test("a new customer goes from sign-up to a working install", async ({ page }, i
   await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(/\/activity\?env=[0-9a-f-]{36}$/);
   const overview = page.locator("section", { hasText: "Overview" });
+  // Both visits share one tab session: the page script's view of each, and the answer.
   await expect(overview).toContainText("Sessions1");
-  await expect(overview).toContainText("Page views1");
+  await expect(overview).toContainText("Page views2");
   await expect(overview).toContainText("Signed requests1");
-  // The server's reports carry no session binding, so they stand apart from the widget's session.
+  // The server's reports carry no session binding, so they stand apart from the page's session.
   await expect(overview).toContainText(
     "0 actions, 1 signed requests and 1 automation signals it couldn't link to a session",
   );

@@ -1,6 +1,6 @@
 {
   "name": "@parallel-research/agent-identification",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Website-owned, session-scoped visitor self-classification widget and server verification helpers",
   "type": "module",
   "license": "MIT",
@@ -29,6 +29,7 @@
     },
     "./styles.css": "./dist/agent-id.css",
     "./script": "./dist/agent-id.js",
+    "./track-script": "./dist/agent-id-track.js",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
